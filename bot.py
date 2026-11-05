@@ -3,6 +3,7 @@ import json
 import asyncio
 import logging
 from datetime import datetime, timedelta
+import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -10,15 +11,13 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from openai import AsyncOpenAI
 
-# ================= НАСТРОЙКИ (Ключи берутся из настроек сервера!) =================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8689460796:AAG05s9JncG8WPndDsB0cJgSItUcIgTAxZk")
+# ================= НАСТРОЙКИ (Берутся из Environment на Render) =================
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Подключаем OpenRouter (работает без VPN и на серверах, и в РФ)
-# Подключаем OpenRouter с обязательными системными заголовками
 ai_client = AsyncOpenAI(
     api_key=AI_API_KEY,
     base_url="https://openrouter.ai/api/v1",
@@ -28,42 +27,59 @@ ai_client = AsyncOpenAI(
     }
 )
 
-# Проверенные бесплатные модели OpenRouter
 FREE_MODELS = [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "google/gemma-2-9b-it:free"
+    "deepseek/deepseek-chat:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "meta-llama/llama-3.2-1b-instruct:free",
+    "qwen/qwen-2.5-7b-instruct:free"
 ]
 
-
-
 async def ask_ai(prompt: str, system_prompt: str = "Ты профессиональный футбольный аналитик.", max_tokens: int = 400) -> str:
-    """Умный запрос к ИИ: пробует модели по очереди, чтобы бот никогда не выдавал ошибку"""
-    for model_name in FREE_MODELS:
-        try:
-            response = await asyncio.wait_for(
-                ai_client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.4,
-                    max_tokens=max_tokens
-                ),
-                timeout=12.0
-            )
-            if response.choices and response.choices[0].message.content:
-                return response.choices[0].message.content
-        except Exception as e:
-            logging.warning(f"Модель {model_name} занята, переключаюсь на резервную... ({e})")
-            continue
-    return "⚠️ Все бесплатные линии ИИ сейчас перегружены. Ориентируйся на математический расчет вероятностей выше!"
+    """Запрашивает ИИ через OpenRouter, а при ошибке переключается на резервный шлюз без ключей"""
+    if AI_API_KEY:
+        for model_name in FREE_MODELS:
+            try:
+                response = await asyncio.wait_for(
+                    ai_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.4,
+                        max_tokens=max_tokens
+                    ),
+                    timeout=9.0
+                )
+                if response.choices and response.choices[0].message.content:
+                    return response.choices[0].message.content
+            except Exception as e:
+                logging.warning(f"Модель {model_name} недоступна ({e}), переключаемся дальше...")
+                continue
 
-# ================= БАЗА И АВТООБНОВЛЕНИЕ МАТЧЕЙ НА 7 ДНЕЙ =================
-CACHE_DATE = None
-CACHED_DB = None
+    # Безотказный резервный шлюз (не требует ключей, без ошибок 404)
+    try:
+        url = "https://text.pollinations.ai/"
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "model": "openai",
+            "seed": 42
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+                if resp.status == 200:
+                    text = await resp.text()
+                    if text.strip():
+                        return text.strip()
+    except Exception as e:
+        logging.error(f"Ошибка резервного канала: {e}")
 
+    return "⚠️ В данный момент линия ИИ недоступна. Ориентируйся на расчет вероятностей выше!"
+
+# ================= БАЗА МАТЧЕЙ НА БЛИЖАЙШИЕ 7 ДНЕЙ =================
 def get_base_matches():
     today = datetime.now()
     d = [(today + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(1, 8)]
@@ -155,7 +171,7 @@ def back_to_matches_kb(league_key: str):
     builder.adjust(1)
     return builder.as_markup()
 
-# ================= ОБРАБОТЧИКИ =================
+# ================= ОБРАБОТЧИКИ СОБЫТИЙ =================
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     text = (
@@ -182,9 +198,10 @@ async def process_express(callback: CallbackQuery):
     
     selected_six = "\n".join(all_matches[:6])
     prompt = (
-        f"Вот 6 главных матчей:\n{selected_six}\n\n"
-        f"Составь «Экспресс дня» строго из этих 6 матчей. Для каждого матча напиши 1 строчкой: "
-        f"Команды — Лучшая надежная ставка (исход, фора или тотал) и примерный кэф. В конце посчитай общий коэффициент экспресса."
+        f"Вот 6 главных матчей недели:\n{selected_six}\n\n"
+        f"Составь «Экспресс дня» строго из этих 6 матчей. Для каждого матча напиши 1 строчкой:\n"
+        f"Команды — Лучшая надежная ставка (исход, фора или тотал) и примерный кэф.\n"
+        f"В конце напиши итоговый суммарный коэффициент экспресса."
     )
     express_text = await ask_ai(prompt, max_tokens=450)
     
@@ -227,10 +244,10 @@ async def process_match_select(callback: CallbackQuery):
     prompt = (
         f"Турнир: {league_title}. Матч: {match['teams']}.\n"
         f"Коэффициенты: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}.\n"
-        f"Чистые вероятности: П1={probs['p1']}%, Х={probs['x']}%, П2={probs['p2']}%.\n"
+        f"Чистые вероятности: П1={probs['p1']}%, Х={probs['x']}%, П2={probs['p2']}%\n"
         f"Напиши очень кратко (до 70 слов) в 2 пункта:\n"
         f"1. ⚔️ Краткий анализ исхода (ключевой фактор матча).\n"
-        f"2. 🎯 Самая лучшая ставка (Value Bet) на этот матч."
+        f"2. 🎯 Самая лучшая ставка (Value Bet) на этот матч с коэффициентом."
     )
     ai_verdict = await ask_ai(prompt, max_tokens=250)
 
@@ -239,7 +256,7 @@ async def process_match_select(callback: CallbackQuery):
         f"🕒 Дата: {match['date']}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📊 **Коэффициенты (Маржа: {probs['margin']}%):**\n"
-        f"• П1: `{odds['p1']}` | Х: `{odds['x']}` | П2: `{odds['p2']}`\n"
+        f"• П1: `{odds['p1']}` | Х: `{odds['x']}` | П2: `{odds['p2']}`\n\n"
         f"🧮 **Вероятности:** П1: **{probs['p1']}%** | Х: **{probs['x']}%** | П2: **{probs['p2']}%**\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"🤖 **Анализ и лучшая ставка:**\n\n{ai_verdict}"
