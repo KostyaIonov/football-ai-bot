@@ -27,8 +27,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Корзина для сборки кастомных экспрессов
+# Корзина экспрессов и кэш ответов ИИ для мгновенной загрузки
 USER_SLIPS = {}
+AI_CACHE = {}
 
 class BetStates(StatesGroup):
     waiting_for_custom_amount = State()
@@ -43,13 +44,12 @@ groq_client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# Заголовки браузера, чтобы спортивный API не блокировал запросы бота
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*"
 }
 
-# ================= КОНФИГУРАЦИЯ РЕАЛЬНЫХ ЛИГ (ESPN LIVE API) =================
+# ================= КОНФИГУРАЦИЯ ЛИГ И КЛУБНЫХ ЭМБЛЕМ =================
 MSK_TZ = timezone(timedelta(hours=3))
 
 LEAGUES_CONFIG = {
@@ -61,63 +61,95 @@ LEAGUES_CONFIG = {
     "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
 }
 
+# Названия клубов с фирменными эмблемами/цветами
 TEAM_TRANSLATIONS = {
     # Англия
-    "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
-    "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон", "Brighton": "Брайтон",
-    "Chelsea": "Челси", "Crystal Palace": "Кристал Пэлас", "Everton": "Эвертон", "Fulham": "Фулхэм",
-    "Ipswich Town": "Ипсвич Таун", "Leicester City": "Лестер", "Liverpool": "Ливерпуль",
-    "Manchester City": "Манчестер Сити", "Manchester United": "Манчестер Юнайтед",
-    "Newcastle United": "Ньюкасл", "Nottingham Forest": "Ноттингем Форест", "Southampton": "Саутгемптон",
-    "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон",
-    "Leeds United": "Лидс Юнайтед", "Burnley": "Бернли", "Sunderland": "Сандерленд",
-    "Coventry City": "Ковентри Сити", "Hull City": "Халл Сити", "Sheffield United": "Шеффилд Юнайтед",
+    "Arsenal": "🔴⚪ Арсенал", "Aston Villa": "🟣🔵 Астон Вилла", "Bournemouth": "🍒 Борнмут",
+    "AFC Bournemouth": "🍒 Борнмут", "Brentford": "🐝 Брентфорд", "Brighton & Hove Albion": "🔵⚪ Брайтон",
+    "Brighton": "🔵⚪ Брайтон", "Chelsea": "🔵🦁 Челси", "Crystal Palace": "🦅 Кристал Пэлас",
+    "Everton": "🔵 Эвертон", "Fulham": "⚪⚫ Фулхэм", "Ipswich Town": "🔵⚪ Ипсвич",
+    "Leicester City": "🦊 Лестер", "Liverpool": "🔴🦅 Ливерпуль", "Manchester City": "🩵 Ман Сити",
+    "Manchester United": "🔴🔱 Ман Юнайтед", "Newcastle United": "⚫⚪ Ньюкасл",
+    "Nottingham Forest": "🌲 Ноттингем", "Southampton": "🔴⚪ Саутгемптон",
+    "Tottenham Hotspur": "⚪🐓 Тоттенхэм", "West Ham United": "⚒️ Вест Хэм",
+    "Wolverhampton Wanderers": "🐺 Вулверхэмптон", "Leeds United": "⚪💛 Лидс",
+    "Burnley": "🟣🩵 Бернли", "Sunderland": "🔴⚪ Сандерленд",
     # Испания
-    "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико Мадрид",
-    "Atletico Madrid": "Атлетико Мадрид", "Athletic Club": "Атлетик Бильбао", "Real Sociedad": "Реал Сосьедад",
-    "Real Betis": "Реал Бетис", "Villarreal": "Вильярреал", "Valencia": "Валенсия", "Sevilla": "Севилья",
-    "Girona": "Жирона", "Celta Vigo": "Сельта", "Osasuna": "Осасуна", "Getafe": "Хетафе",
-    "Rayo Vallecano": "Райо Вальекано", "Mallorca": "Мальорка", "Las Palmas": "Лас-Пальмас",
-    "Alavés": "Алавес", "Deportivo Alavés": "Алавес", "Espanyol": "Эспаньол", "Leganés": "Леганес",
-    "Real Valladolid": "Вальядолид",
+    "Real Madrid": "👑 Реал Мадрид", "Barcelona": "🔵🔴 Барселона", "Atlético Madrid": "🔴⚪ Атлетико М",
+    "Atletico Madrid": "🔴⚪ Атлетико М", "Athletic Club": "🦁 Атлетик Б", "Real Sociedad": "🔵⚪ Реал Сосьедад",
+    "Real Betis": "🟢⚪ Бетис", "Villarreal": "🟡 Вильярреал", "Valencia": "🦇 Валенсия",
+    "Sevilla": "⚪🔴 Севилья", "Girona": "🔴⚪ Жирона", "Celta Vigo": "🩵 Сельта",
+    "Osasuna": "🔴🔵 Осасуна", "Getafe": "🔵 Хетафе", "Rayo Vallecano": "⚡ Райо Вальекано",
+    "Mallorca": "👹 Мальорка", "Las Palmas": "🟡🔵 Лас-Пальмас", "Alavés": "🔵⚪ Алавес",
+    "Deportivo Alavés": "🔵⚪ Алавес", "Espanyol": "🔵⚪ Эспаньол", "Leganés": "🥒 Леганес",
+    "Real Valladolid": "🟣⚪ Вальядолид",
     # Италия
-    "Internazionale": "Интер", "Inter Milan": "Интер", "AC Milan": "Милан", "Juventus": "Ювентус",
-    "Napoli": "Наполи", "AS Roma": "Рома", "Roma": "Рома", "Lazio": "Лацио", "Atalanta": "Аталанта",
-    "Fiorentina": "Фиорентина", "Bologna": "Болонья", "Torino": "Торино", "Udinese": "Удинезе",
-    "Genoa": "Дженоа", "Como": "Комо", "Parma": "Парма", "Hellas Verona": "Верона",
-    "Empoli": "Эмполи", "Cagliari": "Кальяри", "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
+    "Internazionale": "⚫🔵 Интер", "Inter Milan": "⚫🔵 Интер", "AC Milan": "🔴⚫ Милан",
+    "Juventus": "⚪⚫ Ювентус", "Napoli": "🩵 Наполи", "AS Roma": "🐺 Рома", "Roma": "🐺 Рома",
+    "Lazio": "🦅 Лацио", "Atalanta": "⚫🔵 Аталанта", "Fiorentina": "⚜️ Фиорентина",
+    "Bologna": "🔴🔵 Болонья", "Torino": "🐂 Торино", "Udinese": "⚪⚫ Удинезе",
+    "Genoa": "🔴🔵 Дженоа", "Como": "🔵⚪ Комо", "Parma": "🟡🔵 Парма",
+    "Hellas Verona": "🟡🔵 Верона", "Empoli": "🔵 Эмполи", "Cagliari": "🔴🔵 Кальяри",
+    "Lecce": "🟡🔴 Лечче", "Monza": "🔴⚪ Монца", "Venezia": "🟠🟢 Венеция",
     # Германия
-    "Bayern Munich": "Бавария", "Borussia Dortmund": "Боруссия Д", "Bayer Leverkusen": "Байер",
-    "RB Leipzig": "РБ Лейпциг", "VfB Stuttgart": "Штутгарт", "Eintracht Frankfurt": "Айнтрахт Ф",
-    "SC Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Werder Bremen": "Вердер",
-    "Heidenheim": "Хайденхайм", "1. FC Heidenheim 1846": "Хайденхайм", "FC Augsburg": "Аугсбург",
-    "VfL Wolfsburg": "Вольфсбург", "Borussia Mönchengladbach": "Боруссия М", "Mainz": "Майнц",
-    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
-    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль", "Hamburger SV": "Гамбург", "FC Cologne": "Кельн",
+    "Bayern Munich": "🔴⚪ Бавария", "Borussia Dortmund": "🐝 Боруссия Д", "Bayer Leverkusen": "🦁 Байер",
+    "RB Leipzig": "🐂 РБ Лейпциг", "VfB Stuttgart": "⚪🔴 Штутгарт", "Eintracht Frankfurt": "🦅 Айнтрахт Ф",
+    "SC Freiburg": "⚫⚪ Фрайбург", "TSG Hoffenheim": "🔵⚪ Хоффенхайм", "Werder Bremen": "🟢⚪ Вердер",
+    "Heidenheim": "🔴🔵 Хайденхайм", "1. FC Heidenheim 1846": "🔴🔵 Хайденхайм", "FC Augsburg": "🔴🟢 Аугсбург",
+    "VfL Wolfsburg": "🐺 Вольфсбург", "Borussia Mönchengladbach": "⚫⚪ Боруссия М", "Mainz": "🔴⚪ Майнц",
+    "1. FSV Mainz 05": "🔴⚪ Майнц", "1. FC Union Berlin": "🔴⚙️ Унион Берлин", "VfL Bochum": "🔵⚪ Бохум",
+    "FC St. Pauli": "🏴‍☠️ Санкт-Паули", "Holstein Kiel": "🔵⚪ Хольштайн", "Hamburger SV": "🔷 Гамбург", "FC Cologne": "🐐 Кельн",
     # Франция и ЛЧ
-    "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако", "Marseille": "Марсель",
-    "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль", "Lyon": "Лион",
-    "Olympique Lyonnais": "Лион", "Nice": "Ницца", "OGC Nice": "Ницца", "Lens": "Ланс", "RC Lens": "Ланс",
-    "Rennes": "Ренн", "Stade Rennais": "Ренн", "Stade Brestois 29": "Брест", "Brest": "Брест",
-    "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур", "RC Strasbourg Alsace": "Страсбур",
-    "Toulouse": "Тулуза", "Montpellier": "Монпелье", "Nantes": "Нант", "FC Nantes": "Нант",
-    "Auxerre": "Осер", "AJ Auxerre": "Осер", "Angers": "Анже", "Saint-Étienne": "Сент-Этьен", "Le Havre": "Гавр",
-    "Sporting CP": "Спортинг", "Benfica": "Бенфика", "FC Porto": "Порту", "PSV Eindhoven": "ПСВ",
-    "Feyenoord": "Фейеноорд", "Ajax": "Аякс", "Celtic": "Селтик", "Club Brugge": "Брюгге",
-    "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац",
-    "Sparta Prague": "Спарта Прага", "Slovan Bratislava": "Слован Братислава", "Young Boys": "Янг Бойз",
-    "Dinamo Zagreb": "Динамо Загреб", "Crvena Zvezda": "Црвена Звезда", "Galatasaray": "Галатасарай"
+    "Paris Saint-Germain": "🔵🔴 ПСЖ", "AS Monaco": "🔴⚪ Монако", "Monaco": "🔴⚪ Монако",
+    "Marseille": "⚪🩵 Марсель", "Olympique de Marseille": "⚪🩵 Марсель", "Lille": "🐕 Лилль",
+    "LOSC Lille": "🐕 Лилль", "Lyon": "🦁 Лион", "Olympique Lyonnais": "🦁 Лион",
+    "Nice": "🔴⚫ Ницца", "OGC Nice": "🔴⚫ Ницца", "Lens": "🟡🔴 Ланс", "RC Lens": "🟡🔴 Ланс",
+    "Rennes": "🔴⚫ Ренн", "Stade Rennais": "🔴⚫ Ренн", "Stade Brestois 29": "🏴‍☠️ Брест", "Brest": "🏴‍☠️ Брест",
+    "Reims": "🔴⚪ Реймс", "Stade de Reims": "🔴⚪ Реймс", "Strasbourg": "🔵⚪ Страсбур",
+    "RC Strasbourg Alsace": "🔵⚪ Страсбур", "Toulouse": "🟣⚪ Тулуза", "Montpellier": "🟠🔵 Монпелье",
+    "Nantes": "🟡🟢 Нант", "FC Nantes": "🟡🟢 Нант", "Auxerre": "⚪🔵 Осер", "AJ Auxerre": "⚪🔵 Осер",
+    "Angers": "⚫⚪ Анже", "Saint-Étienne": "🟢 Сент-Этьен", "Le Havre": "🩵🔵 Гавр",
+    # Клубы ЛЧ
+    "Sporting CP": "🟢🦁 Спортинг", "Benfica": "🦅 Бенфика", "FC Porto": "🐉 Порту",
+    "PSV Eindhoven": "🔴⚪ ПСВ", "Feyenoord": "🔴⚪ Фейеноорд", "Ajax": "⚪🔴 Аякс",
+    "Celtic": "🍀 Селтик", "Club Brugge": "🔵⚫ Брюгге", "Shakhtar Donetsk": "⚒️ Шахтер",
+    "Red Bull Salzburg": "🐂 Зальцбург", "Sturm Graz": "⚫⚪ Штурм", "Sparta Prague": "🔴🟡 Спарта Прага",
+    "Slovan Bratislava": "🩵 Слован", "Young Boys": "🟡⚫ Янг Бойз", "Dinamo Zagreb": "🔵 Динамо Загреб",
+    "Crvena Zvezda": "🔴⚪ Црвена Звезда", "Galatasaray": "🦁 Галатасарай"
 }
 
-ELITE_CLUBS = {
-    "Реал Мадрид": 0.45, "Манчестер Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
+ELITE_KEYWORDS = {
+    "Реал Мадрид": 0.45, "Ман Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
     "Ливерпуль": 0.40, "Арсенал": 0.38, "Интер": 0.36, "ПСЖ": 0.35, "Байер": 0.30,
-    "Атлетико Мадрид": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24,
+    "Атлетико": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24,
     "Милан": 0.22, "Боруссия Д": 0.22, "Аталанта": 0.20, "Астон Вилла": 0.18
 }
 
+PICK_LABELS = {
+    "p1": "П1",
+    "x": "Х (Ничья)",
+    "p2": "П2",
+    "1x": "1Х",
+    "x2": "Х2",
+    "tb15": "ТБ 1.5",
+    "tb25": "ТБ 2.5",
+    "tm25": "ТМ 2.5",
+    "btts": "ОЗ: Да"
+}
+
+FALLBACK_BADGES = ["🛡️", "⚔️", "🔵⚪", "🔴⚪", "🟢⚪", "🟡⚫"]
+
 def translate_team(name: str) -> str:
-    return TEAM_TRANSLATIONS.get(name, name)
+    if name in TEAM_TRANSLATIONS:
+        return TEAM_TRANSLATIONS[name]
+    badge = FALLBACK_BADGES[sum(ord(c) for c in name) % len(FALLBACK_BADGES)]
+    return f"{badge} {name}"
+
+def get_elite_bonus(ru_name: str) -> float:
+    for kw, val in ELITE_KEYWORDS.items():
+        if kw in ru_name:
+            return val
+    return 0.0
 
 def now_msk() -> datetime:
     return datetime.now(MSK_TZ)
@@ -128,9 +160,9 @@ def clean_ai_text(text: str) -> str:
     text = text.replace("*", "• ")
     return text.strip()
 
-# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И КОЭФФИЦИЕНТОВ =================
+# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И 7 РЫНКОВ КОЭФФИЦИЕНТОВ =================
 SCHEDULE_CACHE = {"data": {}, "updated_at": 0}
-CACHE_TTL = 900  # 15 минут
+CACHE_TTL = 900
 
 def parse_american_odd(val) -> float | None:
     if val is None or isinstance(val, (dict, list, bool)):
@@ -151,7 +183,7 @@ def parse_american_odd(val) -> float | None:
     return None
 
 def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
-    base = 1.45 + ELITE_CLUBS.get(ru_name, 0.0)
+    base = 1.45 + get_elite_bonus(ru_name)
     if not isinstance(comp_dict, dict):
         return base
     records = comp_dict.get("records") or []
@@ -169,7 +201,13 @@ def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
     return base
 
 def compute_realistic_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_name: str, a_name: str) -> dict:
-    """Безопасно извлекает реальные букмекерские кэфы или рассчитывает их по турнирной статистике"""
+    """Рассчитывает полную роспись: П1, Х, П2, ТБ 1.5, ТБ 2.5, ТМ 2.5 и ОЗ (Да)"""
+    h_strength = parse_team_ppg(home_comp, h_name) + 0.22
+    a_strength = parse_team_ppg(away_comp, a_name)
+    diff = h_strength - a_strength
+
+    # 1. Основные исходы (П1, Х, П2)
+    p1_odd, x_odd, p2_odd = None, None, None
     try:
         odds_list = comp_obj.get("odds") or []
         for o in odds_list:
@@ -180,33 +218,61 @@ def compute_realistic_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_n
             d_raw = o.get("drawOdds")
             d_val = d_raw.get("moneyLine") if isinstance(d_raw, dict) else d_raw
 
-            h_odd = parse_american_odd(h_dict.get("moneyLine"))
-            a_odd = parse_american_odd(a_dict.get("moneyLine"))
-            d_odd = parse_american_odd(d_val)
-            if h_odd and a_odd and d_odd and 1.05 <= h_odd <= 25 and 1.05 <= a_odd <= 25:
-                return {"p1": h_odd, "x": d_odd, "p2": a_odd}
-    except Exception as e:
-        logging.debug(f"Парсинг прямых кэфов пропущен: {e}")
+            h_o = parse_american_odd(h_dict.get("moneyLine"))
+            a_o = parse_american_odd(a_dict.get("moneyLine"))
+            d_o = parse_american_odd(d_val)
+            if h_o and a_o and d_o and 1.05 <= h_o <= 25 and 1.05 <= a_o <= 25:
+                p1_odd, x_odd, p2_odd = h_o, d_o, a_o
+                break
+    except Exception:
+        pass
 
-    h_strength = parse_team_ppg(home_comp, h_name) + 0.22
-    a_strength = parse_team_ppg(away_comp, a_name)
-    diff = h_strength - a_strength
+    if not (p1_odd and x_odd and p2_odd):
+        prob_x = max(0.17, min(0.31, 0.28 - abs(diff) * 0.07))
+        rem = 1.0 - prob_x
+        ratio = 1.0 / (1.0 + (2.71828 ** (-diff * 1.15)))
+        prob_p1 = max(0.08, min(0.80, rem * ratio))
+        prob_p2 = max(0.08, min(0.80, rem - prob_p1))
+        margin = 1.045
+        p1_odd = round(max(1.14, 1.0 / (prob_p1 * margin)), 2)
+        x_odd = round(max(2.85, 1.0 / (prob_x * margin)), 2)
+        p2_odd = round(max(1.14, 1.0 / (prob_p2 * margin)), 2)
 
-    prob_x = max(0.17, min(0.31, 0.28 - abs(diff) * 0.07))
-    rem = 1.0 - prob_x
-    ratio = 1.0 / (1.0 + (2.71828 ** (-diff * 1.15)))
-    prob_p1 = max(0.08, min(0.80, rem * ratio))
-    prob_p2 = max(0.08, min(0.80, rem - prob_p1))
+    # 2. Расчет рынка голов (Тоталы и ОЗ) на основе атакующего потенциала пары
+    attack_index = (h_strength + a_strength) / 3.1  # ~1.0 в среднем, >1.1 у топ-атак
+    closeness = max(0.0, 1.0 - abs(diff) * 0.45)    # В близких матчах выше шанс ОЗ
 
-    margin = 1.045
+    prob_tb25 = max(0.38, min(0.68, 0.49 * attack_index + 0.05))
+    prob_tb15 = max(0.68, min(0.88, prob_tb25 + 0.24))
+    prob_tm25 = 1.0 - prob_tb25
+    prob_btts = max(0.40, min(0.67, 0.46 * attack_index + closeness * 0.09))
+
+    m_goals = 1.045
     return {
-        "p1": round(max(1.12, 1.0 / (prob_p1 * margin)), 2),
-        "x": round(max(2.80, 1.0 / (prob_x * margin)), 2),
-        "p2": round(max(1.12, 1.0 / (prob_p2 * margin)), 2)
+        "p1": p1_odd,
+        "x": x_odd,
+        "p2": p2_odd,
+        "tb15": round(max(1.14, 1.0 / (prob_tb15 * m_goals)), 2),
+        "tb25": round(max(1.42, 1.0 / (prob_tb25 * m_goals)), 2),
+        "tm25": round(max(1.45, 1.0 / (prob_tm25 * m_goals)), 2),
+        "btts": round(max(1.44, 1.0 / (prob_btts * m_goals)), 2)
+    }
+
+def calculate_ai_probabilities(odds: dict) -> dict:
+    raw_p1, raw_x, raw_p2 = 1 / odds["p1"], 1 / odds["x"], 1 / odds["p2"]
+    margin_sum = raw_p1 + raw_x + raw_p2
+    return {
+        "p1": round((raw_p1 / margin_sum) * 100, 1),
+        "x": round((raw_x / margin_sum) * 100, 1),
+        "p2": round((raw_p2 / margin_sum) * 100, 1),
+        "tb15": round(min(89.0, (1.0 / odds.get("tb15", 1.30)) * 96.0), 1),
+        "tb25": round(min(75.0, (1.0 / odds.get("tb25", 1.85)) * 95.5), 1),
+        "tm25": round(min(75.0, (1.0 / odds.get("tm25", 1.95)) * 95.5), 1),
+        "btts": round(min(74.0, (1.0 / odds.get("btts", 1.75)) * 95.5), 1),
+        "margin": round((margin_sum - 1) * 100, 2)
     }
 
 def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dict | None:
-    """Безопасно разбирает один матч из JSON ответа ESPN"""
     try:
         if not isinstance(ev, dict):
             return None
@@ -270,17 +336,12 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
         return None
 
 async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str, cfg: dict, now_dt: datetime, now_ts: int) -> tuple[str, dict]:
-    """
-    Запрашивает расписание на месяц в формате YYYYMM (который поддерживается ESPN без ошибки 400),
-    а при необходимости добирает по дням YYYYMMDD.
-    """
     all_upcoming = {}
     months_to_check = [now_dt.strftime("%Y%m")]
     next_month_dt = now_dt + timedelta(days=25)
     if next_month_dt.strftime("%Y%m") not in months_to_check:
         months_to_check.append(next_month_dt.strftime("%Y%m"))
 
-    # 1. Запрос по месяцу (YYYYMM) — отдает сразу все туры месяца одним запросом
     for ym in months_to_check:
         url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={ym}&limit=200"
         try:
@@ -294,7 +355,6 @@ async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str,
         except Exception as e:
             logging.warning(f"Ошибка запроса месяца {ym} для {league_key}: {e}")
 
-    # 2. Если по месяцу ничего не вернулось — проверяем ближайшие 7 дней поштучно (YYYYMMDD)
     if not all_upcoming:
         for day_offset in range(0, 8):
             day_str = (now_dt + timedelta(days=day_offset)).strftime("%Y%m%d")
@@ -315,7 +375,6 @@ async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str,
 
     matches_7d = {m["event_id"]: m for m in sorted_events if m["start_ts"] <= seven_days_limit}
     if matches_7d:
-        logging.info(f"[{league_key}] Загружено {len(matches_7d)} матчей на ближайшие 7 дней.")
         return league_key, {
             "title": cfg["title"],
             "slug": cfg["slug"],
@@ -323,9 +382,7 @@ async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str,
             "extended": False
         }
 
-    # Если в ближайшие 7 дней в этой лиге пауза (например, между турами ЛЧ или на сборные) — берем ближайший тур
     next_round_matches = {m["event_id"]: m for m in sorted_events[:14]}
-    logging.info(f"[{league_key}] В 7 днях пауза, загружено {len(next_round_matches)} матчей ближайшего тура.")
     return league_key, {
         "title": cfg["title"],
         "slug": cfg["slug"],
@@ -649,27 +706,14 @@ class Database:
 
 db_manager = Database()
 
-# ================= МУЛЬТИ-ШЛЮЗ ИИ =================
-async def ask_ai(prompt: str, system_prompt: str = "Ты элитный футбольный аналитик.") -> str | None:
-    if GEMINI_API_KEY:
-        try:
-            resp = await asyncio.wait_for(
-                gemini_client.chat.completions.create(
-                    model="gemini-2.5-flash",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.4,
-                    max_tokens=400
-                ),
-                timeout=8.0
-            )
-            if resp.choices and resp.choices[0].message.content:
-                return clean_ai_text(resp.choices[0].message.content)
-        except Exception as e:
-            logging.warning(f"Gemini пропущен: {e}")
+# ================= СКОРОСТНОЙ МУЛЬТИ-ШЛЮЗ ИИ С КЭШИРОВАНИЕМ =================
+async def ask_ai_cached(cache_key: str, prompt: str, system_prompt: str = "Ты элитный футбольный аналитик.") -> str | None:
+    now_ts = int(now_msk().timestamp())
+    cached = AI_CACHE.get(cache_key)
+    if cached and (now_ts - cached["ts"] < 10800):
+        return cached["text"]
 
+    # 1. Сверхбыстрый кластер Groq (отвечает за 0.6 сек с сервера Render в США)
     for groq_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
         try:
             resp = await asyncio.wait_for(
@@ -679,32 +723,46 @@ async def ask_ai(prompt: str, system_prompt: str = "Ты элитный футб
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.4,
-                    max_tokens=380
+                    temperature=0.45,
+                    max_tokens=360
                 ),
-                timeout=7.0
+                timeout=3.8
             )
             if resp.choices and resp.choices[0].message.content:
-                return clean_ai_text(resp.choices[0].message.content)
+                ans = clean_ai_text(resp.choices[0].message.content)
+                AI_CACHE[cache_key] = {"text": ans, "ts": now_ts}
+                return ans
         except Exception as e:
             logging.warning(f"Groq ({groq_model}) пропущен: {e}")
 
-    try:
-        full_text = quote(f"{system_prompt}\n{prompt}")
-        url = f"https://text.pollinations.ai/{full_text}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
-                if r.status == 200:
-                    ans = await r.text()
-                    if ans and len(ans.strip()) > 15 and "<!DOCTYPE" not in ans:
-                        return clean_ai_text(ans)
-    except Exception:
-        pass
+    # 2. Google Gemini 2.5 Flash
+    if GEMINI_API_KEY:
+        try:
+            resp = await asyncio.wait_for(
+                gemini_client.chat.completions.create(
+                    model="gemini-2.5-flash",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.45,
+                    max_tokens=380
+                ),
+                timeout=4.2
+            )
+            if resp.choices and resp.choices[0].message.content:
+                ans = clean_ai_text(resp.choices[0].message.content)
+                AI_CACHE[cache_key] = {"text": ans, "ts": now_ts}
+                return ans
+        except Exception as e:
+            logging.warning(f"Gemini пропущен: {e}")
+
     return None
 
-# ================= ПРОВЕРКА РЕАЛЬНЫХ РЕЗУЛЬТАТОВ И РАСЧЕТ КУПОНОВ =================
+# ================= ПРОВЕРКА РЕАЛЬНЫХ РЕЗУЛЬТАТОВ (ВКЛЮЧАЯ ТОТАЛЫ И ОЗ) =================
 def evaluate_leg_pick(pick_code: str, home_score: int, away_score: int) -> bool:
     code = pick_code.lower()
+    total_goals = home_score + away_score
     if code in ("p1", "п1"):
         return home_score > away_score
     elif code in ("x", "х"):
@@ -715,6 +773,14 @@ def evaluate_leg_pick(pick_code: str, home_score: int, away_score: int) -> bool:
         return home_score >= away_score
     elif code in ("x2", "х2"):
         return away_score >= home_score
+    elif code == "tb15":
+        return total_goals >= 2
+    elif code == "tb25":
+        return total_goals >= 3
+    elif code == "tm25":
+        return total_goals <= 2
+    elif code == "btts":
+        return (home_score >= 1) and (away_score >= 1)
     return home_score > away_score
 
 async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
@@ -743,7 +809,7 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
             if res["state"] == "in":
                 live_parts.append(f"🔴 LIVE: {leg['teams']} — {res['score_str']} ({res['detail']})")
             else:
-                live_parts.append(f"📅 {leg['teams']} — матч еще не начался")
+                live_parts.append(f"📅 {leg['teams']} — еще не начался")
         else:
             leg_won = evaluate_leg_pick(leg["pick_code"], res["home_score"], res["away_score"])
             if not leg_won:
@@ -771,7 +837,7 @@ async def send_settlement_notification(bet: dict, is_win: bool, score_str: str, 
             f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code>\n"
             f"🏟 <b>Событие:</b> {bet['match_title']}\n"
             f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
-            f"🏁 <b>Реальный итог:</b> <code>{score_str}</code></blockquote>\n"
+            f"🏁 <b>Реальный счет:</b> <code>{score_str}</code></blockquote>\n"
             f"💵 <b>Сумма ставки:</b> <code>{bet['amount']} FC</code>\n"
             f"💰 <b>Выплата:</b> <b><code>+{res['payout']} FC</code></b> <i>(чистыми: +{res['net_profit']} FC)</i>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
@@ -782,7 +848,7 @@ async def send_settlement_notification(bet: dict, is_win: bool, score_str: str, 
             f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code> — ❌ <i>Не сыграл</i>\n"
             f"🏟 <b>Событие:</b> {bet['match_title']}\n"
             f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
-            f"🏁 <b>Реальный итог:</b> <code>{score_str}</code></blockquote>\n"
+            f"🏁 <b>Реальный счет:</b> <code>{score_str}</code></blockquote>\n"
             f"💸 <b>Списано:</b> <code>-{bet['amount']} FC</code>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
         )
@@ -808,17 +874,7 @@ async def match_settlement_worker():
             logging.error(f"Ошибка фонового расчета реальных матчей: {e}")
         await asyncio.sleep(180)
 
-# ================= МАТЕМАТИКА И ЭКСПРЕСС ДНЯ =================
-def calculate_ai_probabilities(odds: dict) -> dict:
-    raw_p1, raw_x, raw_p2 = 1 / odds["p1"], 1 / odds["x"], 1 / odds["p2"]
-    margin_sum = raw_p1 + raw_x + raw_p2
-    return {
-        "p1": round((raw_p1 / margin_sum) * 100, 1),
-        "x": round((raw_x / margin_sum) * 100, 1),
-        "p2": round((raw_p2 / margin_sum) * 100, 1),
-        "margin": round((margin_sum - 1) * 100, 2)
-    }
-
+# ================= РАЗНООБРАЗНАЯ АНАЛИТИКА И ЭКСПРЕСС ДНЯ =================
 def build_daily_express_data(db: dict) -> dict | None:
     all_upcoming = []
     for l_val in db.values():
@@ -837,27 +893,32 @@ def build_daily_express_data(db: dict) -> dict | None:
     combined_prob = 100.0
     max_end_ts = 0
 
-    for m in selected:
+    for idx, m in enumerate(selected):
         t1, t2 = m["home_team"], m["away_team"]
         o = m["odds"]
         probs = calculate_ai_probabilities(o)
         if m["end_ts"] > max_end_ts:
             max_end_ts = m["end_ts"]
 
-        if probs["p1"] >= 52:
+        # Умный выбор разнообразных рынков для экспресса (исходы, тоталы, ОЗ)
+        if probs["p1"] >= 58:
             pick_code, bet_str, k, p = "p1", f"П1 ({t1})", o["p1"], probs["p1"]
-        elif probs["p2"] >= 50:
+        elif probs["p2"] >= 54:
             pick_code, bet_str, k, p = "p2", f"П2 ({t2})", o["p2"], probs["p2"]
+        elif o["tb25"] <= 1.76 and idx % 2 == 0:
+            pick_code, bet_str, k, p = "tb25", "ТБ 2.5 (Тотал Больше 2.5)", o["tb25"], probs["tb25"]
+        elif abs(probs["p1"] - probs["p2"]) <= 11:
+            pick_code, bet_str, k, p = "btts", "ОЗ: Да (Обе забьют)", o["btts"], probs["btts"]
         else:
-            pick_code, bet_str, k, p = "1x", f"1Х ({t1} не проиграет)", round(max(1.22, o["p1"] * 0.72), 2), probs["p1"] + probs["x"]
+            pick_code, bet_str, k, p = "tb15", "ТБ 1.5 (Минимум 2 гола)", o["tb15"], probs["tb15"]
 
         total_odd *= k
         combined_prob *= (p / 100.0)
         picks_text.append(
             f"<b>{len(picks_text)+1}. {m['teams']}</b> <i>({m['date']})</i>\n"
-            f"   🎯 Исход: <code>{bet_str}</code> • Кэф: <b><code>{k}</code></b>"
+            f"   🎯 Прогноз: <code>{bet_str}</code> • Кэф: <b><code>{k}</code></b>"
         )
-        short_titles.append(f"{m['teams']} ({bet_str})")
+        short_titles.append(f"{m['teams']} ({PICK_LABELS.get(pick_code, bet_str)})")
         legs.append({
             "league_slug": m["league_slug"],
             "event_id": m["event_id"],
@@ -872,7 +933,7 @@ def build_daily_express_data(db: dict) -> dict | None:
         "total_odd": final_odd,
         "prob": round(combined_prob * 100, 1),
         "end_ts": max_end_ts,
-        "summary_title": f"Экспресс дня ({len(legs)} реальных матчей)",
+        "summary_title": f"Экспресс дня ({len(legs)} матчей)",
         "summary_pick": " + ".join(short_titles[:3]) + (f" и еще {len(legs)-3}" if len(legs) > 3 else ""),
         "legs": legs
     }
@@ -881,18 +942,25 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
     t1, t2 = match["home_team"], match["away_team"]
     odds = match["odds"]
     p1, x, p2 = probs["p1"], probs["x"], probs["p2"]
-    if p1 >= 55:
-        style = f"⚔️ <b>Расклад сил:</b> {t1} — фаворит встречи на домашнем стадионе (вероятность победы {p1}%). Ожидается контроль мяча и позиционное давление хозяев."
-        bet = f"🎯 <b>Value-прогноз:</b> П1 ({t1}) за <code>{odds['p1']}</code>"
-    elif p2 >= 48:
-        style = f"⚔️ <b>Расклад сил:</b> {t2} превосходит соперника по текущей форме и классу состава ({p2}% против {p1}%)."
-        bet = f"🎯 <b>Value-прогноз:</b> П2 ({t2}) за <code>{odds['p2']}</code>"
+
+    if p1 >= 60:
+        style = f"⚔️ <b>Тактический расклад:</b> {t1} имеет весомое преимущество домашнего поля и класса ({p1}%). Ожидается интенсивный прессинг хозяев с первых минут."
+        bet = f"🎯 <b>Лучший выбор:</b> П1 ({t1}) за <code>{odds['p1']}</code> или надежный ТБ 1.5 за <code>{odds['tb15']}</code>"
+    elif p2 >= 53:
+        style = f"⚔️ <b>Тактический расклад:</b> {t2} сильнее в быстрых переходных фазах и реализации моментов ({p2}% против {p1}%)."
+        bet = f"🎯 <b>Лучший выбор:</b> П2 ({t2}) за <code>{odds['p2']}</code> (надежная альтернатива: ТБ 1.5 за <code>{odds['tb15']}</code>)"
+    elif odds["tb25"] <= 1.78:
+        style = f"⚔️ <b>Тактический расклад:</b> Встреча двух атакующих команд с высоким потенциалом xG. Оборона обеих сторон регулярно допускает моменты."
+        bet = f"🎯 <b>Лучший выбор:</b> ТБ 2.5 за <code>{odds['tb25']}</code> или Обе забьют (Да) за <code>{odds['btts']}</code>"
+    elif abs(p1 - p2) <= 12:
+        style = f"⚔️ <b>Тактический расклад:</b> Абсолютно равное противостояние ({p1}% на {p2}%). В таких матчах исход часто решает обмен голами."
+        bet = f"🎯 <b>Лучший выбор:</b> Обе забьют (Да) за <code>{odds['btts']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
     else:
-        style = f"⚔️ <b>Расклад сил:</b> Конкурентный матч близких по силе команд ({p1}% на {p2}%). Ключевую роль сыграет реализация стандартов."
-        bet = f"🎯 <b>Value-прогноз:</b> П1 ({t1}) за <code>{odds['p1']}</code> или Х за <code>{odds['x']}</code>"
+        style = f"⚔️ <b>Тактический расклад:</b> Умеренное преимущество {t1} ({p1}%), но {t2} опасен на контратаках и стандартах."
+        bet = f"🎯 <b>Лучший выбор:</b> Тотал Больше 1.5 за <code>{odds['tb15']}</code> или П1 за <code>{odds['p1']}</code>"
     return f"{style}\n\n{bet}"
 
-# ================= КЛАВИАТУРЫ =================
+# ================= КЛАВИАТУРЫ (ЧИСТЫЙ ИНТЕРФЕЙС) =================
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
@@ -903,7 +971,7 @@ def main_menu_kb(user_id: int = 0):
     builder.button(text="🇮🇹 Серия А (Италия)", callback_data="league:seriea")
     builder.button(text="🇩🇪 Бундеслига", callback_data="league:bundesliga")
     builder.button(text="🇫🇷 Лига 1 (Франция)", callback_data="league:ligue1")
-    builder.button(text="⚡ Экспресс дня (Реальные матчи)", callback_data="express_day")
+    builder.button(text="⚡ Экспресс дня (Топ-6)", callback_data="express_day")
     builder.button(text="🏆 Топ-10 капперов", callback_data="leaderboard")
 
     if slip_count > 0:
@@ -927,38 +995,43 @@ def matches_kb(league_key: str, matches_dict: dict):
     builder = InlineKeyboardBuilder()
     for match_id, data in list(matches_dict.items())[:15]:
         short_date = data['date'].replace(".2026", "").replace(" МСК", "")
-        builder.button(text=f"⚽ {data['teams']} ({short_date})", callback_data=f"match:{league_key}:{match_id}")
+        builder.button(text=f"{data['teams']} • {short_date}", callback_data=f"match:{league_key}:{match_id}")
     builder.button(text="🔄 Обновить расписание", callback_data=f"refresh_league:{league_key}")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(1)
     return builder.as_markup()
 
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
+    """Аккуратная сетка из 7 рынков (Исходы + Тоталы + ОЗ) без визуального перегруза"""
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
+    # Ряд 1: Основные исходы (3 кнопки)
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    builder.button(text="➕ П1", callback_data=f"slipadd:{league_key}:{match_id}:p1")
-    builder.button(text="➕ Х", callback_data=f"slipadd:{league_key}:{match_id}:x")
-    builder.button(text="➕ П2", callback_data=f"slipadd:{league_key}:{match_id}:p2")
+    # Ряд 2: Тоталы Больше (2 кнопки)
+    builder.button(text=f"ТБ 1.5 ({odds['tb15']})", callback_data=f"pick:{league_key}:{match_id}:tb15")
+    builder.button(text=f"ТБ 2.5 ({odds['tb25']})", callback_data=f"pick:{league_key}:{match_id}:tb25")
+    # Ряд 3: Тотал Меньше и Обе забьют (2 кнопки)
+    builder.button(text=f"ТМ 2.5 ({odds['tm25']})", callback_data=f"pick:{league_key}:{match_id}:tm25")
+    builder.button(text=f"ОЗ: Да ({odds['btts']})", callback_data=f"pick:{league_key}:{match_id}:btts")
 
     if slip_count > 0:
-        builder.button(text=f"🧺 Открыть купон экспресса ({slip_count})", callback_data="view_slip")
+        builder.button(text=f"🧺 Мой купон экспресса ({slip_count})", callback_data="view_slip")
 
     builder.button(text="⬅️ К матчам лиги", callback_data=f"league:{league_key}")
     builder.button(text="🏠 Меню", callback_data="back_to_main")
 
     if slip_count > 0:
-        builder.adjust(3, 3, 1, 2)
+        builder.adjust(3, 2, 2, 1, 2)
     else:
-        builder.adjust(3, 3, 2)
+        builder.adjust(3, 2, 2, 2)
     return builder.as_markup()
 
 def amount_selection_kb(target_code: str, balance: float):
     builder = InlineKeyboardBuilder()
     for amt in [100, 250, 500, 1000]:
-        builder.button(text=f"{amt} FC", callback_data=f"place:{target_code}:{amt}")
+        builder.button(text=f"💵 {amt} FC", callback_data=f"place:{target_code}:{amt}")
     all_in = int(balance) if balance >= 10 else 0
     if all_in >= 10:
         builder.button(text=f"🔥 Ва-банк ({all_in} FC)", callback_data=f"place:{target_code}:{all_in}")
@@ -966,13 +1039,16 @@ def amount_selection_kb(target_code: str, balance: float):
 
     if target_code == "express-day":
         builder.button(text="⬅️ Назад к Экспрессу", callback_data="express_day")
+        builder.adjust(2, 2, 1, 1, 1)
     elif target_code == "custom-slip":
         builder.button(text="⬅️ Назад к купону", callback_data="view_slip")
+        builder.adjust(2, 2, 1, 1, 1)
     else:
-        l_key, m_id, _ = target_code.split("-")
+        l_key, m_id, p_code = target_code.split("-")
+        builder.button(text="➕ Добавить этот исход в мой Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
         builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{l_key}:{m_id}")
+        builder.adjust(2, 2, 1, 1, 1, 1)
 
-    builder.adjust(2, 2, 1, 1, 1)
     return builder.as_markup()
 
 # ================= ОБРАБОТЧИКИ СОБЫТИЙ =================
@@ -985,7 +1061,7 @@ async def cmd_start(message: Message, state: FSMContext):
         f"<blockquote>👤 Игрок: <b>{user['username']}</b>\n"
         f"💰 Доступный банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
         f"🏆 Выиграно купонов: <b><code>{user['wins']}</code></b></blockquote>\n"
-        f"📡 <b>Live-синхронизация:</b> Реальное расписание матчей и автоматический расчет ставок по настоящему финальному счету.\n\n"
+        f"📡 <b>Live-синхронизация:</b> Реальные матчи, расширенная линия (Исходы, Тоталы, ОЗ) и расчет по настоящему финальному счету.\n\n"
         f"👇 <b>Выбери раздел:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
@@ -1160,7 +1236,6 @@ async def process_leaderboard(callback: CallbackQuery):
 # ================= ЭКСПРЕСС ДНЯ И КОРЗИНА ЭКСПРЕССА =================
 @dp.callback_query(F.data == "express_day")
 async def process_express(callback: CallbackQuery):
-    await callback.message.edit_text("⚡ <i>Загружаю реальное расписание и собираю Экспресс дня...</i>", parse_mode="HTML")
     db = await get_real_matches()
     exp_data = build_daily_express_data(db)
 
@@ -1178,7 +1253,7 @@ async def process_express(callback: CallbackQuery):
     builder.adjust(1)
 
     text = (
-        f"⚡ <b>ЭКСПРЕСС ДНЯ (РЕАЛЬНАЯ ЛИНИЯ)</b>\n\n"
+        f"⚡ <b>ЭКСПРЕСС ДНЯ (КОМБИНИРОВАННАЯ ЛИНИЯ)</b>\n\n"
         f"{exp_data['text']}\n\n"
         f"👇 <i>Нажми кнопку ниже, чтобы поставить на весь экспресс одним купоном:</i>"
     )
@@ -1196,7 +1271,7 @@ async def process_slip_add(callback: CallbackQuery):
 
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
-    pick_names = {"p1": "П1", "x": "Х", "p2": "П2"}
+    pick_label = PICK_LABELS.get(pick_code, pick_code.upper())
 
     uid = callback.from_user.id
     slip = USER_SLIPS.get(uid, [])
@@ -1210,15 +1285,19 @@ async def process_slip_add(callback: CallbackQuery):
         "league_slug": match["league_slug"],
         "match_title": match["teams"],
         "pick_code": pick_code,
-        "pick": pick_names[pick_code],
+        "pick": pick_label,
         "odds": odds[pick_code],
-        "prob": probs[pick_code],
+        "prob": probs.get(pick_code, 50.0),
         "start_ts": match["start_ts"],
         "end_ts": match["end_ts"]
     })
     USER_SLIPS[uid] = slip
-    await callback.answer(f"✅ Добавлено в экспресс: {match['teams']} — {pick_names[pick_code]} ({odds[pick_code]}). В купоне: {len(slip)}", show_alert=True)
-    await callback.message.edit_reply_markup(reply_markup=match_outcomes_kb(league_key, match_id, odds, uid))
+    await callback.answer(
+        f"✅ Добавлено в экспресс: {match['teams']} — {pick_label} ({odds[pick_code]}). В купоне: {len(slip)}",
+        show_alert=True
+    )
+    # Возвращаем игрока к карточке матча с обновленным счетчиком купона экспресса
+    await process_match_select(callback)
 
 @dp.callback_query(F.data == "view_slip")
 async def process_view_slip(callback: CallbackQuery):
@@ -1258,7 +1337,7 @@ async def process_clear_slip(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("refresh_league:"))
 async def process_refresh_league(callback: CallbackQuery):
     league_key = callback.data.split(":")[1]
-    await callback.answer("📡 Синхронизация реального расписания с сервером...")
+    await callback.answer("📡 Синхронизация реального расписания...")
     db = await get_real_matches(force_refresh=True)
     league_data = db.get(league_key, {})
     matches = league_data.get("matches", {})
@@ -1291,39 +1370,41 @@ async def process_league_select(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("match:"))
 async def process_match_select(callback: CallbackQuery):
-    _, league_key, match_id = callback.data.split(":")
+    parts = callback.data.split(":")
+    league_key, match_id = parts[1], parts[2]
     db = await get_real_matches()
     match = db.get(league_key, {}).get("matches", {}).get(match_id)
     if not match:
         await callback.answer("⛔ Этот матч уже начался или завершен!", show_alert=True)
-        await process_league_select(callback)
         return
 
     league_title = db[league_key]["title"]
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
 
-    await callback.message.edit_text(f"🧠 <i>ИИ анализирует реальную статистику матча {match['teams']}...</i>", parse_mode="HTML")
+    # Если разбора еще нет в кэше — показываем статус загрузки
+    if match["event_id"] not in AI_CACHE:
+        await callback.message.edit_text(f"🧠 <i>ИИ анализирует статистику {match['teams']}...</i>", parse_mode="HTML")
+
     prompt = (
-        f"Реальный предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
-        f"Матч: {match['teams']}. Текущие показатели сезона: {match['records_info']}.\n"
-        f"Коэффициенты: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}.\n"
-        f"Чистые вероятности: П1={probs['p1']}%, Х={probs['x']}%, П2={probs['p2']}%\n"
-        f"Дай краткий профессиональный разбор (до 60 слов) в 2 пункта:\n"
-        f"1. ⚔️ Форма команд и тактический ключ к матчу.\n"
-        f"2. 🎯 Лучший выбор по линии (П1, Х или П2) с кэфом."
+        f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
+        f"Матч: {match['teams']}. Статистика сезона: {match['records_info']}.\n"
+        f"Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 1.5={odds['tb15']}, ТБ 2.5={odds['tb25']}, ТМ 2.5={odds['tm25']}, ОЗ(Да)={odds['btts']}.\n"
+        f"Дай краткий экспертный разбор (до 60 слов) в 2 пункта:\n"
+        f"1. ⚔️ Тактический рисунок игры и атакующий потенциал.\n"
+        f"2. 🎯 Самая выгодная ставка из ВСЕЙ линии (можно выбрать Тотал ТБ 1.5 / ТБ 2.5 / ТМ 2.5, Обе забьют или исход П1/Х/П2 — выбери то, что реально надежнее для этого матча) с кэфом."
     )
-    ai_verdict = await ask_ai(prompt) or smart_local_match_analysis(match, probs)
+    ai_verdict = await ask_ai_cached(match["event_id"], prompt) or smart_local_match_analysis(match, probs)
 
     text = (
-        f"⚽ <b>{match['teams']}</b>\n"
+        f"🏟 <b>{match['teams']}</b>\n"
         f"🕒 Начало: <code>{match['date']}</code>\n\n"
-        f"<blockquote>📊 <b>Коэффициенты (Маржа {probs['margin']}%):</b>\n"
-        f"П1: <b><code>{odds['p1']}</code></b>  |  Х: <b><code>{odds['x']}</code></b>  |  П2: <b><code>{odds['p2']}</code></b>\n"
-        f"🧮 <b>Вероятности:</b>\n"
-        f"П1: <b>{probs['p1']}%</b>  |  Х: <b>{probs['x']}%</b>  |  П2: <b>{probs['p2']}%</b></blockquote>\n"
+        f"<blockquote>📊 <b>Основные исходы (Вероятность):</b>\n"
+        f"П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%)  |  Х: <b><code>{odds['x']}</code></b> ({probs['x']}%)  |  П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
+        f"⚽ <b>Рынок голов:</b>\n"
+        f"ТБ 1.5: <b><code>{odds['tb15']}</code></b>  |  ТБ 2.5: <b><code>{odds['tb25']}</code></b>  |  ТМ 2.5: <b><code>{odds['tm25']}</code></b>  |  ОЗ: <b><code>{odds['btts']}</code></b></blockquote>\n"
         f"🤖 <b>Аналитика ИИ:</b>\n{ai_verdict}\n\n"
-        f"👇 <b>Сделать ставку (1-й ряд — ординар, 2-й ряд — в экспресс):</b>"
+        f"👇 <b>Выбери исход для ставки (или добавления в экспресс):</b>"
     )
     await callback.message.edit_text(
         text,
@@ -1389,19 +1470,19 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
             return None
         odds = match["odds"]
         probs = calculate_ai_probabilities(odds)
-        pick_names = {"p1": "П1", "x": "Х", "p2": "П2"}
+        pick_label = PICK_LABELS.get(p_code, p_code.upper())
         legs = [{
             "league_slug": match["league_slug"],
             "event_id": match["event_id"],
             "teams": match["teams"],
             "pick_code": p_code,
-            "pick_label": pick_names[p_code]
+            "pick_label": pick_label
         }]
         return {
             "match_title": f"{match['teams']} ({match['date']})",
-            "pick": pick_names[p_code],
+            "pick": pick_label,
             "odds": odds[p_code],
-            "prob": probs[p_code],
+            "prob": probs.get(p_code, 50.0),
             "end_ts": match["end_ts"],
             "bet_type": "single",
             "legs_json": json.dumps(legs, ensure_ascii=False)
@@ -1427,13 +1508,13 @@ async def process_pick_outcome(callback: CallbackQuery, state: FSMContext):
     end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m.%Y в %H:%M МСК")
 
     text = (
-        f"🎫 <b>ОФОРМЛЕНИЕ СТАВКИ</b>\n\n"
+        f"🎫 <b>ОФОРМЛЕНИЕ КУПОНА</b>\n\n"
         f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
-        f"🎯 <b>Исход:</b> <code>{info['pick']}</code>\n"
+        f"🎯 <b>Выбранный рынок:</b> <code>{info['pick']}</code>\n"
         f"📈 <b>Коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
         f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
-        f"👇 <b>Выбери сумму ставки или введи свою:</b>"
+        f"👇 <b>Выбери сумму для ординара или добавь исход в свой Экспресс:</b>"
     )
     await callback.message.edit_text(text, reply_markup=amount_selection_kb(target_code, user["balance"]), parse_mode="HTML")
     await callback.answer()
