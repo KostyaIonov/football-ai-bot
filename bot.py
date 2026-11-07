@@ -1,9 +1,9 @@
 import os
 import re
-import random
+import json
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 import aiohttp
 from aiohttp import web
@@ -42,31 +42,288 @@ groq_client = AsyncOpenAI(
     api_key=GROQ_KEY,
     base_url="https://api.groq.com/openai/v1"
 )
-or_client = AsyncOpenAI(
-    api_key=AI_API_KEY or "dummy",
-    base_url="https://openrouter.ai/api/v1",
-    default_headers={"HTTP-Referer": "https://render.com", "X-Title": "Football Pro Bot"}
-)
 
-# ================= ВРЕМЯ И ЧИСТКА ФОРМАТИРОВАНИЯ =================
+# ================= КОНФИГУРАЦИЯ РЕАЛЬНЫХ ЛИГ (ESPN LIVE API) =================
+MSK_TZ = timezone(timedelta(hours=3))
+
+LEAGUES_CONFIG = {
+    "ucl": {"title": "🏆 Лига Чемпионов УЕФА", "slug": "uefa.champions"},
+    "epl": {"title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)", "slug": "eng.1"},
+    "laliga": {"title": "🇪🇸 Ла Лига (Испания)", "slug": "esp.1"},
+    "seriea": {"title": "🇮🇹 Серия А (Италия)", "slug": "ita.1"},
+    "bundesliga": {"title": "🇩🇪 Бундеслига", "slug": "ger.1"},
+    "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
+}
+
+# Словарь перевода реальных названий клубов на русский язык
+TEAM_TRANSLATIONS = {
+    # Англия
+    "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
+    "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон", "Brighton": "Брайтон",
+    "Chelsea": "Челси", "Crystal Palace": "Кристал Пэлас", "Everton": "Эвертон", "Fulham": "Фулхэм",
+    "Ipswich Town": "Ипсвич Таун", "Leicester City": "Лестер", "Liverpool": "Ливерпуль",
+    "Manchester City": "Манчестер Сити", "Manchester United": "Манчестер Юнайтед",
+    "Newcastle United": "Ньюкасл", "Nottingham Forest": "Ноттингем Форест", "Southampton": "Саутгемптон",
+    "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон",
+    "Leeds United": "Лидс", "Burnley": "Бернли", "Sunderland": "Сандерленд",
+    # Испания
+    "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико Мадрид",
+    "Atletico Madrid": "Атлетико Мадрид", "Athletic Club": "Атлетик Бильбао", "Real Sociedad": "Реал Сосьедад",
+    "Real Betis": "Реал Бетис", "Villarreal": "Вильярреал", "Valencia": "Валенсия", "Sevilla": "Севилья",
+    "Girona": "Жирона", "Celta Vigo": "Сельта", "Osasuna": "Осасуна", "Getafe": "Хетафе",
+    "Rayo Vallecano": "Райо Вальекано", "Mallorca": "Мальорка", "Las Palmas": "Лас-Пальмас",
+    "Alavés": "Алавес", "Deportivo Alavés": "Алавес", "Espanyol": "Эспаньол", "Leganés": "Леганес",
+    "Real Valladolid": "Вальядолид",
+    # Италия
+    "Internazionale": "Интер", "Inter Milan": "Интер", "AC Milan": "Милан", "Juventus": "Ювентус",
+    "Napoli": "Наполи", "AS Roma": "Рома", "Roma": "Рома", "Lazio": "Лацио", "Atalanta": "Аталанта",
+    "Fiorentina": "Фиорентина", "Bologna": "Болонья", "Torino": "Торино", "Udinese": "Удинезе",
+    "Genoa": "Дженоа", "Como": "Комо", "Parma": "Парма", "Hellas Verona": "Верона",
+    "Empoli": "Эмполи", "Cagliari": "Кальяри", "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
+    # Германия
+    "Bayern Munich": "Бавария", "Borussia Dortmund": "Боруссия Д", "Bayer Leverkusen": "Байер",
+    "RB Leipzig": "РБ Лейпциг", "VfB Stuttgart": "Штутгарт", "Eintracht Frankfurt": "Айнтрахт Ф",
+    "SC Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Werder Bremen": "Вердер",
+    "Heidenheim": "Хайденхайм", "1. FC Heidenheim 1846": "Хайденхайм", "FC Augsburg": "Аугсбург",
+    "VfL Wolfsburg": "Вольфсбург", "Borussia Mönchengladbach": "Боруссия М", "Mainz": "Майнц",
+    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
+    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль",
+    # Франция и ЛЧ
+    "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако", "Marseille": "Марсель",
+    "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль", "Lyon": "Лион",
+    "Olympique Lyonnais": "Лион", "Nice": "Ницца", "OGC Nice": "Ницца", "Lens": "Ланс", "RC Lens": "Ланс",
+    "Rennes": "Ренн", "Stade Rennais": "Ренн", "Stade Brestois 29": "Брест", "Brest": "Брест",
+    "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур", "RC Strasbourg Alsace": "Страсбур",
+    "Toulouse": "Тулуза", "Montpellier": "Монпелье", "Nantes": "Нант", "FC Nantes": "Нант",
+    "Auxerre": "Осер", "AJ Auxerre": "Осер", "Angers": "Анже", "Saint-Étienne": "Сент-Этьен", "Le Havre": "Гавр",
+    # Другие гранды ЛЧ
+    "Sporting CP": "Спортинг", "Benfica": "Бенфика", "FC Porto": "Порту", "PSV Eindhoven": "ПСВ",
+    "Feyenoord": "Фейеноорд", "Ajax": "Аякс", "Celtic": "Селтик", "Club Brugge": "Брюгге",
+    "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац",
+    "Sparta Prague": "Спарта Прага", "Slovan Bratislava": "Слован Братислава", "Young Boys": "Янг Бойз",
+    "Dinamo Zagreb": "Динамо Загреб", "Crvena Zvezda": "Црвена Звезда", "Galatasaray": "Галатасарай"
+}
+
+# Элитные клубы для корректировки силы в еврокубках
+ELITE_CLUBS = {
+    "Реал Мадрид": 0.45, "Манчестер Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
+    "Ливерпуль": 0.40, "Арсенал": 0.38, "Интер": 0.36, "ПСЖ": 0.35, "Байер": 0.30,
+    "Атлетико Мадрид": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24,
+    "Милан": 0.22, "Боруссия Д": 0.22, "Аталанта": 0.20, "Астон Вилла": 0.18
+}
+
+def translate_team(name: str) -> str:
+    return TEAM_TRANSLATIONS.get(name, name)
+
 def now_msk() -> datetime:
-    return datetime.utcnow() + timedelta(hours=3)
-
-def parse_match_end_ts(date_str: str) -> int:
-    try:
-        clean = date_str.replace(" МСК", "").strip()
-        start_dt = datetime.strptime(clean, "%d.%m.%Y, %H:%M")
-        end_dt = start_dt + timedelta(minutes=115)
-        return int(end_dt.timestamp())
-    except Exception:
-        return int((now_msk() + timedelta(hours=2)).timestamp())
+    return datetime.now(MSK_TZ)
 
 def clean_ai_text(text: str) -> str:
-    """Преобразует Markdown от ИИ в чистый HTML без лишних символов"""
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", text)
     text = text.replace("*", "• ")
     return text.strip()
+
+# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И КОЭФФИЦИЕНТОВ =================
+SCHEDULE_CACHE = {"data": {}, "updated_at": 0}
+CACHE_TTL = 900  # Кэш расписания на 15 минут
+
+def parse_american_odd(val) -> float | None:
+    """Конвертирует американский или дробный коэффициент ESPN в привычный десятичный (европейский)"""
+    if val is None:
+        return None
+    try:
+        s = str(val).strip().upper()
+        if s in ("EVEN", "EV"):
+            return 2.00
+        num = float(s)
+        if abs(num) < 15:  # Уже десятичный
+            return round(num, 2) if num > 1.01 else None
+        if num > 0:
+            return round(1.0 + (num / 100.0), 2)
+        else:
+            return round(1.0 + (100.0 / abs(num)), 2)
+    except Exception:
+        return None
+
+def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
+    """Вычисляет реальную силу команды по очкам в текущем сезоне (W-D-L из API ESPN)"""
+    base = 1.45 + ELITE_CLUBS.get(ru_name, 0.0)
+    records = comp_dict.get("records", [])
+    for r in records:
+        summary = r.get("summary", "")
+        parts = summary.split("-")
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            w, d, l = int(parts[0]), int(parts[1]), int(parts[2])
+            games = w + d + l
+            if games >= 3:
+                ppg = (w * 3 + d) / games
+                return (ppg * 0.7) + (base * 0.3)
+    return base
+
+def compute_realistic_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_name: str, a_name: str) -> dict:
+    """Извлекает реальные букмекерские кэфы из ESPN, либо рассчитывает их по реальной статистике сезона"""
+    odds_list = comp_obj.get("odds", [])
+    for o in odds_list:
+        h_odd = parse_american_odd(o.get("homeTeamOdds", {}).get("moneyLine"))
+        a_odd = parse_american_odd(o.get("awayTeamOdds", {}).get("moneyLine"))
+        d_odd = parse_american_odd(o.get("drawOdds", {}).get("moneyLine"))
+        if h_odd and a_odd and d_odd and 1.05 <= h_odd <= 25 and 1.05 <= a_odd <= 25:
+            return {"p1": h_odd, "x": d_odd, "p2": a_odd}
+
+    # Математический расчет линии по реальной форме и очкам команд в сезоне
+    h_strength = parse_team_ppg(home_comp, h_name) + 0.22  # Фактор домашнего поля
+    a_strength = parse_team_ppg(away_comp, a_name)
+    diff = h_strength - a_strength
+
+    # Вероятность ничьей выше в равных матчах
+    prob_x = max(0.17, min(0.31, 0.28 - abs(diff) * 0.07))
+    rem = 1.0 - prob_x
+
+    # Логистическое распределение вероятностей П1 и П2
+    ratio = 1.0 / (1.0 + (2.71828 ** (-diff * 1.15)))
+    prob_p1 = max(0.08, min(0.80, rem * ratio))
+    prob_p2 = max(0.08, min(0.80, rem - prob_p1))
+
+    # Закладываем стандартную букмекерскую маржу 4.5%
+    margin = 1.045
+    return {
+        "p1": round(max(1.12, 1.0 / (prob_p1 * margin)), 2),
+        "x": round(max(2.80, 1.0 / (prob_x * margin)), 2),
+        "p2": round(max(1.12, 1.0 / (prob_p2 * margin)), 2)
+    }
+
+async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str, cfg: dict, date_range: str, now_ts: int) -> tuple[str, dict]:
+    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={date_range}&limit=100"
+    matches = {}
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                events = data.get("events", [])
+                # Сортируем матчи строго по времени начала
+                events.sort(key=lambda x: x.get("date", ""))
+                for ev in events:
+                    comp = ev.get("competitions", [{}])[0]
+                    status_state = comp.get("status", {}).get("type", {}).get("state", "pre")
+                    # В линию прематч берем только те матчи, которые еще НЕ начались
+                    if status_state != "pre":
+                        continue
+
+                    raw_date = ev.get("date", "")
+                    try:
+                        dt_utc = datetime.strptime(raw_date[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
+                        dt_msk = dt_utc.astimezone(MSK_TZ)
+                        start_ts = int(dt_msk.timestamp())
+                    except Exception:
+                        continue
+
+                    if start_ts <= now_ts:
+                        continue
+
+                    competitors = comp.get("competitors", [])
+                    if len(competitors) < 2:
+                        continue
+
+                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+
+                    h_name = translate_team(home_c.get("team", {}).get("displayName", "Команда 1"))
+                    a_name = translate_team(away_c.get("team", {}).get("displayName", "Команда 2"))
+
+                    ev_id = str(ev.get("id"))
+                    odds = compute_realistic_odds(comp, home_c, away_c, h_name, a_name)
+
+                    # Получаем реальное положение/очки команд для ИИ-аналитика
+                    h_rec = home_c.get("records", [{}])[0].get("summary", "") if home_c.get("records") else ""
+                    a_rec = away_c.get("records", [{}])[0].get("summary", "") if away_c.get("records") else ""
+
+                    matches[ev_id] = {
+                        "event_id": ev_id,
+                        "league_key": league_key,
+                        "league_slug": cfg["slug"],
+                        "teams": f"{h_name} vs {a_name}",
+                        "home_team": h_name,
+                        "away_team": a_name,
+                        "records_info": f"{h_name} (В-Н-П: {h_rec or 'н/д'}), {a_name} (В-Н-П: {a_rec or 'н/д'})",
+                        "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
+                        "start_ts": start_ts,
+                        "end_ts": start_ts + (115 * 60),
+                        "odds": odds
+                    }
+    except Exception as e:
+        logging.warning(f"Ошибка загрузки расписания {league_key}: {e}")
+
+    return league_key, {"title": cfg["title"], "slug": cfg["slug"], "matches": matches}
+
+async def get_real_matches(force_refresh: bool = False) -> dict:
+    """Возвращает актуальную базу реальных матчей на ближайшие 7 дней"""
+    now_dt = now_msk()
+    now_ts = int(now_dt.timestamp())
+
+    if not force_refresh and SCHEDULE_CACHE["data"] and (now_ts - SCHEDULE_CACHE["updated_at"] < CACHE_TTL):
+        # Отфильтровываем уже начавшиеся матчи из кэша
+        filtered = {}
+        for l_k, l_v in SCHEDULE_CACHE["data"].items():
+            active_m = {m_id: m for m_id, m in l_v["matches"].items() if m["start_ts"] > now_ts}
+            filtered[l_k] = {"title": l_v["title"], "slug": l_v["slug"], "matches": active_m}
+        return filtered
+
+    start_str = (now_dt - timedelta(hours=3)).strftime("%Y%m%d")
+    end_str = (now_dt + timedelta(days=7)).strftime("%Y%m%d")
+    date_range = f"{start_str}-{end_str}"
+
+    result_db = {}
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+            fetch_league_schedule(session, l_key, cfg, date_range, now_ts)
+            for l_key, cfg in LEAGUES_CONFIG.items()
+        ]
+        responses = await asyncio.gather(*tasks)
+        for l_key, l_data in responses:
+            result_db[l_key] = l_data
+
+    if any(len(v["matches"]) > 0 for v in result_db.values()):
+        SCHEDULE_CACHE["data"] = result_db
+        SCHEDULE_CACHE["updated_at"] = now_ts
+
+    return result_db
+
+async def fetch_real_match_result(session: aiohttp.ClientSession, league_slug: str, event_id: str) -> dict:
+    """Проверяет реальный статус и счет конкретного матча через API ESPN"""
+    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{league_slug}/summary?event={event_id}"
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                header = data.get("header", {})
+                comps = header.get("competitions", [{}])
+                if comps:
+                    comp = comps[0]
+                    status_obj = comp.get("status", {})
+                    st_type = status_obj.get("type", {})
+                    state = st_type.get("state", "pre")  # 'pre', 'in', 'post'
+                    completed = bool(st_type.get("completed", False))
+                    detail = st_type.get("shortDetail", "")
+
+                    competitors = comp.get("competitors", [])
+                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0] if competitors else {})
+                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1] if len(competitors) > 1 else {})
+
+                    h_score = int(home_c.get("score", 0) or 0)
+                    a_score = int(away_c.get("score", 0) or 0)
+                    return {
+                        "ok": True,
+                        "state": state,
+                        "completed": completed or (state == "post"),
+                        "home_score": h_score,
+                        "away_score": a_score,
+                        "score_str": f"{h_score}:{a_score}",
+                        "detail": detail
+                    }
+    except Exception as e:
+        logging.warning(f"Ошибка проверки результата матча {event_id}: {e}")
+    return {"ok": False, "state": "unknown", "completed": False}
 
 # ================= БАЗА ДАННЫХ (PostgreSQL + SQLite) =================
 class Database:
@@ -105,6 +362,7 @@ class Database:
                     ALTER TABLE bets ADD COLUMN IF NOT EXISTS settle_ts BIGINT DEFAULT 0;
                     ALTER TABLE bets ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';
                     ALTER TABLE bets ADD COLUMN IF NOT EXISTS score_result TEXT DEFAULT '';
+                    ALTER TABLE bets ADD COLUMN IF NOT EXISTS legs_json TEXT DEFAULT '[]';
                 """)
             logging.info("Облачная БД PostgreSQL подключена!")
         else:
@@ -134,7 +392,8 @@ class Database:
                         win_prob REAL DEFAULT 50.0,
                         settle_ts INTEGER DEFAULT 0,
                         created_at TEXT DEFAULT '',
-                        score_result TEXT DEFAULT ''
+                        score_result TEXT DEFAULT '',
+                        legs_json TEXT DEFAULT '[]'
                     )
                 """)
                 for col_def in [
@@ -142,7 +401,8 @@ class Database:
                     "win_prob REAL DEFAULT 50.0",
                     "settle_ts INTEGER DEFAULT 0",
                     "created_at TEXT DEFAULT ''",
-                    "score_result TEXT DEFAULT ''"
+                    "score_result TEXT DEFAULT ''",
+                    "legs_json TEXT DEFAULT '[]'"
                 ]:
                     try:
                         await db.execute(f"ALTER TABLE bets ADD COLUMN {col_def}")
@@ -199,7 +459,11 @@ class Database:
                 await db.commit()
         return True, bonus
 
-    async def create_pending_bet(self, user_id: int, username: str, match_title: str, pick: str, amount: int, odds: float, win_prob: float, settle_ts: int, bet_type: str = "single") -> dict:
+    async def create_pending_bet(
+        self, user_id: int, username: str, match_title: str, pick: str,
+        amount: int, odds: float, win_prob: float, settle_ts: int,
+        bet_type: str = "single", legs_json: str = "[]"
+    ) -> dict:
         user = await self.get_or_create_user(user_id, username)
         if amount < 10:
             return {"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}
@@ -213,16 +477,16 @@ class Database:
             async with self.pg_pool.acquire() as conn:
                 await conn.execute("UPDATE users SET balance = $1 WHERE user_id = $2", new_balance, user_id)
                 bet_id = await conn.fetchval("""
-                    INSERT INTO bets (user_id, match_title, pick, amount, odds, status, bet_type, win_prob, settle_ts, created_at)
-                    VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9) RETURNING bet_id
-                """, user_id, match_title, pick, amount, odds, bet_type, win_prob, settle_ts, created_str)
+                    INSERT INTO bets (user_id, match_title, pick, amount, odds, status, bet_type, win_prob, settle_ts, created_at, legs_json)
+                    VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10) RETURNING bet_id
+                """, user_id, match_title, pick, amount, odds, bet_type, win_prob, settle_ts, created_str, legs_json)
         else:
             async with aiosqlite.connect(self.sqlite_path) as db:
                 await db.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_balance, user_id))
                 cur = await db.execute("""
-                    INSERT INTO bets (user_id, match_title, pick, amount, odds, status, bet_type, win_prob, settle_ts, created_at)
-                    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-                """, (user_id, match_title, pick, amount, odds, bet_type, win_prob, settle_ts, created_str))
+                    INSERT INTO bets (user_id, match_title, pick, amount, odds, status, bet_type, win_prob, settle_ts, created_at, legs_json)
+                    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+                """, (user_id, match_title, pick, amount, odds, bet_type, win_prob, settle_ts, created_str, legs_json))
                 bet_id = cur.lastrowid
                 await db.commit()
 
@@ -247,15 +511,15 @@ class Database:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
 
-    async def get_due_pending_bets(self, current_ts: int) -> list:
+    async def get_all_pending_bets(self) -> list:
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
-                rows = await conn.fetch("SELECT * FROM bets WHERE status = 'pending' AND settle_ts <= $1", current_ts)
+                rows = await conn.fetch("SELECT * FROM bets WHERE status = 'pending'")
                 return [dict(r) for r in rows]
         else:
             async with aiosqlite.connect(self.sqlite_path) as db:
                 db.row_factory = aiosqlite.Row
-                async with db.execute("SELECT * FROM bets WHERE status = 'pending' AND settle_ts <= ?", (current_ts,)) as cur:
+                async with db.execute("SELECT * FROM bets WHERE status = 'pending'") as cur:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
 
@@ -362,37 +626,82 @@ async def ask_ai(prompt: str, system_prompt: str = "Ты элитный футб
         pass
     return None
 
-# ================= ФОНОВЫЙ ИИ-АГЕНТ РАСЧЕТА МАТЧЕЙ =================
-def generate_realistic_score(pick: str, is_win: bool, bet_type: str) -> str:
-    if bet_type == "express":
-        return "Все события прошли ✅" if is_win else "Одно из событий не прошло ❌"
-    win_p1_scores = ["2:0", "2:1", "3:1", "1:0", "3:0"]
-    win_x_scores = ["1:1", "2:2", "0:0"]
-    win_p2_scores = ["0:2", "1:2", "1:3", "0:1"]
+# ================= ПРОВЕРКА РЕАЛЬНЫХ РЕЗУЛЬТАТОВ И РАСЧЕТ КУПОНОВ =================
+def evaluate_leg_pick(pick_code: str, home_score: int, away_score: int) -> bool:
+    """Проверяет, сыграл ли выбранный исход при реальном счете матча"""
+    code = pick_code.lower()
+    if code in ("p1", "п1"):
+        return home_score > away_score
+    elif code in ("x", "х"):
+        return home_score == away_score
+    elif code in ("p2", "п2"):
+        return away_score > home_score
+    elif code in ("1x", "1х"):
+        return home_score >= away_score
+    elif code in ("x2", "х2"):
+        return away_score >= home_score
+    return home_score > away_score
 
-    if "П1" in pick:
-        return random.choice(win_p1_scores) if is_win else random.choice(win_x_scores + win_p2_scores)
-    elif "Х" in pick or "Ничья" in pick:
-        return random.choice(win_x_scores) if is_win else random.choice(win_p1_scores + win_p2_scores)
-    else:
-        return random.choice(win_p2_scores) if is_win else random.choice(win_p1_scores + win_x_scores)
+async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
+    """
+    Проверяет все события внутри купона по реальным данным ESPN.
+    Возвращает статус: {'settled': True/False, 'live_summary': '...'}
+    """
+    try:
+        legs = json.loads(bet.get("legs_json") or "[]")
+    except Exception:
+        legs = []
 
-async def settle_single_bet_and_notify(bet: dict):
-    prob = float(bet.get("win_prob") or 50.0)
-    roll = random.uniform(0, 100)
-    is_win = roll <= (prob + 4.0)
-    score_str = generate_realistic_score(bet["pick"], is_win, bet.get("bet_type", "single"))
+    if not legs:
+        return {"settled": False, "live_summary": "Ожидание данных матча"}
 
-    res = await db_manager.settle_bet_in_db(bet, is_win, score_str)
+    all_completed = True
+    all_won = True
+    score_parts = []
+    live_parts = []
+
+    for leg in legs:
+        res = await fetch_real_match_result(session, leg["league_slug"], str(leg["event_id"]))
+        if not res["ok"]:
+            all_completed = False
+            live_parts.append(f"⏳ {leg['teams']} — ожидание данных")
+            continue
+
+        if not res["completed"]:
+            all_completed = False
+            if res["state"] == "in":
+                live_parts.append(f"🔴 LIVE: {leg['teams']} — <b>{res['score_str']}</b> ({res['detail']})")
+            else:
+                live_parts.append(f"📅 {leg['teams']} — матч еще не начался")
+        else:
+            leg_won = evaluate_leg_pick(leg["pick_code"], res["home_score"], res["away_score"])
+            if not leg_won:
+                all_won = False
+            icon = "✅" if leg_won else "❌"
+            if len(legs) == 1:
+                score_parts.append(f"{res['score_str']}")
+            else:
+                score_parts.append(f"{leg['teams']} {res['score_str']} ({icon})")
+            live_parts.append(f"🏁 {leg['teams']} — <b>{res['score_str']}</b> {icon}")
+
+    # Рассчитываем купон ТОЛЬКО когда все реальные матчи в нем официально завершились
+    if all_completed:
+        final_score_str = " | ".join(score_parts)
+        db_res = await db_manager.settle_bet_in_db(bet, all_won, final_score_str)
+        await send_settlement_notification(bet, all_won, final_score_str, db_res)
+        return {"settled": True, "is_win": all_won, "score_str": final_score_str}
+
+    return {"settled": False, "live_summary": "\n".join(live_parts)}
+
+async def send_settlement_notification(bet: dict, is_win: bool, score_str: str, res: dict):
     type_label = "⚡ ЭКСПРЕСС" if bet.get("bet_type") == "express" else "⚽ ОРДИНАР"
-
     if is_win:
         msg = (
             f"🎉 <b>СТАВКА СЫГРАЛА! ({type_label})</b>\n\n"
             f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code>\n"
-            f"🏟 <b>Матч:</b> {bet['match_title']}\n"
+            f"🏟 <b>Событие:</b> {bet['match_title']}\n"
             f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
-            f"🏁 <b>Счет / Итог:</b> <code>{score_str}</code></blockquote>\n"
+            f"🏁 <b>Реальный итог:</b> <code>{score_str}</code></blockquote>\n"
             f"💵 <b>Сумма ставки:</b> <code>{bet['amount']} FC</code>\n"
             f"💰 <b>Выплата:</b> <b><code>+{res['payout']} FC</code></b> <i>(чистыми: +{res['net_profit']} FC)</i>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
@@ -401,9 +710,9 @@ async def settle_single_bet_and_notify(bet: dict):
         msg = (
             f"📢 <b>МАТЧ ЗАВЕРШЕН ({type_label})</b>\n\n"
             f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code> — ❌ <i>Не сыграл</i>\n"
-            f"🏟 <b>Матч:</b> {bet['match_title']}\n"
+            f"🏟 <b>Событие:</b> {bet['match_title']}\n"
             f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
-            f"🏁 <b>Счет / Итог:</b> <code>{score_str}</code></blockquote>\n"
+            f"🏁 <b>Реальный итог:</b> <code>{score_str}</code></blockquote>\n"
             f"💸 <b>Списано:</b> <code>-{bet['amount']} FC</code>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
         )
@@ -418,17 +727,19 @@ async def settle_single_bet_and_notify(bet: dict):
         logging.warning(f"Не удалось отправить пуш пользователю {bet['user_id']}: {e}")
 
 async def match_settlement_worker():
+    """Фоновый агент: каждые 3 минуты проверяет реальное завершение матчей через ESPN API"""
     while True:
         try:
-            current_ts = int(now_msk().timestamp())
-            due_bets = await db_manager.get_due_pending_bets(current_ts)
-            for b in due_bets:
-                await settle_single_bet_and_notify(b)
+            pending_bets = await db_manager.get_all_pending_bets()
+            if pending_bets:
+                async with aiohttp.ClientSession() as session:
+                    for b in pending_bets:
+                        await check_and_settle_real_bet(session, b)
         except Exception as e:
-            logging.error(f"Ошибка фонового расчета ставок: {e}")
-        await asyncio.sleep(30)
+            logging.error(f"Ошибка фонового расчета реальных матчей: {e}")
+        await asyncio.sleep(180)
 
-# ================= БАЗА МАТЧЕЙ И МАТЕМАТИКА =================
+# ================= МАТЕМАТИКА И ФОРМИРОВАНИЕ ЭКСПРЕССА ДНЯ =================
 def calculate_ai_probabilities(odds: dict) -> dict:
     raw_p1, raw_x, raw_p2 = 1 / odds["p1"], 1 / odds["x"], 1 / odds["p2"]
     margin_sum = raw_p1 + raw_x + raw_p2
@@ -439,128 +750,93 @@ def calculate_ai_probabilities(odds: dict) -> dict:
         "margin": round((margin_sum - 1) * 100, 2)
     }
 
-def get_base_matches():
-    today = now_msk()
-    d = [(today + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(0, 7)]
-    return {
-        "ucl": {
-            "title": "🏆 Лига Чемпионов УЕФА",
-            "matches": {
-                "m1": {"teams": "Реал Мадрид vs Милан", "date": f"{d[0]}, 23:00 МСК", "odds": {"p1": 1.55, "x": 4.40, "p2": 5.80}},
-                "m2": {"teams": "Барселона vs Бавария", "date": f"{d[1]}, 23:00 МСК", "odds": {"p1": 2.40, "x": 3.85, "p2": 2.70}},
-                "m3": {"teams": "Интер vs Арсенал", "date": f"{d[2]}, 23:00 МСК", "odds": {"p1": 2.65, "x": 3.25, "p2": 2.75}},
-                "m4": {"teams": "ПСЖ vs Манчестер Сити", "date": f"{d[3]}, 23:00 МСК", "odds": {"p1": 2.10, "x": 3.50, "p2": 3.20}}
-            }
-        },
-        "epl": {
-            "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)",
-            "matches": {
-                "m1": {"teams": "Арсенал vs Ливерпуль", "date": f"{d[0]}, 22:30 МСК", "odds": {"p1": 2.20, "x": 3.40, "p2": 3.30}},
-                "m2": {"teams": "Манчестер Юнайтед vs Челси", "date": f"{d[1]}, 19:30 МСК", "odds": {"p1": 2.50, "x": 3.30, "p2": 2.80}},
-                "m3": {"teams": "Тоттенхэм vs Астон Вилла", "date": f"{d[2]}, 17:00 МСК", "odds": {"p1": 1.95, "x": 3.70, "p2": 3.60}}
-            }
-        },
-        "laliga": {
-            "title": "🇪🇸 Ла Лига (Испания)",
-            "matches": {
-                "m1": {"teams": "Реал Мадрид vs Барселона", "date": f"{d[1]}, 22:00 МСК", "odds": {"p1": 2.30, "x": 3.50, "p2": 3.00}},
-                "m2": {"teams": "Атлетико Мадрид vs Вильярреал", "date": f"{d[2]}, 20:30 МСК", "odds": {"p1": 1.75, "x": 3.60, "p2": 4.80}}
-            }
-        },
-        "seriea": {
-            "title": "🇮🇹 Серия А (Италия)",
-            "matches": {
-                "m1": {"teams": "Интер vs Ювентус", "date": f"{d[0]}, 22:45 МСК", "odds": {"p1": 2.05, "x": 3.30, "p2": 3.80}},
-                "m2": {"teams": "Милан vs Наполи", "date": f"{d[2]}, 22:45 МСК", "odds": {"p1": 2.45, "x": 3.20, "p2": 3.05}}
-            }
-        },
-        "bundesliga": {
-            "title": "🇩🇪 Бундеслига (Германия)",
-            "matches": {
-                "m1": {"teams": "Бавария vs Боруссия Дортмунд", "date": f"{d[1]}, 19:30 МСК", "odds": {"p1": 1.60, "x": 4.20, "p2": 5.00}},
-                "m2": {"teams": "Байер vs РБ Лейпциг", "date": f"{d[2]}, 17:30 МСК", "odds": {"p1": 2.15, "x": 3.60, "p2": 3.10}}
-            }
-        },
-        "ligue1": {
-            "title": "🇫🇷 Лига 1 (Франция)",
-            "matches": {
-                "m1": {"teams": "ПСЖ vs Монако", "date": f"{d[1]}, 21:00 МСК", "odds": {"p1": 1.45, "x": 4.50, "p2": 6.50}},
-                "m2": {"teams": "Марсель vs Лион", "date": f"{d[3]}, 22:00 МСК", "odds": {"p1": 2.25, "x": 3.40, "p2": 3.10}}
-            }
-        }
-    }
+def build_daily_express_data(db: dict) -> dict | None:
+    """Собирает Экспресс дня из 6 ближайших реальных топ-матчей"""
+    all_upcoming = []
+    for l_val in db.values():
+        for m in l_val["matches"].values():
+            all_upcoming.append(m)
 
-def build_daily_express_data(db: dict) -> dict:
+    # Сортируем по дате, чтобы в экспресс попадали ближайшие реальные матчи
+    all_upcoming.sort(key=lambda x: x["start_ts"])
+    selected = all_upcoming[:6]
+    if not selected:
+        return None
+
     picks_text = []
     short_titles = []
+    legs = []
     total_odd = 1.0
     combined_prob = 100.0
     max_end_ts = 0
 
-    for l_val in db.values():
-        for m in l_val["matches"].values():
-            if len(picks_text) >= 6:
-                break
-            t1, t2 = m["teams"].split(" vs ")
-            o = m["odds"]
-            probs = calculate_ai_probabilities(o)
-            end_ts = parse_match_end_ts(m["date"])
-            if end_ts > max_end_ts:
-                max_end_ts = end_ts
+    for m in selected:
+        t1, t2 = m["home_team"], m["away_team"]
+        o = m["odds"]
+        probs = calculate_ai_probabilities(o)
+        if m["end_ts"] > max_end_ts:
+            max_end_ts = m["end_ts"]
 
-            if probs["p1"] >= 54:
-                bet_str, k, p = f"П1 ({t1})", o["p1"], probs["p1"]
-            else:
-                bet_str, k, p = f"1Х ({t1})", round(o["p1"] * 0.74, 2), min(82.0, probs["p1"] + probs["x"] - 8)
+        if probs["p1"] >= 52:
+            pick_code, bet_str, k, p = "p1", f"П1 ({t1})", o["p1"], probs["p1"]
+        elif probs["p2"] >= 50:
+            pick_code, bet_str, k, p = "p2", f"П2 ({t2})", o["p2"], probs["p2"]
+        else:
+            pick_code, bet_str, k, p = "1x", f"1Х ({t1} не проиграет)", round(max(1.22, o["p1"] * 0.72), 2), probs["p1"] + probs["x"]
 
-            total_odd *= k
-            combined_prob = combined_prob * (p / 100.0)
-            picks_text.append(f"<b>{len(picks_text)+1}. {m['teams']}</b> <i>({m['date']})</i>\n   🎯 Исход: <code>{bet_str}</code> • Кэф: <b><code>{k}</code></b>")
-            short_titles.append(f"{m['teams']} ({bet_str})")
-        if len(picks_text) >= 6:
-            break
+        total_odd *= k
+        combined_prob *= (p / 100.0)
+        picks_text.append(
+            f"<b>{len(picks_text)+1}. {m['teams']}</b> <i>({m['date']})</i>\n"
+            f"   🎯 Исход: <code>{bet_str}</code> • Кэф: <b><code>{k}</code></b>"
+        )
+        short_titles.append(f"{m['teams']} ({bet_str})")
+        legs.append({
+            "league_slug": m["league_slug"],
+            "event_id": m["event_id"],
+            "teams": m["teams"],
+            "pick_code": pick_code,
+            "pick_label": bet_str
+        })
 
     final_odd = round(total_odd, 2)
-    playable_prob = max(18.0, round(combined_prob * 100 * 2.2, 1))
     return {
         "text": "\n\n".join(picks_text) + f"\n\n<blockquote>📈 <b>Итоговый коэффициент:</b> <code>{final_odd}</code></blockquote>",
         "total_odd": final_odd,
-        "prob": playable_prob,
+        "prob": round(combined_prob * 100, 1),
         "end_ts": max_end_ts,
-        "summary_title": "Экспресс дня (6 топ-матчей)",
-        "summary_pick": " + ".join(short_titles[:3]) + " и др. (6 событий)"
+        "summary_title": f"Экспресс дня ({len(legs)} реальных матчей)",
+        "summary_pick": " + ".join(short_titles[:3]) + (f" и еще {len(legs)-3}" if len(legs) > 3 else ""),
+        "legs": legs
     }
 
 def smart_local_match_analysis(match: dict, probs: dict) -> str:
-    t1, t2 = match["teams"].split(" vs ")
+    t1, t2 = match["home_team"], match["away_team"]
     odds = match["odds"]
     p1, x, p2 = probs["p1"], probs["x"], probs["p2"]
-    if p1 >= 58:
-        style = f"⚔️ <b>Расклад сил:</b> {t1} доминирует по метрикам xG и домашнему прессингу (вероятность {p1}%)."
+    if p1 >= 55:
+        style = f"⚔️ <b>Расклад сил:</b> {t1} — фаворит встречи на домашнем стадионе (вероятность победы {p1}%). Ожидается контроль мяча и позиционное давление хозяев."
         bet = f"🎯 <b>Value-прогноз:</b> П1 ({t1}) за <code>{odds['p1']}</code>"
-    elif p2 >= 50:
-        style = f"⚔️ <b>Расклад сил:</b> {t2} сильнее в переходных фазах и реализации моментов ({p2}% против {p1}%)."
+    elif p2 >= 48:
+        style = f"⚔️ <b>Расклад сил:</b> {t2} превосходит соперника по текущей форме и классу состава ({p2}% против {p1}%)."
         bet = f"🎯 <b>Value-прогноз:</b> П2 ({t2}) за <code>{odds['p2']}</code>"
     else:
-        style = f"⚔️ <b>Расклад сил:</b> Равный матч ({p1}% на {p2}%) с высокой плотностью в центре поля."
-        bet = f"🎯 <b>Value-прогноз:</b> П1 / Двойной шанс 1Х (базовый кэф <code>{odds['p1']}</code>)"
+        style = f"⚔️ <b>Расклад сил:</b> Конкурентный матч близких по силе команд ({p1}% на {p2}%). Ключевую роль сыграет реализация стандартов."
+        bet = f"🎯 <b>Value-прогноз:</b> П1 ({t1}) за <code>{odds['p1']}</code> или Х за <code>{odds['x']}</code>"
     return f"{style}\n\n{bet}"
 
-# ================= КЛАВИАТУРЫ (ОБНОВЛЕННЫЙ ДИЗАЙН) =================
+# ================= КЛАВИАТУРЫ =================
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
-    # 1-я строка: Личный кабинет во всю ширину экрана
     builder.button(text="👤 Личный кабинет", callback_data="profile")
-    # 2-4 строки: Турниры по 2 в ряд
     builder.button(text="🏆 Лига Чемпионов", callback_data="league:ucl")
     builder.button(text="🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)", callback_data="league:epl")
     builder.button(text="🇪🇸 Ла Лига (Испания)", callback_data="league:laliga")
     builder.button(text="🇮🇹 Серия А (Италия)", callback_data="league:seriea")
     builder.button(text="🇩🇪 Бундеслига", callback_data="league:bundesliga")
     builder.button(text="🇫🇷 Лига 1 (Франция)", callback_data="league:ligue1")
-    # 5-6 строки: Экспресс дня и Рейтинг
-    builder.button(text="⚡ Экспресс дня (6 матчей)", callback_data="express_day")
+    builder.button(text="⚡ Экспресс дня (Реальные матчи)", callback_data="express_day")
     builder.button(text="🏆 Топ-10 капперов", callback_data="leaderboard")
 
     if slip_count > 0:
@@ -582,22 +858,22 @@ def profile_kb(active_count: int = 0):
 
 def matches_kb(league_key: str, matches_dict: dict):
     builder = InlineKeyboardBuilder()
-    for match_id, data in matches_dict.items():
-        short_date = data['date'].split(',')[0]
+    for match_id, data in list(matches_dict.items())[:15]:
+        short_date = data['date'].replace(".2026", "").replace(" МСК", "")
         builder.button(text=f"⚽ {data['teams']} ({short_date})", callback_data=f"match:{league_key}:{match_id}")
+    builder.button(text="🔄 Обновить расписание", callback_data=f"refresh_league:{league_key}")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(1)
     return builder.as_markup()
 
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
-    """Компактные кнопки П1 | Х | П2 без лишних слов, чтобы кэфы всегда были видны полностью"""
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
-    # Ряд 1: Ординар (просто П1, Х, П2 и коэффициент)
+    # 1-й ряд: Ординар (компактно П1, Х, П2)
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    # Ряд 2: Добавление в свой экспресс
+    # 2-й ряд: В экспресс
     builder.button(text="➕ П1", callback_data=f"slipadd:{league_key}:{match_id}:p1")
     builder.button(text="➕ Х", callback_data=f"slipadd:{league_key}:{match_id}:x")
     builder.button(text="➕ П2", callback_data=f"slipadd:{league_key}:{match_id}:p2")
@@ -623,7 +899,6 @@ def amount_selection_kb(target_code: str, balance: float):
         builder.button(text=f"🔥 Ва-банк ({all_in} FC)", callback_data=f"place:{target_code}:{all_in}")
     builder.button(text="✍️ Ввести свою сумму", callback_data=f"custom_amt:{target_code}")
 
-    # Кнопка возврата прямо к матчу или экспрессу
     if target_code == "express-day":
         builder.button(text="⬅️ Назад к Экспрессу", callback_data="express_day")
     elif target_code == "custom-slip":
@@ -641,11 +916,11 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user = await db_manager.get_or_create_user(message.from_user.id, message.from_user.username)
     text = (
-        f"⚽ <b>FOOTBALL AI PRO — АНАЛИТИКА И СТАВКИ</b>\n\n"
+        f"⚽ <b>AI_BET_BOT — РЕАЛЬНАЯ ЛИНИЯ И СТАВКИ</b>\n\n"
         f"<blockquote>👤 Игрок: <b>{user['username']}</b>\n"
         f"💰 Доступный банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
         f"🏆 Выиграно купонов: <b><code>{user['wins']}</code></b></blockquote>\n"
-        f"🤖 ИИ-разборы матчей, математический расчет вероятностей и Live-купоны с выплатой по финальному свистку.\n\n"
+        f"📡 <b>Live-синхронизация:</b> Реальное расписание матчей на 7 дней вперед и автоматический расчет ставок по настоящему финальному счету.\n\n"
         f"👇 <b>Выбери раздел:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
@@ -655,14 +930,14 @@ async def process_back_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
     text = (
-        f"⚽ <b>ГЛАВНОЕ МЕНЮ • FOOTBALL AI PRO</b>\n\n"
+        f"⚽ <b>ГЛАВНОЕ МЕНЮ • AI_BET_BOT</b>\n\n"
         f"<blockquote>💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  |  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>\n"
         f"👇 <b>Выбери турнир или открой Личный кабинет:</b>"
     )
     await callback.message.edit_text(text, reply_markup=main_menu_kb(callback.from_user.id), parse_mode="HTML")
     await callback.answer()
 
-# ================= ЛИЧНЫЙ КАБИНЕТ И АРХИВ СТАВОК =================
+# ================= ЛИЧНЫЙ КАБИНЕТ И LIVE-РАДАР =================
 @dp.callback_query(F.data == "profile")
 async def process_profile(callback: CallbackQuery):
     user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
@@ -682,7 +957,7 @@ async def process_profile(callback: CallbackQuery):
         f"• Рассчитано ставок: <code>{total_settled}</code> (✅ <code>{user['wins']}</code> | ❌ <code>{user['losses']}</code>)\n"
         f"• Процент побед (Winrate): <b><code>{winrate}%</code></b>\n"
         f"• Чистый профит (ROI): <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n\n"
-        f"<i>🔔 ИИ-агент автоматически пришлет уведомление в чат по завершении каждого матча.</i>"
+        f"<i>📡 Бот отслеживает реальные результаты матчей и пришлет уведомление сразу после финального свистка.</i>"
     )
     await callback.message.edit_text(text, reply_markup=profile_kb(len(active_bets)), parse_mode="HTML")
     await callback.answer()
@@ -696,12 +971,12 @@ async def process_active_bets(callback: CallbackQuery):
         text = (
             "⏳ <b>АКТИВНЫЕ СТАВКИ</b>\n\n"
             "<blockquote>Сейчас у тебя нет купонов в игре.</blockquote>\n"
-            "Открой любую лигу или «⚡ Экспресс дня», чтобы сделать ставку!"
+            "Открой любую лигу или «⚡ Экспресс дня», чтобы сделать ставку на предстоящие матчи!"
         )
     else:
         lines = []
         for b in bets:
-            end_dt = datetime.fromtimestamp(b["settle_ts"]).strftime("%d.%m в %H:%M МСК")
+            end_dt = datetime.fromtimestamp(b["settle_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
             btype = "⚡ Экспресс" if b.get("bet_type") == "express" else "⚽ Ординар"
             pot_win = round(b["amount"] * b["odds"], 1)
             lines.append(
@@ -709,10 +984,10 @@ async def process_active_bets(callback: CallbackQuery):
                 f"🏟 <b>{b['match_title']}</b>\n"
                 f"🎯 Исход: <code>{b['pick']}</code>  •  Кэф: <b><code>{b['odds']}</code></b>\n"
                 f"💵 Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{pot_win} FC</code></b>\n"
-                f"⏱ Расчет: <i>{end_dt}</i></blockquote>"
+                f"⏱ Ориентир окончания: <i>{end_dt}</i></blockquote>"
             )
         text = "⏳ <b>МОИ АКТИВНЫЕ КУПОНЫ В ИГРЕ:</b>\n\n" + "\n".join(lines)
-        builder.button(text="🤖 ИИ-Агент: Проверить результаты сейчас", callback_data="force_check_matches")
+        builder.button(text="📡 Проверить Live-счет и статус матчей", callback_data="check_live_status")
 
     builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
     builder.button(text="⬅️ В кабинет", callback_data="profile")
@@ -723,16 +998,30 @@ async def process_active_bets(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
-@dp.callback_query(F.data == "force_check_matches")
-async def process_force_check(callback: CallbackQuery):
+@dp.callback_query(F.data == "check_live_status")
+async def process_check_live_status(callback: CallbackQuery):
+    """Проверяет реальный статус матчей на сервере ESPN: если завершились — рассчитывает, если идут — показывает LIVE-счет"""
     bets = await db_manager.get_user_bets(callback.from_user.id, active_only=True)
     if not bets:
         await callback.answer("У тебя нет активных купонов!", show_alert=True)
         return
-    await callback.answer("🤖 ИИ-агент проверяет результаты матчей и рассчитывает купоны...", show_alert=True)
-    for b in bets:
-        await settle_single_bet_and_notify(b)
-    await process_profile(callback)
+
+    settled_count = 0
+    live_info = []
+    async with aiohttp.ClientSession() as session:
+        for b in bets:
+            res = await check_and_settle_real_bet(session, b)
+            if res["settled"]:
+                settled_count += 1
+            else:
+                live_info.append(f"Купон #{b['bet_id']}: {res.get('live_summary', '')}")
+
+    if settled_count > 0:
+        await callback.answer(f"✅ Рассчитано завершенных купонов: {settled_count}! Проверь сообщение в чате.", show_alert=True)
+        await process_profile(callback)
+    else:
+        clean_alert = re.sub(r"<.*?>", "", "\n".join(live_info))[:195]
+        await callback.answer(f"📡 Статус реальных матчей:\n{clean_alert}", show_alert=True)
 
 @dp.callback_query(F.data == "archive_bets")
 async def process_archive_bets(callback: CallbackQuery):
@@ -740,14 +1029,14 @@ async def process_archive_bets(callback: CallbackQuery):
     if not bets:
         text = (
             "🗄 <b>АРХИВ СТАВОК ПУСТ</b>\n\n"
-            "<blockquote>Сюда попадают все завершенные купоны после расчета ИИ-агентом.</blockquote>"
+            "<blockquote>Сюда попадают все купоны после официального завершения реальных матчей.</blockquote>"
         )
     else:
         lines = []
         for b in bets:
             is_win = b["status"] == "win"
             badge = f"✅ ВЫИГРЫШ (+{round(b['amount']*b['odds'], 1)} FC)" if is_win else f"❌ ПРОИГРЫШ (-{b['amount']} FC)"
-            score_info = f"\n🏁 Счет: <code>{b['score_result']}</code>" if b.get("score_result") else ""
+            score_info = f"\n🏁 Реальный счет: <code>{b['score_result']}</code>" if b.get("score_result") else ""
             lines.append(
                 f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> — <b>{badge}</b>\n"
                 f"🏟 {b['match_title']}{score_info}\n"
@@ -807,11 +1096,16 @@ async def process_leaderboard(callback: CallbackQuery):
 # ================= ЭКСПРЕСС ДНЯ И КОРЗИНА ЭКСПРЕССА =================
 @dp.callback_query(F.data == "express_day")
 async def process_express(callback: CallbackQuery):
-    await callback.message.edit_text("⚡ <i>ИИ собирает Экспресс дня из 6 матчей...</i>", parse_mode="HTML")
-    db = get_base_matches()
+    await callback.message.edit_text("⚡ <i>Загружаю реальное расписание и собираю Экспресс дня...</i>", parse_mode="HTML")
+    db = await get_real_matches()
     exp_data = build_daily_express_data(db)
 
     builder = InlineKeyboardBuilder()
+    if not exp_data:
+        builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+        await callback.message.edit_text("На ближайшие дни матчей не найдено.", reply_markup=builder.as_markup())
+        return
+
     builder.button(
         text=f"🔥 Поставить на Экспресс (Кэф {exp_data['total_odd']})",
         callback_data="pick:express_day:all:exp"
@@ -820,7 +1114,7 @@ async def process_express(callback: CallbackQuery):
     builder.adjust(1)
 
     text = (
-        f"⚡ <b>ЭКСПРЕСС ДНЯ (6 МАТЧЕЙ)</b>\n\n"
+        f"⚡ <b>ЭКСПРЕСС ДНЯ (РЕАЛЬНАЯ ЛИНИЯ)</b>\n\n"
         f"{exp_data['text']}\n\n"
         f"👇 <i>Нажми кнопку ниже, чтобы поставить на весь экспресс одним купоном:</i>"
     )
@@ -830,28 +1124,36 @@ async def process_express(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("slipadd:"))
 async def process_slip_add(callback: CallbackQuery):
     _, league_key, match_id, pick_code = callback.data.split(":")
-    db = get_base_matches()
-    match = db[league_key]["matches"][match_id]
+    db = await get_real_matches()
+    match = db.get(league_key, {}).get("matches", {}).get(match_id)
+    if not match:
+        await callback.answer("⛔ Матч уже начался или линия обновилась!", show_alert=True)
+        return
+
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
     pick_names = {"p1": "П1", "x": "Х", "p2": "П2"}
 
     uid = callback.from_user.id
     slip = USER_SLIPS.get(uid, [])
-    slip = [item for item in slip if item["match_title"] != match["teams"]]
+    slip = [item for item in slip if item["event_id"] != match["event_id"]]
     if len(slip) >= 6:
         await callback.answer("⚠️ В один экспресс можно добавить максимум 6 матчей!", show_alert=True)
         return
 
     slip.append({
+        "event_id": match["event_id"],
+        "league_slug": match["league_slug"],
         "match_title": match["teams"],
+        "pick_code": pick_code,
         "pick": pick_names[pick_code],
         "odds": odds[pick_code],
         "prob": probs[pick_code],
-        "end_ts": parse_match_end_ts(match["date"])
+        "start_ts": match["start_ts"],
+        "end_ts": match["end_ts"]
     })
     USER_SLIPS[uid] = slip
-    await callback.answer(f"✅ Добавлено в экспресс: {match['teams']} — {pick_names[pick_code]} ({odds[pick_code]}). Событий в купоне: {len(slip)}", show_alert=True)
+    await callback.answer(f"✅ Добавлено в экспресс: {match['teams']} — {pick_names[pick_code]} ({odds[pick_code]}). В купоне: {len(slip)}", show_alert=True)
     await callback.message.edit_reply_markup(reply_markup=match_outcomes_kb(league_key, match_id, odds, uid))
 
 @dp.callback_query(F.data == "view_slip")
@@ -888,34 +1190,61 @@ async def process_clear_slip(callback: CallbackQuery, state: FSMContext):
     await callback.answer("🗑 Купон экспресса очищен!", show_alert=True)
     await process_back_main(callback, state)
 
-# ================= КАРТОЧКА МАТЧА И ОФОРМЛЕНИЕ СТАВКИ =================
+# ================= ВЫБОР РЕАЛЬНОГО МАТЧА И ОФОРМЛЕНИЕ СТАВКИ =================
+@dp.callback_query(F.data.startswith("refresh_league:"))
+async def process_refresh_league(callback: CallbackQuery):
+    league_key = callback.data.split(":")[1]
+    await callback.answer("📡 Синхронизация реального расписания с сервером...")
+    db = await get_real_matches(force_refresh=True)
+    league_data = db.get(league_key, {})
+    matches = league_data.get("matches", {})
+    if not matches:
+        text = f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие 7 дней официальных матчей в этом турнире нет (перерыв в календаре).</blockquote>"
+    else:
+        text = f"<b>{league_data['title']}</b>\n📅 Реальное расписание на ближайшие 7 дней (МСК):"
+    await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
+
 @dp.callback_query(F.data.startswith("league:"))
 async def process_league_select(callback: CallbackQuery):
     league_key = callback.data.split(":")[1]
-    db = get_base_matches()
-    league_data = db.get(league_key)
-    matches = league_data["matches"] if league_data else {}
-    text = f"<b>{league_data['title']}</b>\n📅 Выбери матч для ИИ-разбора и ставки:"
+    db = await get_real_matches()
+    league_data = db.get(league_key, {})
+    matches = league_data.get("matches", {})
+
+    if not matches:
+        text = (
+            f"<b>{league_data.get('title', 'Турнир')}</b>\n\n"
+            f"<blockquote>📅 В ближайшие 7 дней матчей в этой лиге нет в официальном календаре УЕФА.</blockquote>\n"
+            f"Выбери другую лигу в главном меню!"
+        )
+    else:
+        text = f"<b>{league_data['title']}</b>\n📅 Реальные матчи на ближайшие 7 дней (время МСК):"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("match:"))
 async def process_match_select(callback: CallbackQuery):
     _, league_key, match_id = callback.data.split(":")
-    db = get_base_matches()
-    match = db[league_key]["matches"][match_id]
+    db = await get_real_matches()
+    match = db.get(league_key, {}).get("matches", {}).get(match_id)
+    if not match:
+        await callback.answer("⛔ Этот матч уже начался или завершен!", show_alert=True)
+        await process_league_select(callback)
+        return
+
     league_title = db[league_key]["title"]
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
 
-    await callback.message.edit_text(f"🧠 <i>ИИ анализирует матч {match['teams']}...</i>", parse_mode="HTML")
+    await callback.message.edit_text(f"🧠 <i>ИИ анализирует реальную статистику матча {match['teams']}...</i>", parse_mode="HTML")
     prompt = (
-        f"Турнир: {league_title}. Матч: {match['teams']}.\n"
+        f"Реальный предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
+        f"Матч: {match['teams']}. Текущие показатели сезона: {match['records_info']}.\n"
         f"Коэффициенты: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}.\n"
         f"Чистые вероятности: П1={probs['p1']}%, Х={probs['x']}%, П2={probs['p2']}%\n"
-        f"Дай краткий разбор (до 60 слов) в 2 пункта:\n"
-        f"1. ⚔️ Тактический анализ исхода.\n"
-        f"2. 🎯 Самая лучшая ставка (Value Bet) с кэфом."
+        f"Дай краткий профессиональный разбор (до 60 слов) в 2 пункта:\n"
+        f"1. ⚔️ Форма команд и тактический ключ к матчу.\n"
+        f"2. 🎯 Лучший выбор по линии (П1, Х или П2) с кэфом."
     )
     ai_verdict = await ask_ai(prompt) or smart_local_match_analysis(match, probs)
 
@@ -924,9 +1253,9 @@ async def process_match_select(callback: CallbackQuery):
         f"🕒 Начало: <code>{match['date']}</code>\n\n"
         f"<blockquote>📊 <b>Коэффициенты (Маржа {probs['margin']}%):</b>\n"
         f"П1: <b><code>{odds['p1']}</code></b>  |  Х: <b><code>{odds['x']}</code></b>  |  П2: <b><code>{odds['p2']}</code></b>\n"
-        f"🧮 <b>Вероятности ИИ:</b>\n"
+        f"🧮 <b>Вероятности:</b>\n"
         f"П1: <b>{probs['p1']}%</b>  |  Х: <b>{probs['x']}%</b>  |  П2: <b>{probs['p2']}%</b></blockquote>\n"
-        f"🤖 <b>Экспертный разбор ИИ:</b>\n{ai_verdict}\n\n"
+        f"🤖 <b>Аналитика ИИ:</b>\n{ai_verdict}\n\n"
         f"👇 <b>Сделать ставку (1-й ряд — ординар, 2-й ряд — в экспресс):</b>"
     )
     await callback.message.edit_text(
@@ -936,17 +1265,22 @@ async def process_match_select(callback: CallbackQuery):
     )
     await callback.answer()
 
-def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
-    db = get_base_matches()
+async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
+    db = await get_real_matches()
+    now_ts = int(now_msk().timestamp())
+
     if target_code == "express-day":
         exp = build_daily_express_data(db)
+        if not exp:
+            return None
         return {
             "match_title": exp["summary_title"],
             "pick": exp["summary_pick"],
             "odds": exp["total_odd"],
             "prob": exp["prob"],
             "end_ts": exp["end_ts"],
-            "bet_type": "express"
+            "bet_type": "express",
+            "legs_json": json.dumps(exp["legs"], ensure_ascii=False)
         }
     elif target_code == "custom-slip":
         slip = USER_SLIPS.get(user_id, [])
@@ -956,33 +1290,54 @@ def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         comb_prob = 1.0
         max_ts = 0
         titles = []
+        legs = []
         for s in slip:
+            if s["start_ts"] <= now_ts:
+                return None  # Один из матчей в корзине уже начался
             total_odd *= s["odds"]
             comb_prob *= (s["prob"] / 100.0)
             if s["end_ts"] > max_ts:
                 max_ts = s["end_ts"]
             titles.append(f"{s['match_title']} ({s['pick']})")
+            legs.append({
+                "league_slug": s["league_slug"],
+                "event_id": s["event_id"],
+                "teams": s["match_title"],
+                "pick_code": s["pick_code"],
+                "pick_label": s["pick"]
+            })
         return {
             "match_title": f"Персональный экспресс ({len(slip)} матчей)",
             "pick": " + ".join(titles),
             "odds": round(total_odd, 2),
-            "prob": max(20.0, round(comb_prob * 100 * 2.0, 1)),
+            "prob": round(comb_prob * 100, 1),
             "end_ts": max_ts,
-            "bet_type": "express"
+            "bet_type": "express",
+            "legs_json": json.dumps(legs, ensure_ascii=False)
         }
     else:
         l_key, m_id, p_code = target_code.split("-")
-        match = db[l_key]["matches"][m_id]
+        match = db.get(l_key, {}).get("matches", {}).get(m_id)
+        if not match or match["start_ts"] <= now_ts:
+            return None
         odds = match["odds"]
         probs = calculate_ai_probabilities(odds)
         pick_names = {"p1": "П1", "x": "Х", "p2": "П2"}
+        legs = [{
+            "league_slug": match["league_slug"],
+            "event_id": match["event_id"],
+            "teams": match["teams"],
+            "pick_code": p_code,
+            "pick_label": pick_names[p_code]
+        }]
         return {
             "match_title": f"{match['teams']} ({match['date']})",
             "pick": pick_names[p_code],
             "odds": odds[p_code],
             "prob": probs[p_code],
-            "end_ts": parse_match_end_ts(match["date"]),
-            "bet_type": "single"
+            "end_ts": match["end_ts"],
+            "bet_type": "single",
+            "legs_json": json.dumps(legs, ensure_ascii=False)
         }
 
 @dp.callback_query(F.data.startswith("pick:"))
@@ -996,20 +1351,20 @@ async def process_pick_outcome(callback: CallbackQuery, state: FSMContext):
     else:
         target_code = f"{p1}-{p2}-{p3}"
 
-    info = resolve_bet_target(target_code, callback.from_user.id)
+    info = await resolve_bet_target(target_code, callback.from_user.id)
     if not info:
-        await callback.answer("Купон пуст!", show_alert=True)
+        await callback.answer("⛔ Матч уже начался или купон устарел!", show_alert=True)
         return
 
     user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
-    end_str = datetime.fromtimestamp(info["end_ts"]).strftime("%d.%m.%Y в %H:%M МСК")
+    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m.%Y в %H:%M МСК")
 
     text = (
         f"🎫 <b>ОФОРМЛЕНИЕ СТАВКИ</b>\n\n"
         f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
         f"🎯 <b>Исход:</b> <code>{info['pick']}</code>\n"
         f"📈 <b>Коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
-        f"⏱ <b>Расчет купона:</b> <i>{end_str}</i></blockquote>\n"
+        f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
         f"👇 <b>Выбери сумму ставки или введи свою:</b>"
     )
@@ -1020,9 +1375,9 @@ async def process_pick_outcome(callback: CallbackQuery, state: FSMContext):
 async def process_place_fixed_amount(callback: CallbackQuery):
     _, target_code, amt_str = callback.data.split(":")
     amount = int(amt_str)
-    info = resolve_bet_target(target_code, callback.from_user.id)
+    info = await resolve_bet_target(target_code, callback.from_user.id)
     if not info:
-        await callback.answer("Ошибка купона! Попробуй заново.", show_alert=True)
+        await callback.answer("⛔ Прием ставок закрыт: матч уже начался!", show_alert=True)
         return
 
     res = await db_manager.create_pending_bet(
@@ -1034,7 +1389,8 @@ async def process_place_fixed_amount(callback: CallbackQuery):
         odds=info["odds"],
         win_prob=info["prob"],
         settle_ts=info["end_ts"],
-        bet_type=info["bet_type"]
+        bet_type=info["bet_type"],
+        legs_json=info["legs_json"]
     )
 
     if not res["ok"]:
@@ -1044,7 +1400,7 @@ async def process_place_fixed_amount(callback: CallbackQuery):
     if target_code == "custom-slip":
         USER_SLIPS.pop(callback.from_user.id, None)
 
-    end_str = datetime.fromtimestamp(info["end_ts"]).strftime("%d.%m в %H:%M МСК")
+    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
     text = (
         f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{res['bet_id']})</b>\n\n"
         f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
@@ -1052,14 +1408,14 @@ async def process_place_fixed_amount(callback: CallbackQuery):
         f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
         f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>\n"
         f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
-        f"⏱ <b>Расчет по окончании матча:</b> <i>{end_str}</i>"
+        f"📡 <b>Расчет после завершения реального матча:</b> <i>~{end_str}</i>"
     )
     builder = InlineKeyboardBuilder()
     builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer("🎫 Купон зарегистрирован!")
+    await callback.answer("🎫 Купон зарегистрирован в системе!")
 
 @dp.callback_query(F.data.startswith("custom_amt:"))
 async def process_custom_amount_prompt(callback: CallbackQuery, state: FSMContext):
@@ -1091,10 +1447,10 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
         return
 
     amount = int(raw_text)
-    info = resolve_bet_target(target_code, message.from_user.id)
+    info = await resolve_bet_target(target_code, message.from_user.id)
     if not info:
         await state.clear()
-        await message.answer("⚠️ Купон устарел. Выбери матч заново.", reply_markup=main_menu_kb(message.from_user.id))
+        await message.answer("⛔ Матч уже начался или купон устарел.", reply_markup=main_menu_kb(message.from_user.id))
         return
 
     res = await db_manager.create_pending_bet(
@@ -1106,7 +1462,8 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
         odds=info["odds"],
         win_prob=info["prob"],
         settle_ts=info["end_ts"],
-        bet_type=info["bet_type"]
+        bet_type=info["bet_type"],
+        legs_json=info["legs_json"]
     )
 
     if not res["ok"]:
@@ -1117,7 +1474,7 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
     if target_code == "custom-slip":
         USER_SLIPS.pop(message.from_user.id, None)
 
-    end_str = datetime.fromtimestamp(info["end_ts"]).strftime("%d.%m в %H:%M МСК")
+    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
     text = (
         f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{res['bet_id']})</b>\n\n"
         f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
@@ -1125,7 +1482,7 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
         f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
         f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>\n"
         f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
-        f"⏱ <b>Расчет по окончании матча:</b> <i>{end_str}</i>"
+        f"📡 <b>Расчет после завершения реального матча:</b> <i>~{end_str}</i>"
     )
     builder = InlineKeyboardBuilder()
     builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
@@ -1135,7 +1492,7 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
 
 # ================= ВЕБ-СЕРВЕР И ЗАПУСК =================
 async def handle_ping(request):
-    return web.Response(text="Football AI Pro Live Bookmaker is running 24/7!")
+    return web.Response(text="AI_BET_BOT Live Sports Engine is running 24/7!")
 
 async def start_web_server():
     app = web.Application()
@@ -1149,6 +1506,7 @@ async def start_web_server():
 async def main():
     logging.basicConfig(level=logging.INFO)
     await db_manager.init()
+    await get_real_matches(force_refresh=True)
     await start_web_server()
     asyncio.create_task(match_settlement_worker())
     await bot.delete_webhook(drop_pending_updates=True)
