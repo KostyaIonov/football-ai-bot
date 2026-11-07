@@ -38,6 +38,7 @@ BOT_USERNAME = ""
 class BetStates(StatesGroup):
     waiting_for_custom_total = State()
     waiting_for_custom_amount = State()
+    waiting_for_nickname = State()
 
 class AdminStates(StatesGroup):
     waiting_for_broadcast = State()
@@ -88,6 +89,19 @@ POPULAR_CLUBS = [
     "Ювентус", "Наполи", "ПСЖ", "Атлетико",
     "Бенфика", "Спортинг", "Галатасарай", "Фенербахче"
 ]
+
+FOOTBALL_NICK_BASES = [
+    "El_Capitano", "VAR_Oracle", "xG_Master", "TikiTaka_Pro",
+    "GoldenBoot", "Sniper_FC", "Phantom_Striker", "Bets_Maestro",
+    "Ultra_Scout", "Derby_Boss", "Playmaker", "BoxToBox",
+    "HatTrick_King", "TotalOver", "CleanSheet", "Grand_Capper"
+]
+
+FORBIDDEN_NICK_WORDS = {
+    "admin", "админ", "administrator", "администратор",
+    "ai_bet_bot", "support", "саппорт", "поддержка",
+    "модератор", "moderator", "system", "система", "bot", "бот"
+}
 
 ACHIEVEMENTS_CONFIG = {
     "first_bet": {"title": "🟢 Первый шаг", "desc": "Сделать первую ставку в боте", "reward": 150},
@@ -208,12 +222,25 @@ def get_user_rank_info(balance: float, is_vip: int) -> tuple[str, int]:
     else:
         return "🌱 Новичок лиги", 250
 
+def generate_football_nickname() -> str:
+    base = random.choice(FOOTBALL_NICK_BASES)
+    num = random.randint(7, 99)
+    return f"{base}_{num}"
+
+def validate_custom_nickname(raw_nick: str) -> tuple[bool, str]:
+    nick = raw_nick.strip()
+    if len(nick) < 3 or len(nick) > 16:
+        return False, "Длина никнейма должна быть от 3 до 16 символов."
+    if not re.match(r"^[a-zA-Zа-яА-ЯёЁ0-9_\-\s]+$", nick):
+        return False, "Разрешены только буквы, цифры, пробел, дефис и нижнее подчеркивание."
+    low = nick.lower()
+    for bad in FORBIDDEN_NICK_WORDS:
+        if bad in low:
+            return False, "Этот никнейм зарезервирован системой. Выбери другой."
+    return True, nick
+
 # ================= ПОШАГОВОЕ ФОРМАТИРОВАНИЕ СОБЫТИЙ ЭКСПРЕССА =================
 def format_bet_legs_multiline(bet: dict, with_result: bool = False) -> str:
-    """
-    Отображает каждое событие купона на отдельной строке со статусом (✅, ❌, 🔄, 🔴 LIVE или 📅)
-    как в Архиве, так и в Активных ставках!
-    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -248,7 +275,6 @@ def format_bet_legs_multiline(bet: dict, with_result: bool = False) -> str:
             )
         return "\n".join(lines)
 
-    # Для ординара
     if legs:
         lg = legs[0]
         st = lg.get("final_status", "")
@@ -770,7 +796,8 @@ class Database:
                         streak INT DEFAULT 0,
                         totals_wins INT DEFAULT 0,
                         last_spin TEXT DEFAULT '',
-                        active_booster TEXT DEFAULT ''
+                        active_booster TEXT DEFAULT '',
+                        is_incognito INT DEFAULT 0
                     );
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT DEFAULT 0;
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS referrals_count INT DEFAULT 0;
@@ -780,6 +807,7 @@ class Database:
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS totals_wins INT DEFAULT 0;
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_spin TEXT DEFAULT '';
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS active_booster TEXT DEFAULT '';
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_incognito INT DEFAULT 0;
 
                     CREATE TABLE IF NOT EXISTS bets (
                         bet_id SERIAL PRIMARY KEY,
@@ -831,7 +859,8 @@ class Database:
                         streak INTEGER DEFAULT 0,
                         totals_wins INTEGER DEFAULT 0,
                         last_spin TEXT DEFAULT '',
-                        active_booster TEXT DEFAULT ''
+                        active_booster TEXT DEFAULT '',
+                        is_incognito INTEGER DEFAULT 0
                     )
                 """)
                 await db.execute("""
@@ -870,7 +899,8 @@ class Database:
                     "referred_by INTEGER DEFAULT 0", "referrals_count INTEGER DEFAULT 0",
                     "favorite_club TEXT DEFAULT ''", "achievements TEXT DEFAULT '[]'",
                     "streak INTEGER DEFAULT 0", "totals_wins INTEGER DEFAULT 0",
-                    "last_spin TEXT DEFAULT ''", "active_booster TEXT DEFAULT ''"
+                    "last_spin TEXT DEFAULT ''", "active_booster TEXT DEFAULT ''",
+                    "is_incognito INTEGER DEFAULT 0"
                 ]:
                     try:
                         await db.execute(f"ALTER TABLE users ADD COLUMN {col_def}")
@@ -891,7 +921,7 @@ class Database:
             logging.info("Локальная БД SQLite подключена!")
 
     async def get_or_create_user(self, user_id: int, username: str = "", referrer_id: int = 0) -> tuple[dict, bool]:
-        uname = username or f"Player_{str(user_id)[-4:]}"
+        uname = username or f"Capper_{str(user_id)[-4:]}"
         rewarded = False
 
         if self.use_pg:
@@ -948,6 +978,27 @@ class Database:
     async def get_user(self, user_id: int, username: str = "") -> dict:
         u, _ = await self.get_or_create_user(user_id, username)
         return u
+
+    async def update_nickname(self, user_id: int, new_nick: str):
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                await conn.execute("UPDATE users SET username = $1 WHERE user_id = $2", new_nick, user_id)
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                await db.execute("UPDATE users SET username = ? WHERE user_id = ?", (new_nick, user_id))
+                await db.commit()
+
+    async def toggle_user_incognito(self, user_id: int) -> int:
+        user = await self.get_user(user_id)
+        new_val = 0 if int(user.get("is_incognito") or 0) == 1 else 1
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                await conn.execute("UPDATE users SET is_incognito = $1 WHERE user_id = $2", new_val, user_id)
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                await db.execute("UPDATE users SET is_incognito = ? WHERE user_id = ?", (new_val, user_id))
+                await db.commit()
+        return new_val
 
     async def unlock_achievement(self, user_id: int, ach_key: str) -> bool:
         if ach_key not in ACHIEVEMENTS_CONFIG:
@@ -1124,7 +1175,6 @@ class Database:
         }
 
     async def update_bet_legs_progress(self, bet_id: int, updated_legs_json: str):
-        """Сохраняет промежуточные результаты сыгравших матчей внутри активного экспресса"""
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
                 await conn.execute("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", updated_legs_json, bet_id)
@@ -1368,12 +1418,16 @@ class Database:
     async def get_leaderboard(self) -> list:
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
-                rows = await conn.fetch("SELECT username, balance, wins, losses, is_vip, favorite_club FROM users ORDER BY balance DESC LIMIT 10")
+                rows = await conn.fetch(
+                    "SELECT user_id, username, balance, wins, losses, is_vip, favorite_club, is_incognito FROM users ORDER BY balance DESC LIMIT 10"
+                )
                 return [dict(r) for r in rows]
         else:
             async with aiosqlite.connect(self.sqlite_path) as db:
                 db.row_factory = aiosqlite.Row
-                async with db.execute("SELECT username, balance, wins, losses, is_vip, favorite_club FROM users ORDER BY balance DESC LIMIT 10") as cur:
+                async with db.execute(
+                    "SELECT user_id, username, balance, wins, losses, is_vip, favorite_club, is_incognito FROM users ORDER BY balance DESC LIMIT 10"
+                ) as cur:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
 
@@ -1583,11 +1637,6 @@ async def calculate_cashout_offer(session: aiohttp.ClientSession, bet: dict) -> 
     return min(offer, max_win)
 
 async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
-    """
-    Проверяет каждое событие в купоне.
-    Даже если экспресс еще не завершился целиком, сохраняет статусы уже завершившихся
-    и идущих в LIVE матчей в базу данных, чтобы игрок видел прогресс в 'Активных ставках'!
-    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -1668,7 +1717,6 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
         await send_settlement_notification(bet, outcome_status, effective_odds, db_res)
         return {"settled": True, "status": outcome_status, "score_str": final_score_str}
 
-    # Если купон еще в игре, но отдельные события экспресса обновились — сохраняем прогресс в БД
     if legs_changed:
         bet["legs_json"] = updated_legs_str
         await db_manager.update_bet_legs_progress(bet["bet_id"], updated_legs_str)
@@ -1899,7 +1947,6 @@ def main_menu_kb(user_id: int = 0):
     return builder.as_markup()
 
 def other_leagues_kb(db: dict):
-    """Хаб дополнительных турниров с динамическим счетчиком доступных матчей"""
     builder = InlineKeyboardBuilder()
     for l_key, cfg in OTHER_LEAGUES.items():
         cnt = len(db.get(l_key, {}).get("matches", {}))
@@ -1918,13 +1965,13 @@ def profile_kb(active_count: int = 0, bonus_amt: int = 250, ach_count: int = 0, 
     builder.button(text=f"🎁 Бонус (+{bonus_amt})", callback_data="claim_bonus")
     builder.button(text=f"🎖 Трофеи ({ach_count}/15)", callback_data="achievements_menu")
     builder.button(text=club_btn, callback_data="fav_club_menu")
-    builder.button(text="🤝 Пригласить друга (+500 FC)", callback_data="referral_menu")
+    builder.button(text="✏️ Никнейм", callback_data="nick_menu")
+    builder.button(text="🤝 Друзья (+500)", callback_data="referral_menu")
     builder.button(text="🏠 Главное меню", callback_data="back_to_main")
-    builder.adjust(2, 2, 2, 1, 1)
+    builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
 def matches_kb(league_key: str, matches_dict: dict):
-    """Компактные кнопки матчей без обрезки на экране телефона"""
     builder = InlineKeyboardBuilder()
     for match_id, data in list(matches_dict.items())[:15]:
         builder.button(
@@ -1940,17 +1987,13 @@ def matches_kb(league_key: str, matches_dict: dict):
     return builder.as_markup()
 
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
-    """Лаконичная сетка карточки матча на 1 экран смартфона"""
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
-    # Ряд 1: Основные исходы
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    # Ряд 2: Тоталы
     builder.button(text="📈 Тотал Б (ТБ)", callback_data=f"totals_menu:{league_key}:{match_id}:tb")
     builder.button(text="📉 Тотал М (ТМ)", callback_data=f"totals_menu:{league_key}:{match_id}:tm")
-    # Ряд 3: Сводка/ИТБ и Форы/ОЗ
     builder.button(text="📊 Сводка и ИТБ", callback_data=f"stats_menu:{league_key}:{match_id}")
     builder.button(text="🛡️ Форы / 1Х2 / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
 
@@ -2107,7 +2150,7 @@ async def process_other_leagues(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text, reply_markup=other_leagues_kb(db), parse_mode="HTML")
     await callback.answer()
 
-# ================= ЛИЧНЫЙ КАБИНЕТ И АНИМИРОВАННАЯ РУЛЕТКА =================
+# ================= ЛИЧНЫЙ КАБИНЕТ, СМЕНА НИКА И АНИМИРОВАННАЯ РУЛЕТКА =================
 @dp.callback_query(F.data == "profile")
 async def process_profile(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -2156,6 +2199,66 @@ async def process_profile(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML"
     )
     await callback.answer()
+
+def nick_menu_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🎲 Случайный ник", callback_data="nick_random")
+    builder.button(text="🔄 Сбросить к Telegram", callback_data="nick_reset")
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+@dp.callback_query(F.data == "nick_menu")
+async def process_nick_menu(callback: CallbackQuery, state: FSMContext):
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
+    await state.set_state(BetStates.waiting_for_nickname)
+    text = (
+        f"✏️ <b>НАСТРОЙКА ПСЕВДОНИМА</b>\n\n"
+        f"<blockquote>👤 Текущий никнейм: <b>{user['username']}</b></blockquote>\n"
+        f"• Напиши в чат любой свой псевдоним (от 3 до 16 символов: буквы, цифры, пробел или <code>_</code>).\n"
+        f"• Или используй генератор футбольных ников кнопкой ниже:"
+    )
+    await callback.message.edit_text(text, reply_markup=nick_menu_kb(), parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "nick_random")
+async def process_nick_random(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(BetStates.waiting_for_nickname)
+    new_nick = generate_football_nickname()
+    await db_manager.update_nickname(callback.from_user.id, new_nick)
+    text = (
+        f"✏️ <b>НАСТРОЙКА ПСЕВДОНИМА</b>\n\n"
+        f"<blockquote>🎲 Новый псевдоним: <b>{new_nick}</b></blockquote>\n"
+        f"• Нажми «🎲 Случайный ник» еще раз для другого варианта, напиши свой в чат или вернись в кабинет:"
+    )
+    await callback.message.edit_text(text, reply_markup=nick_menu_kb(), parse_mode="HTML")
+    await callback.answer(f"🎲 Установлен ник: {new_nick}")
+
+@dp.callback_query(F.data == "nick_reset")
+async def process_nick_reset(callback: CallbackQuery, state: FSMContext):
+    default_nick = callback.from_user.username or callback.from_user.first_name or f"Capper_{str(callback.from_user.id)[-4:]}"
+    default_nick = re.sub(r"[<>&]", "", default_nick)[:16]
+    await db_manager.update_nickname(callback.from_user.id, default_nick)
+    await callback.answer(f"🔄 Возвращено имя: {default_nick}", show_alert=True)
+    await process_profile(callback, state)
+
+@dp.message(BetStates.waiting_for_nickname)
+async def process_custom_nickname_input(message: Message, state: FSMContext):
+    raw_text = message.text or ""
+    ok, result_or_err = validate_custom_nickname(raw_text)
+    if not ok:
+        await message.answer(f"⚠️ {result_or_err}\nПопробуй ввести другое имя:", reply_markup=nick_menu_kb(), parse_mode="HTML")
+        return
+
+    await db_manager.update_nickname(message.from_user.id, result_or_err)
+    await state.clear()
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👤 Вернуться в кабинет", callback_data="profile")
+    await message.answer(
+        f"✅ Твой псевдоним успешно изменен на <b>{result_or_err}</b>!",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
 
 @dp.callback_query(F.data == "roulette_menu")
 async def process_roulette_menu(callback: CallbackQuery):
@@ -2211,7 +2314,6 @@ async def process_spin_roulette(callback: CallbackQuery):
     ]
     chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
 
-    # Покадровая анимация прокрутки барабана
     anim_frames = [
         "🎰 <b>БАРАБАН НАБИРАЕТ СКОРОСТЬ...</b>\n\n<blockquote><code>[ 💰 +150 FC ] ➔ [ ⚡ Кэф-буст ] ➔ [ 💎 +750 FC ]</code></blockquote>\n<i>Крутим колесо фортуны...</i>",
         "🎰 <b>БАРАБАН ЗАМЕДЛЯЕТСЯ...</b>\n\n<blockquote><code>[ 🛡 Страховка ] ➔ [ 🔥 ДЖЕКПОТ ] ➔ [ 🎟 Билет ]</code></blockquote>\n<i>Стрелка почти остановилась...</i>"
@@ -2412,7 +2514,7 @@ async def process_se_submit(callback: CallbackQuery):
     await callback.answer("🎉 Купон Суперэкспресса принят!", show_alert=True)
     await process_superexpress_menu(callback)
 
-# ================= РЕФЕРАЛЫ, АКТИВНЫЕ СТАВКИ, АРХИВ И ТОП-10 =================
+# ================= РЕФЕРАЛЫ, АКТИВНЫЕ СТАВКИ, АРХИВ И ТОП-10 С ИНКОГНИТО =================
 @dp.callback_query(F.data == "referral_menu")
 async def process_referral_menu(callback: CallbackQuery):
     global BOT_USERNAME
@@ -2592,28 +2694,55 @@ async def process_claim_bonus(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.answer("⏳ Ты уже забирал бонус сегодня! Возвращайся завтра.", show_alert=True)
 
-@dp.callback_query(F.data == "leaderboard")
-async def process_leaderboard(callback: CallbackQuery):
+async def render_leaderboard_view(callback: CallbackQuery):
+    viewer = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
+    is_incog = int(viewer.get("is_incognito") or 0) == 1
+
     top = await db_manager.get_leaderboard()
     medals = ["🥇", "🥈", "🥉"]
     lines = []
     for i, u in enumerate(top):
         place_str = medals[i] if i < 3 else f"<b>{i+1}.</b>"
-        club_tag = f" • <i>{u['favorite_club']}</i>" if u.get("favorite_club") else ""
+        u_incog = int(u.get("is_incognito") or 0) == 1
+        is_me = (u["user_id"] == callback.from_user.id)
+
+        if u_incog:
+            disp_name = f"🕶 Скрытый #{str(u['user_id'])[-4:]}" + (" <i>(Ты)</i>" if is_me else "")
+            club_tag = ""
+        else:
+            disp_name = f"<b>{u['username']}</b>" + (" <i>(Ты)</i>" if is_me else "")
+            club_tag = f" • <i>{u['favorite_club']}</i>" if u.get("favorite_club") else ""
+
         lines.append(
-            f"{place_str} <b>{u['username']}</b>{club_tag} — <b><code>{round(u['balance'], 1)} FC</code></b> <i>(Побед: {u['wins']})</i>"
+            f"{place_str} {disp_name}{club_tag} — <b><code>{round(u['balance'], 1)} FC</code></b> <i>(Побед: {u['wins']})</i>"
         )
+
     body = "\n".join(lines) if lines else "Рейтинг пока формируется."
+    incog_btn_txt = "🟢 Инкогнито: ВКЛ" if is_incog else "🕶 Инкогнито: ВЫКЛ"
+
     builder = InlineKeyboardBuilder()
-    builder.button(text="👤 Личный кабинет", callback_data="profile")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(2)
+    builder.button(text=incog_btn_txt, callback_data="toggle_incognito")
+    builder.button(text="👤 Кабинет", callback_data="profile")
+    builder.button(text="🏠 В меню", callback_data="back_to_main")
+    builder.adjust(2, 1)
+
     await callback.message.edit_text(
         f"🏆 <b>ТОП-10 КАППЕРОВ ПРОЕКТА</b>\n\n<blockquote>{body}</blockquote>",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
+
+@dp.callback_query(F.data == "leaderboard")
+async def process_leaderboard(callback: CallbackQuery):
+    await render_leaderboard_view(callback)
     await callback.answer()
+
+@dp.callback_query(F.data == "toggle_incognito")
+async def process_toggle_incognito(callback: CallbackQuery):
+    new_state = await db_manager.toggle_user_incognito(callback.from_user.id)
+    msg = "🕶 Режим Инкогнито ВКЛЮЧЕН: твой ник скрыт в Топ-10!" if new_state == 1 else "👀 Режим Инкогнито ВЫКЛЮЧЕН: твой ник снова виден в Топ-10!"
+    await callback.answer(msg, show_alert=True)
+    await render_leaderboard_view(callback)
 
 # ================= ЭКСПРЕСС ДНЯ И КОРЗИНА ЭКСПРЕССА =================
 @dp.callback_query(F.data == "express_day")
