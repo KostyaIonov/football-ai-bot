@@ -43,7 +43,6 @@ class AdminStates(StatesGroup):
     waiting_for_broadcast = State()
     waiting_for_gift_data = State()
 
-# Клиенты ИИ
 gemini_client = AsyncOpenAI(
     api_key=GEMINI_API_KEY or "dummy",
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -58,11 +57,11 @@ HTTP_HEADERS = {
     "Accept": "application/json, text/plain, */*"
 }
 
-# ================= КОНФИГУРАЦИЯ ЛИГ, КЛУБОВ И ДОСТИЖЕНИЙ =================
+# ================= КОНФИГУРАЦИЯ ТУРНИРОВ (ТОП-5 + ДРУГИЕ ЛИГИ) =================
 MSK_TZ = timezone(timedelta(hours=3))
 
-LEAGUES_CONFIG = {
-    "ucl": {"title": "🏆 Лига Чемпионов УЕФА", "slug": "uefa.champions"},
+MAIN_LEAGUES = {
+    "ucl": {"title": "🏆 Лига Чемпионов", "slug": "uefa.champions"},
     "epl": {"title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)", "slug": "eng.1"},
     "laliga": {"title": "🇪🇸 Ла Лига (Испания)", "slug": "esp.1"},
     "seriea": {"title": "🇮🇹 Серия А (Италия)", "slug": "ita.1"},
@@ -70,11 +69,24 @@ LEAGUES_CONFIG = {
     "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
 }
 
+OTHER_LEAGUES = {
+    "uel": {"title": "🏆 Лига Европы", "slug": "uefa.europa"},
+    "uecl": {"title": "🏆 Лига Конференций", "slug": "uefa.europa.conference"},
+    "por": {"title": "🇵🇹 Португалия", "slug": "por.1"},
+    "ned": {"title": "🇳🇱 Нидерланды", "slug": "ned.1"},
+    "tur": {"title": "🇹🇷 Турция", "slug": "tur.1"},
+    "eng2": {"title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Чемпионшип", "slug": "eng.2"},
+    "bra": {"title": "🇧🇷 Бразилия", "slug": "bra.1"}
+}
+
+LEAGUES_CONFIG = {**MAIN_LEAGUES, **OTHER_LEAGUES}
+
 POPULAR_CLUBS = [
     "Реал Мадрид", "Барселона", "Арсенал", "Ливерпуль",
-    "Манчестер Сити", "Манчестер Юнайтед", "Челси", "Бавария",
+    "Ман Сити", "Ман Юнайтед", "Челси", "Бавария",
     "Боруссия Д", "Байер", "Интер", "Милан",
-    "Ювентус", "Наполи", "ПСЖ", "Атлетико Мадрид"
+    "Ювентус", "Наполи", "ПСЖ", "Атлетико",
+    "Бенфика", "Спортинг", "Галатасарай", "Фенербахче"
 ]
 
 ACHIEVEMENTS_CONFIG = {
@@ -96,39 +108,38 @@ ACHIEVEMENTS_CONFIG = {
 }
 
 BOOSTER_NAMES = {
-    "insure50": "🛡 Страховка 50% (возврат половины суммы при проигрыше)",
+    "insure50": "🛡 Страховка 50% (возврат половины при проигрыше)",
     "boost035": "⚡ Кэф-буст +0.35 к следующей ставке"
 }
 
 TEAM_TRANSLATIONS = {
-    # Англия
-    "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут",
-    "AFC Bournemouth": "Борнмут", "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон",
-    "Brighton": "Брайтон", "Chelsea": "Челси", "Crystal Palace": "Кристал Пэлас",
-    "Everton": "Эвертон", "Fulham": "Фулхэм", "Ipswich Town": "Ипсвич",
-    "Leicester City": "Лестер", "Liverpool": "Ливерпуль", "Manchester City": "Манчестер Сити",
-    "Manchester United": "Манчестер Юнайтед", "Newcastle United": "Ньюкасл",
-    "Nottingham Forest": "Ноттингем Форест", "Southampton": "Саутгемптон",
-    "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм",
-    "Wolverhampton Wanderers": "Вулверхэмптон", "Leeds United": "Лидс",
-    "Burnley": "Бернли", "Sunderland": "Сандерленд",
+    # Англия (АПЛ + Чемпионшип)
+    "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
+    "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон", "Brighton": "Брайтон", "Chelsea": "Челси",
+    "Crystal Palace": "Кристал Пэлас", "Everton": "Эвертон", "Fulham": "Фулхэм", "Ipswich Town": "Ипсвич",
+    "Leicester City": "Лестер", "Liverpool": "Ливерпуль", "Manchester City": "Ман Сити",
+    "Manchester United": "Ман Юнайтед", "Newcastle United": "Ньюкасл", "Nottingham Forest": "Ноттингем",
+    "Southampton": "Саутгемптон", "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм",
+    "Wolverhampton Wanderers": "Вулверхэмптон", "Leeds United": "Лидс", "Burnley": "Бернли",
+    "Sunderland": "Сандерленд", "Sheffield United": "Шеффилд Ютд", "West Bromwich Albion": "Вест Бромвич",
+    "Middlesbrough": "Мидлсбро", "Norwich City": "Норвич", "Coventry City": "Ковентри",
+    "Watford": "Уотфорд", "Blackburn Rovers": "Блэкберн", "Bristol City": "Бристоль Сити",
+    "Hull City": "Халл Сити", "Stoke City": "Сток Сити", "Swansea City": "Суонси", "Millwall": "Миллуолл",
+    "Queens Park Rangers": "КПР", "Preston North End": "Престон", "Cardiff City": "Кардифф",
     # Испания
-    "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико Мадрид",
-    "Atletico Madrid": "Атлетико Мадрид", "Athletic Club": "Атлетик Бильбао", "Real Sociedad": "Реал Сосьедад",
-    "Real Betis": "Бетис", "Villarreal": "Вильярреал", "Valencia": "Валенсия",
-    "Sevilla": "Севилья", "Girona": "Жирона", "Celta Vigo": "Сельта",
-    "Osasuna": "Осасуна", "Getafe": "Хетафе", "Rayo Vallecano": "Райо Вальекано",
-    "Mallorca": "Мальорка", "Las Palmas": "Лас-Пальмас", "Alavés": "Алавес",
-    "Deportivo Alavés": "Алавес", "Espanyol": "Эспаньол", "Leganés": "Леганес",
+    "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико",
+    "Atletico Madrid": "Атлетико", "Athletic Club": "Атлетик Б", "Real Sociedad": "Реал Сосьедад",
+    "Real Betis": "Бетис", "Villarreal": "Вильярреал", "Valencia": "Валенсия", "Sevilla": "Севилья",
+    "Girona": "Жирона", "Celta Vigo": "Сельта", "Osasuna": "Осасуна", "Getafe": "Хетафе",
+    "Rayo Vallecano": "Райо Вальекано", "Mallorca": "Мальорка", "Las Palmas": "Лас-Пальмас",
+    "Alavés": "Алавес", "Deportivo Alavés": "Алавес", "Espanyol": "Эспаньол", "Leganés": "Леганес",
     "Real Valladolid": "Вальядолид",
     # Италия
-    "Internazionale": "Интер", "Inter Milan": "Интер", "AC Milan": "Милан",
-    "Juventus": "Ювентус", "Napoli": "Наполи", "AS Roma": "Рома", "Roma": "Рома",
-    "Lazio": "Лацио", "Atalanta": "Аталанта", "Fiorentina": "Фиорентина",
-    "Bologna": "Болонья", "Torino": "Торино", "Udinese": "Удинезе",
-    "Genoa": "Дженоа", "Como": "Комо", "Parma": "Парма",
-    "Hellas Verona": "Верона", "Empoli": "Эмполи", "Cagliari": "Кальяри",
-    "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
+    "Internazionale": "Интер", "Inter Milan": "Интер", "AC Milan": "Милан", "Juventus": "Ювентус",
+    "Napoli": "Наполи", "AS Roma": "Рома", "Roma": "Рома", "Lazio": "Лацио", "Atalanta": "Аталанта",
+    "Fiorentina": "Фиорентина", "Bologna": "Болонья", "Torino": "Торино", "Udinese": "Удинезе",
+    "Genoa": "Дженоа", "Como": "Комо", "Parma": "Парма", "Hellas Verona": "Верона",
+    "Empoli": "Эмполи", "Cagliari": "Кальяри", "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
     # Германия
     "Bayern Munich": "Бавария", "Borussia Dortmund": "Боруссия Д", "Bayer Leverkusen": "Байер",
     "RB Leipzig": "РБ Лейпциг", "VfB Stuttgart": "Штутгарт", "Eintracht Frankfurt": "Айнтрахт Ф",
@@ -137,30 +148,36 @@ TEAM_TRANSLATIONS = {
     "VfL Wolfsburg": "Вольфсбург", "Borussia Mönchengladbach": "Боруссия М", "Mainz": "Майнц",
     "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
     "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн", "Hamburger SV": "Гамбург", "FC Cologne": "Кельн",
-    # Франция и ЛЧ
-    "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако",
-    "Marseille": "Марсель", "Olympique de Marseille": "Марсель", "Lille": "Лилль",
-    "LOSC Lille": "Лилль", "Lyon": "Лион", "Olympique Lyonnais": "Лион",
-    "Nice": "Ницца", "OGC Nice": "Ницца", "Lens": "Ланс", "RC Lens": "Ланс",
+    # Франция
+    "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако", "Marseille": "Марсель",
+    "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль", "Lyon": "Лион",
+    "Olympique Lyonnais": "Лион", "Nice": "Ницца", "OGC Nice": "Ницца", "Lens": "Ланс", "RC Lens": "Ланс",
     "Rennes": "Ренн", "Stade Rennais": "Ренн", "Stade Brestois 29": "Брест", "Brest": "Брест",
-    "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур",
-    "RC Strasbourg Alsace": "Страсбур", "Toulouse": "Тулуза", "Montpellier": "Монпелье",
-    "Nantes": "Нант", "FC Nantes": "Нант", "Auxerre": "Осер", "AJ Auxerre": "Осер",
-    "Angers": "Анже", "Saint-Étienne": "Сент-Этьен", "Le Havre": "Гавр",
-    # Клубы ЛЧ
-    "Sporting CP": "Спортинг", "Benfica": "Бенфика", "FC Porto": "Порту",
-    "PSV Eindhoven": "ПСВ", "Feyenoord": "Фейеноорд", "Ajax": "Аякс",
-    "Celtic": "Селтик", "Club Brugge": "Брюгге", "Shakhtar Donetsk": "Шахтер",
-    "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац", "Sparta Prague": "Спарта Прага",
-    "Slovan Bratislava": "Слован", "Young Boys": "Янг Бойз", "Dinamo Zagreb": "Динамо Загреб",
-    "Crvena Zvezda": "Црвена Звезда", "Galatasaray": "Галатасарай"
+    "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур", "RC Strasbourg Alsace": "Страсбур",
+    "Toulouse": "Тулуза", "Montpellier": "Монпелье", "Nantes": "Нант", "FC Nantes": "Нант",
+    "Auxerre": "Осер", "AJ Auxerre": "Осер", "Angers": "Анже", "Saint-Étienne": "Сент-Этьен", "Le Havre": "Гавр",
+    # Португалия, Нидерланды, Турция, Бразилия, Еврокубки
+    "Sporting CP": "Спортинг", "Benfica": "Бенфика", "FC Porto": "Порту", "SC Braga": "Брага",
+    "Vitória de Guimarães": "Витория Гим", "Famalicão": "Фамаликан", "Rio Ave": "Риу Аве", "Boavista": "Боавишта",
+    "PSV Eindhoven": "ПСВ", "Feyenoord": "Фейеноорд", "Ajax": "Аякс", "AZ Alkmaar": "АЗ Алкмар",
+    "FC Twente": "Твенте", "FC Utrecht": "Утрехт", "Sparta Rotterdam": "Спарта Р", "Heerenveen": "Херенвен",
+    "Galatasaray": "Галатасарай", "Fenerbahce": "Фенербахче", "Fenerbahçe": "Фенербахче",
+    "Besiktas": "Бешикташ", "Beşiktaş": "Бешикташ", "Trabzonspor": "Трабзонспор",
+    "Istanbul Basaksehir": "Башакшехир", "Samsunspor": "Самсунспор", "Antalyaspor": "Антальяспор",
+    "Flamengo": "Фламенго", "Palmeiras": "Палмейрас", "Botafogo": "Ботафого", "São Paulo": "Сан-Паулу",
+    "Corinthians": "Коринтианс", "Fluminense": "Флуминенсе", "Grêmio": "Гремио", "Internacional": "Интернасьонал",
+    "Atlético Mineiro": "Атлетико Минейро", "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко да Гама", "Santos": "Сантос",
+    "Celtic": "Селтик", "Rangers": "Рейнджерс", "Club Brugge": "Брюгге", "Anderlecht": "Андерлехт",
+    "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац",
+    "Sparta Prague": "Спарта Прага", "Slavia Prague": "Славия Прага", "Olympiacos": "Олимпиакос", "PAOK": "ПАОК"
 }
 
 ELITE_KEYWORDS = {
-    "Реал Мадрид": 0.45, "Манчестер Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
+    "Реал Мадрид": 0.45, "Ман Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
     "Ливерпуль": 0.40, "Арсенал": 0.38, "Интер": 0.36, "ПСЖ": 0.35, "Байер": 0.30,
-    "Атлетико": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24,
-    "Милан": 0.22, "Боруссия Д": 0.22, "Аталанта": 0.20, "Астон Вилла": 0.18
+    "Атлетико": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24, "Милан": 0.22,
+    "Боруссия Д": 0.22, "Спортинг": 0.28, "Бенфика": 0.26, "Порту": 0.25,
+    "ПСВ": 0.28, "Аякс": 0.24, "Галатасарай": 0.26, "Фенербахче": 0.25, "Палмейрас": 0.24, "Фламенго": 0.24
 }
 
 def translate_team(name: str) -> str:
@@ -182,7 +199,6 @@ def clean_ai_text(text: str) -> str:
     return text.strip()
 
 def get_user_rank_info(balance: float, is_vip: int) -> tuple[str, int]:
-    """Уникальные значки рангов (без дублирования медалей 1-3 места)"""
     if is_vip or balance >= 15000:
         return "👑 Легенда Уолл-Стрит", 1000
     elif balance >= 5000:
@@ -192,8 +208,12 @@ def get_user_rank_info(balance: float, is_vip: int) -> tuple[str, int]:
     else:
         return "🌱 Новичок лиги", 250
 
-# ================= ФОРМАТИРОВАНИЕ ПОСТРОЧНЫХ СПИСКОВ СОБЫТИЙ =================
+# ================= ПОШАГОВОЕ ФОРМАТИРОВАНИЕ СОБЫТИЙ ЭКСПРЕССА =================
 def format_bet_legs_multiline(bet: dict, with_result: bool = False) -> str:
+    """
+    Отображает каждое событие купона на отдельной строке со статусом (✅, ❌, 🔄, 🔴 LIVE или 📅)
+    как в Архиве, так и в Активных ставках!
+    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -205,22 +225,45 @@ def format_bet_legs_multiline(bet: dict, with_result: bool = False) -> str:
             t_name = leg.get("teams", "Матч")
             p_lbl = leg.get("pick_label") or leg.get("pick_code", "")
             l_odd = leg.get("odds", "")
-            odd_str = f" (кэф <code>{l_odd}</code>)" if l_odd else ""
-            if with_result and leg.get("final_score"):
-                st = leg.get("final_status", "")
-                icon = "✅" if st == "win" else ("🔄 Возврат" if st == "push" else "❌")
-                lines.append(
-                    f"<b>{idx}. {t_name}</b>\n"
-                    f"   🎯 <code>{p_lbl}</code>{odd_str} • Счет: <b><code>{leg['final_score']}</code></b> {icon}"
-                )
+            odd_str = f" (<code>{l_odd}</code>)" if l_odd else ""
+
+            st = leg.get("final_status", "")
+            f_score = leg.get("final_score", "")
+            live_sc = leg.get("live_score", "")
+
+            if st == "win":
+                status_tag = f"✅ <b>{f_score}</b> (Сыграло)"
+            elif st == "loss":
+                status_tag = f"❌ <b>{f_score}</b> (Не прошло)"
+            elif st == "push":
+                status_tag = f"🔄 <b>{f_score}</b> (Возврат)"
+            elif live_sc:
+                status_tag = f"🔴 LIVE: <b>{live_sc}</b>"
             else:
-                lines.append(
-                    f"<b>{idx}. {t_name}</b>\n"
-                    f"   🎯 Исход: <code>{p_lbl}</code>{odd_str}"
-                )
+                status_tag = "📅 Ожидает"
+
+            lines.append(
+                f"<b>{idx}. {t_name}</b>\n"
+                f"   🎯 <code>{p_lbl}</code>{odd_str} • {status_tag}"
+            )
         return "\n".join(lines)
 
-    score_part = f"\n🏁 Реальный счет: <b><code>{bet['score_result']}</code></b>" if (with_result and bet.get("score_result") and bet.get("status") != "cashout") else ""
+    # Для ординара
+    if legs:
+        lg = legs[0]
+        st = lg.get("final_status", "")
+        f_score = lg.get("final_score") or bet.get("score_result", "")
+        live_sc = lg.get("live_score", "")
+        if with_result and f_score and bet.get("status") != "cashout":
+            icon = "✅" if st == "win" else ("🔄 Возврат" if st == "push" else "❌")
+            score_part = f"\n🏁 Реальный счет: <b><code>{f_score}</code></b> {icon}"
+        elif live_sc:
+            score_part = f"\n🔴 Идет матч: <b><code>{live_sc}</code></b>"
+        else:
+            score_part = ""
+    else:
+        score_part = f"\n🏁 Реальный счет: <b><code>{bet['score_result']}</code></b>" if (with_result and bet.get("score_result")) else ""
+
     return (
         f"🏟 <b>Матч:</b> {bet['match_title']}\n"
         f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <b><code>{bet['odds']}</code></b>){score_part}"
@@ -274,7 +317,7 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
         calc_odd = round(max(1.10, min(15.0, 1.0 / (p_win * 1.045))), 2)
         return {
             "pick_code": f"{'itb1' if is_home else 'itb2'}_{line:.1f}",
-            "label": f"{prefix_lbl} Больше {line:.1f}",
+            "label": f"{prefix_lbl} > {line:.1f}",
             "odds": calc_odd,
             "prob": round(p_win * 100, 1)
         }
@@ -318,7 +361,7 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
         calc_odd = round(max(1.08, min(19.0, 1.0 / (effective_win_prob * margin))), 2)
 
         line_str = f"{int_line}.0" if is_integer_line else f"{line:.1f}"
-        refund_note = " (с возвратом)" if is_integer_line else ""
+        refund_note = " (возврат)" if is_integer_line else ""
         return {
             "pick_code": f"{direction}_{line_str}",
             "label": f"{label_prefix} {line_str}{refund_note}",
@@ -391,7 +434,7 @@ def parse_team_stats_detail(comp_dict: dict, ru_name: str) -> dict:
                ["❌П"] * 5)[:5]
         form_visual = " ".join(seq)
     else:
-        form_visual = "📊 Первые туры"
+        form_visual = "📊 Старт сезона"
 
     points = w * 3 + d
     return {
@@ -562,7 +605,7 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
             "a_stats": a_stats,
             "records_info": f"{h_name} ({h_stats['record_str']}), {a_name} ({a_stats['record_str']})",
             "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
-            "short_date": dt_msk.strftime("%d.%m • %H:%M"),
+            "short_date": dt_msk.strftime("%d.%m %H:%M"),
             "start_ts": start_ts,
             "end_ts": start_ts + (115 * 60),
             "exp_goals": exp_goals,
@@ -907,7 +950,6 @@ class Database:
         return u
 
     async def unlock_achievement(self, user_id: int, ach_key: str) -> bool:
-        """Разблокирует достижение, начисляет награду и отправляет пуш игроку"""
         if ach_key not in ACHIEVEMENTS_CONFIG:
             return False
         user = await self.get_user(user_id)
@@ -1022,7 +1064,6 @@ class Database:
         if user["balance"] < amount:
             return {"ok": False, "error": f"Недостаточно средств! Твой баланс: {round(user['balance'], 1)} FC."}
 
-        # Проверяем Ва-банк, Любимый клуб и Активный бустер от рулетки
         is_all_in = 1 if (user["balance"] - amount < 10.0) else 0
         fav_club = user.get("favorite_club") or ""
         is_fav_club = 1 if (fav_club and (fav_club in match_title or fav_club in pick)) else 0
@@ -1081,6 +1122,16 @@ class Database:
             "new_balance": new_balance,
             "potential_win": round(amount * final_odds, 1)
         }
+
+    async def update_bet_legs_progress(self, bet_id: int, updated_legs_json: str):
+        """Сохраняет промежуточные результаты сыгравших матчей внутри активного экспресса"""
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                await conn.execute("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", updated_legs_json, bet_id)
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                await db.execute("UPDATE bets SET legs_json = ? WHERE bet_id = ?", (updated_legs_json, bet_id))
+                await db.commit()
 
     async def get_user_bets(self, user_id: int, active_only: bool = True) -> list:
         if self.use_pg:
@@ -1144,7 +1195,6 @@ class Database:
             w_inc, l_inc = 1, 0
             new_streak = cur_streak + 1
 
-            # Проверяем, была ли ставка на тотал
             try:
                 legs_list = json.loads(legs_str)
             except Exception:
@@ -1207,7 +1257,6 @@ class Database:
                 )
                 await db.commit()
 
-        # Проверка и выдача достижений
         uid = bet["user_id"]
         if outcome_status == "cashout":
             await self.unlock_achievement(uid, "cashout_profit")
@@ -1328,7 +1377,6 @@ class Database:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
 
-    # Функции Админ-панели
     async def get_project_stats(self) -> dict:
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
@@ -1434,7 +1482,7 @@ async def ask_ai_cached(cache_key: str, prompt: str, system_prompt: str = "Ты 
 
     return None
 
-# ================= ПРОВЕРКА РЕЗУЛЬТАТОВ СТАВОК И СУПЕРЭКСПРЕССА =================
+# ================= ПРОВЕРКА РЕЗУЛЬТАТОВ И ПРОМЕЖУТОЧНЫХ НОГ ЭКСПРЕССА =================
 def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str:
     code = pick_code.lower()
     total_goals = home_score + away_score
@@ -1535,6 +1583,11 @@ async def calculate_cashout_offer(session: aiohttp.ClientSession, bet: dict) -> 
     return min(offer, max_win)
 
 async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
+    """
+    Проверяет каждое событие в купоне.
+    Даже если экспресс еще не завершился целиком, сохраняет статусы уже завершившихся
+    и идущих в LIVE матчей в базу данных, чтобы игрок видел прогресс в 'Активных ставках'!
+    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -1549,24 +1602,33 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
     all_pushed = True
     score_parts = []
     live_parts = []
+    legs_changed = False
 
     for leg in legs:
         res = await fetch_real_match_result(session, leg["league_slug"], str(leg["event_id"]))
         if not res["ok"]:
             all_completed = False
-            live_parts.append(f"⏳ {leg['teams']} — ожидание данных")
+            live_parts.append(f"⏳ {leg['teams']} — ожидание")
             continue
 
         if not res["completed"]:
             all_completed = False
             if res["state"] == "in":
-                live_parts.append(f"🔴 LIVE: {leg['teams']} — {res['score_str']} ({res['detail']})")
+                live_tag = f"{res['score_str']} ({res['detail']})"
+                if leg.get("live_score") != live_tag:
+                    leg["live_score"] = live_tag
+                    legs_changed = True
+                live_parts.append(f"🔴 LIVE: {leg['teams']} — {live_tag}")
             else:
-                live_parts.append(f"📅 {leg['teams']} — еще не начался")
+                live_parts.append(f"📅 {leg['teams']} — ожидает начала")
         else:
             st = evaluate_leg_result(leg["pick_code"], res["home_score"], res["away_score"])
-            leg["final_score"] = res["score_str"]
-            leg["final_status"] = st
+            if leg.get("final_status") != st or leg.get("final_score") != res["score_str"]:
+                leg["final_score"] = res["score_str"]
+                leg["final_status"] = st
+                leg.pop("live_score", None)
+                legs_changed = True
+
             leg_odd = float(leg.get("odds") or bet["odds"])
             if st == "win":
                 effective_odds *= leg_odd
@@ -1586,6 +1648,8 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
                 score_parts.append(f"{leg['teams']} {res['score_str']} ({icon})")
             live_parts.append(f"🏁 {leg['teams']} — {res['score_str']} {icon}")
 
+    updated_legs_str = json.dumps(legs, ensure_ascii=False)
+
     if all_completed:
         final_score_str = " | ".join(score_parts)
         if any_lost:
@@ -1598,12 +1662,16 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
         if len(legs) == 1 and outcome_status == "win":
             effective_odds = float(bet["odds"])
 
-        updated_legs_str = json.dumps(legs, ensure_ascii=False)
         bet["legs_json"] = updated_legs_str
         bet["score_result"] = final_score_str
         db_res = await db_manager.settle_bet_in_db(bet, outcome_status, effective_odds, final_score_str, updated_legs_str)
         await send_settlement_notification(bet, outcome_status, effective_odds, db_res)
         return {"settled": True, "status": outcome_status, "score_str": final_score_str}
+
+    # Если купон еще в игре, но отдельные события экспресса обновились — сохраняем прогресс в БД
+    if legs_changed:
+        bet["legs_json"] = updated_legs_str
+        await db_manager.update_bet_legs_progress(bet["bet_id"], updated_legs_str)
 
     return {"settled": False, "live_summary": "\n".join(live_parts)}
 
@@ -1791,85 +1859,105 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
     p1, x, p2 = probs["p1"], probs["x"], probs["p2"]
 
     if p1 >= 60:
-        style = f"⚔️ <b>Тактический расклад:</b> {t1} имеет весомое преимущество домашнего поля и класса ({p1}%). Ожидается интенсивный прессинг хозяев с первых минут."
-        bet = f"🎯 <b>Лучший выбор:</b> П1 ({t1}) за <code>{odds['p1']}</code> или надежный ТБ 1.5 за <code>{odds['tb15']}</code>"
+        style = f"⚔️ <b>Расклад:</b> {t1} имеет весомый перевес домашнего поля и класса ({p1}%)."
+        bet = f"🎯 <b>Выбор ИИ:</b> П1 ({t1}) за <code>{odds['p1']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
     elif p2 >= 53:
-        style = f"⚔️ <b>Тактический расклад:</b> {t2} сильнее в быстрых переходных фазах и реализации моментов ({p2}% против {p1}%)."
-        bet = f"🎯 <b>Лучший выбор:</b> П2 ({t2}) за <code>{odds['p2']}</code> или Фора 2 (0) за <code>{odds['f20']}</code>"
+        style = f"⚔️ <b>Расклад:</b> {t2} сильнее в переходных фазах и реализации моментов ({p2}% против {p1}%)."
+        bet = f"🎯 <b>Выбор ИИ:</b> П2 ({t2}) за <code>{odds['p2']}</code> или Фора 2 (0) за <code>{odds['f20']}</code>"
     elif odds["tb25"] <= 1.78:
-        style = f"⚔️ <b>Тактический расклад:</b> Встреча двух атакующих команд с высоким потенциалом xG ({match['exp_goals']}). Оборона обеих сторон регулярно допускает моменты."
-        bet = f"🎯 <b>Лучший выбор:</b> ТБ 2.5 за <code>{odds['tb25']}</code> или Обе забьют (Да) за <code>{odds['btts']}</code>"
+        style = f"⚔️ <b>Расклад:</b> Встреча двух атакующих команд с высоким потенциалом xG ({match['exp_goals']})."
+        bet = f"🎯 <b>Выбор ИИ:</b> ТБ 2.5 за <code>{odds['tb25']}</code> или Обе забьют за <code>{odds['btts']}</code>"
     elif abs(p1 - p2) <= 12:
-        style = f"⚔️ <b>Тактический расклад:</b> Равное противостояние ({p1}% на {p2}%). В таких матчах оптимальна ставка на обмен голами или тотал с подстраховкой."
-        bet = f"🎯 <b>Лучший выбор:</b> Обе забьют (Да) за <code>{odds['btts']}</code> или ТБ 2.0 (с возвратом)"
+        style = f"⚔️ <b>Расклад:</b> Плотное противостояние ({p1}% на {p2}%). Высока вероятность обмена голами."
+        bet = f"🎯 <b>Выбор ИИ:</b> Обе забьют за <code>{odds['btts']}</code> или ТБ 2.0 (с возвратом)"
     else:
-        style = f"⚔️ <b>Тактический расклад:</b> Умеренное преимущество {t1} ({p1}%), но {t2} опасен на контратаках и стандартах."
-        bet = f"🎯 <b>Лучший выбор:</b> Фора 1 (0) за <code>{odds['f10']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
+        style = f"⚔️ <b>Расклад:</b> Инициатива у {t1} ({p1}%), но {t2} опасен на стандартах и контратаках."
+        bet = f"🎯 <b>Выбор ИИ:</b> Фора 1 (0) за <code>{odds['f10']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
     return f"{style}\n\n{bet}"
 
-# ================= КЛАВИАТУРЫ =================
+# ================= МОБИЛЬНЫЕ КЛАВИАТУРЫ (ОПТИМИЗИРОВАННЫЕ ПОД СМАРТФОН) =================
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
     builder.button(text="👤 Личный кабинет", callback_data="profile")
     builder.button(text="🏆 Лига Чемпионов", callback_data="league:ucl")
-    builder.button(text="🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)", callback_data="league:epl")
-    builder.button(text="🇪🇸 Ла Лига (Испания)", callback_data="league:laliga")
-    builder.button(text="🇮🇹 Серия А (Италия)", callback_data="league:seriea")
+    builder.button(text="🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ", callback_data="league:epl")
+    builder.button(text="🇪🇸 Ла Лига", callback_data="league:laliga")
+    builder.button(text="🇮🇹 Серия А", callback_data="league:seriea")
     builder.button(text="🇩🇪 Бундеслига", callback_data="league:bundesliga")
-    builder.button(text="🇫🇷 Лига 1 (Франция)", callback_data="league:ligue1")
+    builder.button(text="🇫🇷 Лига 1", callback_data="league:ligue1")
+    builder.button(text="🌐 Другие чемпионаты (7 лиг)", callback_data="other_leagues")
     builder.button(text="⚡ Экспресс дня", callback_data="express_day")
-    builder.button(text="🎯 Суперэкспресс тура", callback_data="superexpress_menu")
+    builder.button(text="🎯 Суперэкспресс", callback_data="superexpress_menu")
     builder.button(text="🏆 Топ-10 капперов", callback_data="leaderboard")
 
     if slip_count > 0:
         builder.button(text=f"🧺 Мой купон экспресса ({slip_count})", callback_data="view_slip")
-        builder.adjust(1, 2, 2, 2, 2, 1, 1)
+        builder.adjust(1, 2, 2, 2, 1, 2, 1, 1)
     else:
-        builder.adjust(1, 2, 2, 2, 2, 1)
+        builder.adjust(1, 2, 2, 2, 1, 2, 1)
     return builder.as_markup()
 
-def profile_kb(active_count: int = 0, bonus_amt: int = 250, ach_count: int = 0, fav_club: str = ""):
-    club_btn = f"⭐ Клуб: {fav_club}" if fav_club else "⭐ Выбрать клуб"
+def other_leagues_kb(db: dict):
+    """Хаб дополнительных турниров с динамическим счетчиком доступных матчей"""
     builder = InlineKeyboardBuilder()
-    builder.button(text=f"⏳ Активные ставки ({active_count})", callback_data="active_bets")
-    builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
-    builder.button(text="🎰 Футбольная рулетка", callback_data="roulette_menu")
-    builder.button(text=f"🎁 Бонус (+{bonus_amt} FC)", callback_data="claim_bonus")
-    builder.button(text=f"🎖 Достижения ({ach_count}/{len(ACHIEVEMENTS_CONFIG)})", callback_data="achievements_menu")
-    builder.button(text=club_btn, callback_data="fav_club_menu")
-    builder.button(text="🤝 Пригласить друга (+500 FC)", callback_data="referral_menu")
+    for l_key, cfg in OTHER_LEAGUES.items():
+        cnt = len(db.get(l_key, {}).get("matches", {}))
+        badge = f" ({cnt})" if cnt > 0 else ""
+        builder.button(text=f"{cfg['title']}{badge}", callback_data=f"league:{l_key}")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(2, 2, 2, 1, 1)
     return builder.as_markup()
 
+def profile_kb(active_count: int = 0, bonus_amt: int = 250, ach_count: int = 0, fav_club: str = ""):
+    club_btn = f"⭐ {fav_club}" if fav_club else "⭐ Мой клуб"
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"⏳ Активные ({active_count})", callback_data="active_bets")
+    builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
+    builder.button(text="🎰 Рулетка удачи", callback_data="roulette_menu")
+    builder.button(text=f"🎁 Бонус (+{bonus_amt})", callback_data="claim_bonus")
+    builder.button(text=f"🎖 Трофеи ({ach_count}/15)", callback_data="achievements_menu")
+    builder.button(text=club_btn, callback_data="fav_club_menu")
+    builder.button(text="🤝 Пригласить друга (+500 FC)", callback_data="referral_menu")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
+    builder.adjust(2, 2, 2, 1, 1)
+    return builder.as_markup()
+
 def matches_kb(league_key: str, matches_dict: dict):
+    """Компактные кнопки матчей без обрезки на экране телефона"""
     builder = InlineKeyboardBuilder()
     for match_id, data in list(matches_dict.items())[:15]:
         builder.button(
-            text=f"▫️ {data['teams']}  |  {data['short_date']}",
+            text=f"{data['teams']} • {data['short_date']}",
             callback_data=f"match:{league_key}:{match_id}"
         )
-    builder.button(text="🔄 Обновить расписание", callback_data=f"refresh_league:{league_key}")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(1)
+    builder.button(text="🔄 Обновить", callback_data=f"refresh_league:{league_key}")
+    if league_key in OTHER_LEAGUES:
+        builder.button(text="⬅️ Другие лиги", callback_data="other_leagues")
+    else:
+        builder.button(text="🏠 В меню", callback_data="back_to_main")
+    builder.adjust(*([1] * min(15, len(matches_dict))), 2)
     return builder.as_markup()
 
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
+    """Лаконичная сетка карточки матча на 1 экран смартфона"""
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
+    # Ряд 1: Основные исходы
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    builder.button(text="📈 Тотал Больше (ТБ)", callback_data=f"totals_menu:{league_key}:{match_id}:tb")
-    builder.button(text="📉 Тотал Меньше (ТМ)", callback_data=f"totals_menu:{league_key}:{match_id}:tm")
-    builder.button(text="📊 Сводка и ИТБ команд", callback_data=f"stats_menu:{league_key}:{match_id}")
-    builder.button(text="🛡️ Фора (0) / 1Х2 / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
+    # Ряд 2: Тоталы
+    builder.button(text="📈 Тотал Б (ТБ)", callback_data=f"totals_menu:{league_key}:{match_id}:tb")
+    builder.button(text="📉 Тотал М (ТМ)", callback_data=f"totals_menu:{league_key}:{match_id}:tm")
+    # Ряд 3: Сводка/ИТБ и Форы/ОЗ
+    builder.button(text="📊 Сводка и ИТБ", callback_data=f"stats_menu:{league_key}:{match_id}")
+    builder.button(text="🛡️ Форы / 1Х2 / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
 
     if slip_count > 0:
-        builder.button(text=f"🧺 Мой купон экспресса ({slip_count})", callback_data="view_slip")
+        builder.button(text=f"🧺 Купон экспресса ({slip_count})", callback_data="view_slip")
 
-    builder.button(text="⬅️ К списку матчей", callback_data=f"league:{league_key}")
+    builder.button(text="⬅️ К матчам", callback_data=f"league:{league_key}")
     builder.button(text="🏠 Меню", callback_data="back_to_main")
 
     if slip_count > 0:
@@ -1887,10 +1975,10 @@ def stats_and_itb_kb(match: dict):
         m1 = evaluate_custom_market(match, f"itb1_{line_val}")
         m2 = evaluate_custom_market(match, f"itb2_{line_val}")
         if m1 and m2:
-            builder.button(text=f"🏠 ИТБ1 > {line_val} ({m1['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb1_{line_val}")
-            builder.button(text=f"✈️ ИТБ2 > {line_val} ({m2['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb2_{line_val}")
+            builder.button(text=f"🏠 ИТБ1>{line_val} ({m1['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb1_{line_val}")
+            builder.button(text=f"✈️ ИТБ2>{line_val} ({m2['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb2_{line_val}")
 
-    builder.button(text="⬅️ Назад к разбору матча", callback_data=f"match:{league_key}:{match_id}")
+    builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{league_key}:{match_id}")
     builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
@@ -1909,7 +1997,7 @@ def totals_constructor_kb(match: dict, direction: str):
                 callback_data=f"pick:{league_key}:{match_id}:{code}"
             )
 
-    builder.button(text="⬅️ Назад к разбору матча", callback_data=f"match:{league_key}:{match_id}")
+    builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{league_key}:{match_id}")
     builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
@@ -1921,11 +2009,11 @@ def extras_menu_kb(match: dict):
 
     builder.button(text=f"1Х ({o['1x']})", callback_data=f"pick:{league_key}:{match_id}:1x")
     builder.button(text=f"Х2 ({o['x2']})", callback_data=f"pick:{league_key}:{match_id}:x2")
-    builder.button(text=f"Фора 1 (0) • {o['f10']}", callback_data=f"pick:{league_key}:{match_id}:f10")
-    builder.button(text=f"Фора 2 (0) • {o['f20']}", callback_data=f"pick:{league_key}:{match_id}:f20")
-    builder.button(text=f"Обе забьют: Да ({o['btts']})", callback_data=f"pick:{league_key}:{match_id}:btts")
-    builder.button(text=f"Обе забьют: Нет ({o['btts_no']})", callback_data=f"pick:{league_key}:{match_id}:btts_no")
-    builder.button(text="⬅️ Назад к разбору матча", callback_data=f"match:{league_key}:{match_id}")
+    builder.button(text=f"Фора 1(0) • {o['f10']}", callback_data=f"pick:{league_key}:{match_id}:f10")
+    builder.button(text=f"Фора 2(0) • {o['f20']}", callback_data=f"pick:{league_key}:{match_id}:f20")
+    builder.button(text=f"ОЗ: Да ({o['btts']})", callback_data=f"pick:{league_key}:{match_id}:btts")
+    builder.button(text=f"ОЗ: Нет ({o['btts_no']})", callback_data=f"pick:{league_key}:{match_id}:btts_no")
+    builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{league_key}:{match_id}")
     builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
@@ -1946,13 +2034,13 @@ def amount_selection_kb(target_code: str, balance: float):
         builder.adjust(2, 2, 1, 1, 1)
     else:
         l_key, m_id, p_code = target_code.split("-", 2)
-        builder.button(text="➕ Добавить этот исход в Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
+        builder.button(text="➕ В мой Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
         builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{l_key}:{m_id}")
-        builder.adjust(2, 2, 1, 1, 1, 1)
+        builder.adjust(2, 2, 1, 1, 2)
 
     return builder.as_markup()
 
-# ================= СТАРТ И РЕФЕРАЛЬНАЯ СИСТЕМА =================
+# ================= СТАРТ И НАВИГАЦИЯ =================
 @dp.message(CommandStart())
 async def cmd_start(message: Message, command: CommandObject, state: FSMContext):
     await state.clear()
@@ -1982,15 +2070,14 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
             pass
 
     rank_name, _ = get_user_rank_info(user["balance"], user["is_vip"])
-    bonus_note = "\n🎁 <i>Тебе начислено +500 FC по приглашению друга!</i>" if rewarded else ""
+    bonus_note = "\n🎁 <i>Начислено +500 FC по приглашению друга!</i>\n" if rewarded else ""
     text = (
-        f"⚽ <b>AI_BET_BOT — ФУТБОЛЬНАЯ АНАЛИТИКА И ЛИНИЯ</b>\n\n"
+        f"⚽ <b>AI_BET_BOT • ФУТБОЛЬНАЯ ЛИНИЯ</b>\n\n"
         f"<blockquote>👤 Каппер: <b>{user['username']}</b>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
-        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  |  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>"
-        f"{bonus_note}\n"
-        f"📡 Реальные матчи, Суперэкспресс тура, Футбольная рулетка, 15 достижений и честный расчет по финальному свистку.\n\n"
-        f"👇 <b>Выбери раздел:</b>"
+        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>"
+        f"{bonus_note}"
+        f"👇 <b>Выбери турнир или открой Личный кабинет:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
 
@@ -2002,13 +2089,25 @@ async def process_back_main(callback: CallbackQuery, state: FSMContext):
     text = (
         f"⚽ <b>ГЛАВНОЕ МЕНЮ • AI_BET_BOT</b>\n\n"
         f"<blockquote>🏅 <b>{rank_name}</b>\n"
-        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  |  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>\n"
-        f"👇 <b>Выбери турнир, Суперэкспресс или открой Личный кабинет:</b>"
+        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>\n"
+        f"👇 <b>Выбери турнир или игровой режим:</b>"
     )
     await callback.message.edit_text(text, reply_markup=main_menu_kb(callback.from_user.id), parse_mode="HTML")
     await callback.answer()
 
-# ================= ЛИЧНЫЙ КАБИНЕТ, РУЛЕТКА, ДОСТИЖЕНИЯ И КЛУБ =================
+@dp.callback_query(F.data == "other_leagues")
+async def process_other_leagues(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    db = await get_real_matches()
+    text = (
+        "🌐 <b>ДРУГИЕ ЧЕМПИОНАТЫ И ЕВРОКУБКИ</b>\n\n"
+        "<blockquote>В скобках указано количество доступных матчей в расписании.</blockquote>\n"
+        "👇 <b>Выбери турнир:</b>"
+    )
+    await callback.message.edit_text(text, reply_markup=other_leagues_kb(db), parse_mode="HTML")
+    await callback.answer()
+
+# ================= ЛИЧНЫЙ КАБИНЕТ И АНИМИРОВАННАЯ РУЛЕТКА =================
 @dp.callback_query(F.data == "profile")
 async def process_profile(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -2024,25 +2123,32 @@ async def process_profile(callback: CallbackQuery, state: FSMContext):
     except Exception:
         unlocked = []
 
+    streak = int(user.get("streak") or 0)
+    if streak < 3:
+        streak_target = f" <i>(до «Хет-трика»: {3 - streak})</i>"
+    elif streak < 7:
+        streak_target = f" <i>(до «Снайпера»: {7 - streak})</i>"
+    else:
+        streak_target = " 🔥 <i>Мастер серии!</i>"
+
     fav_club = user.get("favorite_club") or ""
-    club_line = f"⭐ Любимый клуб: <b>{fav_club}</b> <i>(+10% к профиту)</i>\n" if fav_club else ""
+    club_line = f"⭐ Клуб: <b>{fav_club}</b> <i>(+10% к выплатам)</i>\n" if fav_club else ""
     booster_code = user.get("active_booster") or ""
-    booster_line = f"\n🚀 <b>Активный бустер:</b> {BOOSTER_NAMES.get(booster_code, booster_code)}" if booster_code else ""
+    booster_line = f"\n🚀 <b>Активный бустер:</b> {BOOSTER_NAMES.get(booster_code, booster_code)}\n" if booster_code else ""
 
     text = (
-        f"👤 <b>ЛИЧНЫЙ КАБИНЕТ</b>\n\n"
-        f"<blockquote>🆔 Игрок: <b>{user['username']}</b> (<code>{user['user_id']}</code>)\n"
+        f"👤 <b>КАБИНЕТ КАППЕРА</b>\n\n"
+        f"<blockquote>🆔 <b>{user['username']}</b> (<code>{user['user_id']}</code>)\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"{club_line}"
         f"💰 Свободный банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
-        f"⏳ Ставок в игре: <b><code>{len(active_bets)}</code></b> | 🔥 Серия побед: <b><code>{user.get('streak', 0)}</code></b></blockquote>"
-        f"{booster_line}\n"
-        f"📊 <b>Статистика каппера:</b>\n"
-        f"• Рассчитано ставок: <code>{total_settled}</code> (✅ <code>{user['wins']}</code> | ❌ <code>{user['losses']}</code>)\n"
-        f"• Процент побед (Winrate): <b><code>{winrate}%</code></b>\n"
-        f"• Чистый профит (ROI): <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n"
-        f"• Открыто достижений: <b><code>{len(unlocked)} из {len(ACHIEVEMENTS_CONFIG)}</code></b>\n"
-        f"• Приглашено друзей: <b><code>{user.get('referrals_count', 0)}</code></b>"
+        f"🔥 Серия побед: <b><code>{streak} подряд</code></b>{streak_target}\n"
+        f"⏳ Купонов в игре: <b><code>{len(active_bets)}</code></b></blockquote>"
+        f"{booster_line}"
+        f"📊 <b>Эффективность:</b>\n"
+        f"• Ставок: <code>{total_settled}</code> (✅ <code>{user['wins']}</code> | ❌ <code>{user['losses']}</code>)\n"
+        f"• Винрейт: <b><code>{winrate}%</code></b>  |  ROI: <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n"
+        f"• Трофеи: <b><code>{len(unlocked)}/15</code></b>  |  Друзья: <b><code>{user.get('referrals_count', 0)}</code></b>"
     )
     await callback.message.edit_text(
         text,
@@ -2057,25 +2163,25 @@ async def process_roulette_menu(callback: CallbackQuery):
     today_str = now_msk().strftime("%Y-%m-%d")
     can_spin = user.get("last_spin") != today_str
     booster_code = user.get("active_booster") or ""
-    booster_info = f"\n🚀 <b>Сейчас активен бустер:</b> {BOOSTER_NAMES.get(booster_code, '')}\n" if booster_code else ""
+    booster_info = f"\n🚀 <b>Активен бустер:</b> {BOOSTER_NAMES.get(booster_code, '')}\n" if booster_code else ""
 
     text = (
         f"🎰 <b>ФУТБОЛЬНАЯ РУЛЕТКА УДАЧИ</b>\n\n"
         f"<blockquote>Бесплатное вращение доступно <b>1 раз в сутки</b>!\n"
         f"Выбивай монеты FC, страховку ставки или буст коэффициента.</blockquote>"
         f"{booster_info}\n"
-        f"🎁 <b>Призовые сектора барабана:</b>\n"
-        f"• 💰 Валюта: <code>+150 FC</code>, <code>+300 FC</code>, <code>+750 FC</code>, <code>+2 000 FC</code>\n"
-        f"• 🛡 <b>Страховка 50%</b> — вернет половину ставки при проигрыше\n"
-        f"• ⚡ <b>Кэф-буст +0.35</b> — увеличит коэффициент следующего купона\n"
-        f"• 🎟 <b>Золотой билет</b> — +100 FC и мгновенный повторный спин!"
+        f"🎁 <b>Сектора на барабане:</b>\n"
+        f"• 💰 Монеты: <code>+150</code>, <code>+300</code>, <code>+750</code>, <code>+2 000 FC</code>\n"
+        f"• 🛡 <b>Страховка 50%</b> — возврат половины ставки при проигрыше\n"
+        f"• ⚡ <b>Кэф-буст +0.35</b> — прибавка к кэфу следующего купона\n"
+        f"• 🎟 <b>Золотой билет</b> — +100 FC и повторное вращение!"
     )
     builder = InlineKeyboardBuilder()
     if can_spin:
         builder.button(text="🎲 Крутить барабан (Бесплатно)", callback_data="spin_roulette")
     else:
         builder.button(text="⏳ Доступно завтра (Уже прокручено)", callback_data="spin_cooldown")
-    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
@@ -2092,31 +2198,44 @@ async def process_spin_roulette(callback: CallbackQuery):
         await callback.answer("⏳ Ты уже крутил рулетку сегодня!", show_alert=True)
         return
 
+    await callback.answer("🎰 Барабан запущен!")
+
     sectors = [
         {"name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
         {"name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
-        {"name": "🛡 Бустер: Страховка ставки 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
+        {"name": "🛡 Бустер: Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
         {"name": "⚡ Бустер: Кэф-буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
-        {"name": "🎟 Золотой билет (+100 FC + Повторный спин!)", "coins": 100, "booster": "", "respin": True, "weight": 10},
+        {"name": "🎟 Золотой билет (+100 FC + Спин!)", "coins": 100, "booster": "", "respin": True, "weight": 10},
         {"name": "💎 Крупный куш: +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
-        {"name": "🔥 ДЖЕКПОТ РУЛЕТКИ: +2 000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
+        {"name": "🔥 ДЖЕКПОТ: +2 000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
     ]
     chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
+
+    # Покадровая анимация прокрутки барабана
+    anim_frames = [
+        "🎰 <b>БАРАБАН НАБИРАЕТ СКОРОСТЬ...</b>\n\n<blockquote><code>[ 💰 +150 FC ] ➔ [ ⚡ Кэф-буст ] ➔ [ 💎 +750 FC ]</code></blockquote>\n<i>Крутим колесо фортуны...</i>",
+        "🎰 <b>БАРАБАН ЗАМЕДЛЯЕТСЯ...</b>\n\n<blockquote><code>[ 🛡 Страховка ] ➔ [ 🔥 ДЖЕКПОТ ] ➔ [ 🎟 Билет ]</code></blockquote>\n<i>Стрелка почти остановилась...</i>"
+    ]
+    for frame_txt in anim_frames:
+        try:
+            await callback.message.edit_text(frame_txt, parse_mode="HTML")
+            await asyncio.sleep(0.65)
+        except Exception:
+            pass
+
     res = await db_manager.spin_roulette_db(
         callback.from_user.id, chosen["coins"], chosen["booster"], chosen["respin"]
     )
 
-    await callback.answer(f"🎰 Выпал сектор: {chosen['name']}!", show_alert=True)
     text = (
-        f"🎰 <b>РЕЗУЛЬТАТ ВРАЩЕНИЯ РУЛЕТКИ</b>\n\n"
-        f"<blockquote>🎯 Выпавший сектор:\n"
-        f"<b>{chosen['name']}</b></blockquote>\n"
-        f"🏦 <b>Твой текущий баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
+        f"🎉 <b>РУЛЕТКА ОСТАНОВИЛАСЬ!</b>\n\n"
+        f"<blockquote>▶️ <b>[ {chosen['name']} ]</b> ◀️</blockquote>\n"
+        f"🏦 <b>Твой текущий банк:</b> <b><code>{res['new_balance']} FC</code></b>"
     )
     builder = InlineKeyboardBuilder()
     if chosen["respin"]:
-        builder.button(text="🎟 Использовать Золотой билет (Крутить еще раз!)", callback_data="spin_roulette")
-    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
+        builder.button(text="🎟 Крутить еще раз (Золотой билет!)", callback_data="spin_roulette")
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
@@ -2142,12 +2261,12 @@ async def process_achievements_menu(callback: CallbackQuery):
         )
 
     text = (
-        f"🎖 <b>ЗАЛ СЛАВЫ И ДОСТИЖЕНИЯ ({len(unlocked)}/{len(ACHIEVEMENTS_CONFIG)})</b>\n"
-        f"💰 Заработано на достижениях: <b><code>+{total_bonus_earned} FC</code></b>\n\n"
+        f"🎖 <b>ЗАЛ СЛАВЫ ({len(unlocked)}/{len(ACHIEVEMENTS_CONFIG)})</b>\n"
+        f"💰 Заработано на трофеях: <b><code>+{total_bonus_earned} FC</code></b>\n\n"
         f"<blockquote>" + "\n\n".join(lines) + "</blockquote>"
     )
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
@@ -2158,16 +2277,16 @@ async def process_fav_club_menu(callback: CallbackQuery):
 
     text = (
         f"⭐ <b>ВЫБОР ЛЮБИМОГО КЛУБА</b>\n\n"
-        f"<blockquote>Текущий выбор: <b>{cur_club}</b>\n"
-        f"Любая победная ставка на матч твоего любимого клуба приносит <b>+10% к чистой прибыли</b>!</blockquote>\n"
-        f"👇 Выбери свой клуб из списка:"
+        f"<blockquote>Текущий клуб: <b>{cur_club}</b>\n"
+        f"Любая победная ставка на матч любимого клуба приносит <b>+10% к чистой прибыли</b>!</blockquote>\n"
+        f"👇 Выбери свой клуб:"
     )
     builder = InlineKeyboardBuilder()
     for idx, club in enumerate(POPULAR_CLUBS):
         mark = "⭐ " if club == cur_club else ""
         builder.button(text=f"{mark}{club}", callback_data=f"set_club:{idx}")
-    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
-    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1)
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
+    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
@@ -2177,7 +2296,7 @@ async def process_set_club(callback: CallbackQuery, state: FSMContext):
     if 0 <= idx < len(POPULAR_CLUBS):
         club = POPULAR_CLUBS[idx]
         await db_manager.set_favorite_club(callback.from_user.id, club)
-        await callback.answer(f"⭐ Твой любимый клуб теперь {club}! (+10% к выплатам на матчи клуба)", show_alert=True)
+        await callback.answer(f"⭐ Любимый клуб: {club}! (+10% к выплатам)", show_alert=True)
     await process_profile(callback, state)
 
 # ================= ТОТАЛИЗАТОР «СУПЕРЭКСПРЕСС ТУРА» =================
@@ -2203,16 +2322,14 @@ async def process_superexpress_menu(callback: CallbackQuery):
         picks = json.loads(existing["picks_json"])
         lines = []
         for i, p in enumerate(picks, 1):
-            lines.append(f"<b>{i}. {p['teams']}</b>\n   🎯 Твой выбор: <code>{p['pick_label']}</code>")
-        status_txt = "⏳ Ожидает завершения всех 6 матчей" if existing["status"] == "pending" else f"🏁 Завершен (Угадано: {existing['guessed']}/6, Выплата: +{existing['payout']} FC)"
+            lines.append(f"<b>{i}. {p['teams']}</b>\n   🎯 Выбор: <code>{p['pick_label']}</code>")
+        status_txt = "⏳ В игре (ожидает завершения 6 матчей)" if existing["status"] == "pending" else f"🏁 Завершен (Угадано: {existing['guessed']}/6, Выплата: +{existing['payout']} FC)"
         text = (
-            f"🎯 <b>СУПЕРЭКСПРЕСС ТУРА — КУПОН ОФОРМЛЕН</b>\n\n"
+            f"🎯 <b>СУПЕРЭКСПРЕСС — КУПОН В ИГРЕ</b>\n\n"
             f"<blockquote>" + "\n".join(lines) + "</blockquote>\n"
             f"📡 <b>Статус:</b> {status_txt}\n\n"
-            f"🏆 <b>Призовая сетка:</b>\n"
-            f"• 4 из 6 угадано — <code>+500 FC</code>\n"
-            f"• 5 из 6 угадано — <code>+2 500 FC</code>\n"
-            f"• 6 из 6 угадано — <b><code>+10 000 FC</code></b>"
+            f"🏆 <b>Призовой фонд:</b>\n"
+            f"• 4 из 6 — <code>+500 FC</code> | 5 из 6 — <code>+2 500 FC</code> | 6 из 6 — <b><code>+10 000 FC</code></b>"
         )
         builder.button(text="🏠 В главное меню", callback_data="back_to_main")
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -2224,14 +2341,14 @@ async def process_superexpress_menu(callback: CallbackQuery):
     lines = []
     for idx, m in enumerate(top6):
         cur_pick = draft.get(idx, "")
-        lbl = {"p1": "П1", "x": "Х", "p2": "П2"}.get(cur_pick, "Не выбрано")
-        lines.append(f"<b>{idx+1}. {m['teams']}</b> <i>({m['short_date']})</i>\n   Выбор: <b><code>{lbl}</code></b>")
+        lbl = {"p1": "П1", "x": "Х", "p2": "П2"}.get(cur_pick, "—")
+        lines.append(f"<b>{idx+1}. {m['teams']}</b> <i>({m['short_date']})</i> • Выбор: <b><code>{lbl}</code></b>")
         for code, btn_txt in [("p1", "П1"), ("x", "Х"), ("p2", "П2")]:
             mark = "✅ " if cur_pick == code else ""
             builder.button(text=f"{mark}#{idx+1} {btn_txt}", callback_data=f"se_pick:{idx}:{code}")
 
     if len(draft) == 6:
-        builder.button(text="🔥 Подтвердить купон Суперэкспресса (Бесплатно)", callback_data="se_submit")
+        builder.button(text="🔥 Подтвердить Суперэкспресс (Бесплатно)", callback_data="se_submit")
 
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     if len(draft) == 6:
@@ -2240,11 +2357,11 @@ async def process_superexpress_menu(callback: CallbackQuery):
         builder.adjust(3, 3, 3, 3, 3, 3, 1)
 
     text = (
-        f"🎯 <b>СУПЕРЭКСПРЕСС ТУРА (БЕСПЛАТНЫЙ ВХОД)</b>\n\n"
-        f"<blockquote>Угадай исходы 6 главных матчей тура!\n"
-        f"• 4 из 6 — <b>+500 FC</b> | 5 из 6 — <b>+2 500 FC</b> | 6 из 6 — <b>+10 000 FC</b></blockquote>\n" +
+        f"🎯 <b>СУПЕРЭКСПРЕСС ТУРА (БЕСПЛАТНО)</b>\n\n"
+        f"<blockquote>Угадай исходы 6 матчей!\n"
+        f"4/6: <b>+500 FC</b> • 5/6: <b>+2 500 FC</b> • 6/6: <b>+10 000 FC</b></blockquote>\n" +
         "\n".join(lines) +
-        f"\n\n👇 <i>Отметь исходы (П1 / Х / П2) для каждого из 6 матчей кнопками ниже ({len(draft)}/6 выбрано):</i>"
+        f"\n\n👇 <i>Выбери исходы кнопками ниже ({len(draft)}/6):</i>"
     )
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
@@ -2292,7 +2409,7 @@ async def process_se_submit(callback: CallbackQuery):
 
     await db_manager.create_superexpress_entry(uid, round_key, picks_list)
     SUPEREXPRESS_DRAFTS.pop(uid, None)
-    await callback.answer("🎉 Твой купон Суперэкспресса принят! Удачи!", show_alert=True)
+    await callback.answer("🎉 Купон Суперэкспресса принят!", show_alert=True)
     await process_superexpress_menu(callback)
 
 # ================= РЕФЕРАЛЫ, АКТИВНЫЕ СТАВКИ, АРХИВ И ТОП-10 =================
@@ -2314,17 +2431,14 @@ async def process_referral_menu(callback: CallbackQuery):
     text = (
         f"🤝 <b>ПАРТНЕРСКАЯ ПРОГРАММА (+500 FC)</b>\n\n"
         f"<blockquote>👥 Приглашено друзей: <b><code>{user.get('referrals_count', 0)}</code></b>\n"
-        f"💰 Заработано на бонусах: <b><code>{user.get('referrals_count', 0) * 500} FC</code></b></blockquote>\n"
-        f"🎁 <b>Как это работает:</b>\n"
-        f"Отправь свою ссылку другу. Как только он запустит бота:\n"
-        f"• Ты мгновенно получишь <b><code>+500 FC</code></b> на свой баланс (+ достижение «Скаут»)\n"
-        f"• Твой друг получит повышенный стартовый банк <b><code>1 500 FC</code></b>!\n\n"
-        f"🔗 <b>Твоя персональная ссылка:</b>\n"
-        f"<code>{ref_link}</code>"
+        f"💰 Заработано: <b><code>{user.get('referrals_count', 0) * 500} FC</code></b></blockquote>\n"
+        f"• Тебе мгновенно начисляется <b><code>+500 FC</code></b> за каждого друга\n"
+        f"• Друг получает повышенный стартовый банк <b><code>1 500 FC</code></b>\n\n"
+        f"🔗 <b>Твоя ссылка:</b>\n<code>{ref_link}</code>"
     )
     builder = InlineKeyboardBuilder()
     builder.button(text="📤 Отправить приглашение другу", url=share_url)
-    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
+    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
@@ -2338,7 +2452,7 @@ async def process_active_bets(callback: CallbackQuery):
         text = (
             "⏳ <b>АКТИВНЫЕ СТАВКИ</b>\n\n"
             "<blockquote>Сейчас у тебя нет купонов в игре.</blockquote>\n"
-            "Открой любую лигу или «⚡ Экспресс дня», чтобы сделать ставку на предстоящие матчи!"
+            "Открой любую лигу или «⚡ Экспресс дня», чтобы сделать ставку!"
         )
     else:
         lines = []
@@ -2349,15 +2463,15 @@ async def process_active_bets(callback: CallbackQuery):
             events_multiline = format_bet_legs_multiline(b, with_result=False)
             b_tag = f"\n🚀 Бустер: <code>{BOOSTER_NAMES.get(b['booster_used'], '')}</code>" if b.get("booster_used") else ""
             lines.append(
-                f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> ({btype}) • Общий кэф: <b><code>{b['odds']}</code></b>\n"
+                f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> ({btype}) • Кэф: <b><code>{b['odds']}</code></b>\n"
                 f"{events_multiline}{b_tag}\n"
                 f"💵 Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{pot_win} FC</code></b>\n"
-                f"⏱ Ориентир расчета: <i>{end_dt}</i></blockquote>"
+                f"⏱ Расчет: <i>~{end_dt}</i></blockquote>"
             )
             builder.button(text=f"💸 CashOut купона #{b['bet_id']}", callback_data=f"cashout_ask:{b['bet_id']}")
 
         text = "⏳ <b>МОИ АКТИВНЫЕ КУПОНЫ В ИГРЕ:</b>\n\n" + "\n".join(lines)
-        builder.button(text="📡 Проверить Live-счет и статус матчей", callback_data="check_live_status")
+        builder.button(text="📡 Обновить Live-статусы матчей", callback_data="check_live_status")
 
     builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
     builder.button(text="⬅️ В кабинет", callback_data="profile")
@@ -2382,12 +2496,11 @@ async def process_cashout_ask(callback: CallbackQuery):
 
     events_multiline = format_bet_legs_multiline(bet, with_result=False)
     text = (
-        f"💸 <b>ДОСРОЧНЫЙ ВЫКУП СТАВКИ (CASHOUT)</b>\n\n"
+        f"💸 <b>ДОСРОЧНЫЙ ВЫКУП (CASHOUT)</b>\n\n"
         f"<blockquote>🎫 <b>Купон #{bet['bet_id']}</b> (Кэф <code>{bet['odds']}</code>)\n"
         f"{events_multiline}\n"
         f"💵 <b>Сумма ставки:</b> <code>{bet['amount']} FC</code></blockquote>\n"
-        f"💰 <b>Предложенная сумма выкупа сейчас:</b> <b><code>{offer} FC</code></b>\n\n"
-        f"Забрать <code>{offer} FC</code> на баланс прямо сейчас, не дожидаясь окончания матча?"
+        f"💰 <b>Сумма выкупа сейчас:</b> <b><code>{offer} FC</code></b>"
     )
     builder = InlineKeyboardBuilder()
     builder.button(text=f"✅ Забрать {offer} FC сейчас", callback_data=f"cashout_confirm:{bet_id}:{offer}")
@@ -2429,10 +2542,10 @@ async def process_check_live_status(callback: CallbackQuery):
 
     if settled_count > 0:
         await callback.answer(f"✅ Рассчитано завершенных купонов: {settled_count}! Проверь чат.", show_alert=True)
-        await process_active_bets(callback)
     else:
         clean_alert = re.sub(r"<.*?>", "", "\n".join(live_info))[:195]
-        await callback.answer(f"📡 Статус реальных матчей:\n{clean_alert}", show_alert=True)
+        await callback.answer(f"📡 Статусы обновлены:\n{clean_alert}", show_alert=True)
+    await process_active_bets(callback)
 
 @dp.callback_query(F.data == "archive_bets")
 async def process_archive_bets(callback: CallbackQuery):
@@ -2481,7 +2594,6 @@ async def process_claim_bonus(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "leaderboard")
 async def process_leaderboard(callback: CallbackQuery):
-    """Чистая таблица лидеров без дублирования медалей"""
     top = await db_manager.get_leaderboard()
     medals = ["🥇", "🥈", "🥉"]
     lines = []
@@ -2523,7 +2635,7 @@ async def process_express(callback: CallbackQuery):
     builder.adjust(1)
 
     text = (
-        f"⚡ <b>ЭКСПРЕСС ДНЯ (КОМБИНИРОВАННАЯ ЛИНИЯ)</b>\n\n"
+        f"⚡ <b>ЭКСПРЕСС ДНЯ (ТОП-6 СОБЫТИЙ)</b>\n\n"
         f"{exp_data['text']}\n\n"
         f"👇 <i>Нажми кнопку ниже, чтобы поставить на весь экспресс одним купоном:</i>"
     )
@@ -2603,20 +2715,20 @@ async def process_clear_slip(callback: CallbackQuery, state: FSMContext):
     await callback.answer("🗑 Купон экспресса очищен!", show_alert=True)
     await process_back_main(callback, state)
 
-# ================= КАРТОЧКА МАТЧА, СВОДКА И ИТБ, КОНСТРУКТОР ТОТАЛОВ =================
+# ================= КАРТОЧКА МАТЧА, СВОДКА И КОНСТРУКТОР ТОТАЛОВ =================
 @dp.callback_query(F.data.startswith("refresh_league:"))
 async def process_refresh_league(callback: CallbackQuery):
     league_key = callback.data.split(":")[1]
-    await callback.answer("📡 Синхронизация реального расписания...")
+    await callback.answer("📡 Обновляю расписание...")
     db = await get_real_matches(force_refresh=True)
     league_data = db.get(league_key, {})
     matches = league_data.get("matches", {})
     if not matches:
         text = f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие дни официальных матчей не найдено.</blockquote>"
     elif league_data.get("extended"):
-        text = f"<b>{league_data['title']}</b>\n📅 <i>В ближайшие 7 дней перерыв между турами — показаны матчи ближайшего тура (МСК):</i>"
+        text = f"<b>{league_data['title']}</b>\n📅 <i>Матчи ближайшего тура (время МСК):</i>"
     else:
-        text = f"<b>{league_data['title']}</b>\n📅 Реальное расписание на ближайшие 7 дней (МСК):"
+        text = f"<b>{league_data['title']}</b>\n📅 <i>Расписание на ближайшие 7 дней (МСК):</i>"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("league:"))
@@ -2630,12 +2742,12 @@ async def process_league_select(callback: CallbackQuery, state: FSMContext):
     if not matches:
         text = (
             f"<b>{league_data.get('title', 'Турнир')}</b>\n\n"
-            f"<blockquote>📅 На ближайшие дни матчей не найдено. Нажми «Обновить расписание».</blockquote>"
+            f"<blockquote>📅 На ближайшие дни матчей не найдено. Нажми «🔄 Обновить».</blockquote>"
         )
     elif league_data.get("extended"):
-        text = f"<b>{league_data['title']}</b>\n📅 <i>В ближайшие 7 дней перерыв между турами — показаны матчи ближайшего тура (время МСК):</i>"
+        text = f"<b>{league_data['title']}</b>\n📅 <i>Матчи ближайшего тура (время МСК):</i>"
     else:
-        text = f"<b>{league_data['title']}</b>\n📅 Реальные матчи на ближайшие 7 дней (время МСК):"
+        text = f"<b>{league_data['title']}</b>\n📅 <i>Реальные матчи на 7 дней (время МСК):</i>"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
     await callback.answer()
 
@@ -2648,33 +2760,32 @@ async def render_match_card(message_obj: Message, league_key: str, match_id: str
     user = await db_manager.get_user(user_id)
     fav_club = user.get("favorite_club") or ""
     is_fav_match = fav_club and (fav_club in match["teams"])
-    fav_banner = f"\n⭐ <b>Матч твоего любимого клуба ({fav_club})! +10% к чистой выплате при победе!</b>\n" if is_fav_match else ""
+    fav_banner = f"\n⭐ <b>Матч любимого клуба ({fav_club}) • +10% к выплате!</b>" if is_fav_match else ""
 
     league_title = db[league_key]["title"]
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
 
     if match["event_id"] not in AI_CACHE:
-        await message_obj.edit_text(f"🧠 <i>ИИ анализирует статистику матча {match['teams']}...</i>", parse_mode="HTML")
+        await message_obj.edit_text(f"🧠 <i>ИИ анализирует матч {match['teams']}...</i>", parse_mode="HTML")
 
     prompt = (
         f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
         f"Хозяева: {match['home_team']}. Гости: {match['away_team']}. Статистика: {match['records_info']}.\n"
         f"Ожидаемые голы xG: {match['exp_goals']}. Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 1.5={odds['tb15']}, ТБ 2.5={odds['tb25']}, ОЗ(Да)={odds['btts']}.\n"
-        f"Дай краткий профессиональный разбор (до 55 слов) в 2 пункта:\n"
-        f"1. ⚔️ Тактический рисунок игры и потенциал атаки.\n"
-        f"2. 🎯 Самая выгодная ставка из всей линии (Тотал, Обе забьют, Фора (0) или исход) с кэфом."
+        f"Дай краткий разбор (до 50 слов) в 2 пункта:\n"
+        f"1. ⚔️ Тактика и потенциал атаки.\n"
+        f"2. 🎯 Лучшая ставка из линии (Тотал, ОЗ, Фора(0) или исход) с кэфом."
     )
     ai_verdict = await ask_ai_cached(match["event_id"], prompt) or smart_local_match_analysis(match, probs)
 
     text = (
         f"🏟 <b>{league_title}</b>\n"
         f"🏠 <b>{match['home_team']}</b>  vs  ✈️ <b>{match['away_team']}</b>\n"
-        f"🕒 Начало: <code>{match['date']}</code>{fav_banner}\n\n"
-        f"<blockquote>📊 <b>Линия 1Х2:</b>  П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%)  |  Х: <b><code>{odds['x']}</code></b> ({probs['x']}%)  |  П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
-        f"⚽ <b>Модель голов (xG):</b> <b><code>{match['exp_goals']}</code></b>  •  Точный счет ИИ: <b><code>{match['best_score']}</code></b></blockquote>\n"
-        f"🤖 <b>Экспертный разбор:</b>\n{ai_verdict}\n\n"
-        f"👇 <b>Выбери исход или открой Сводку / Тоталы / Форы:</b>"
+        f"🕒 <code>{match['date']}</code>{fav_banner}\n\n"
+        f"<blockquote>📊 <b>1Х2:</b> П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%) | Х: <b><code>{odds['x']}</code></b> ({probs['x']}%) | П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
+        f"⚽ <b>xG матча:</b> <b><code>{match['exp_goals']}</code></b>  •  Точный счет ИИ: <b><code>{match['best_score']}</code></b></blockquote>\n"
+        f"🤖 <b>Вердикт ИИ:</b>\n{ai_verdict}"
     )
     await message_obj.edit_text(
         text,
@@ -2707,18 +2818,15 @@ async def process_stats_menu(callback: CallbackQuery, state: FSMContext):
     hs = match["h_stats"]
     as_ = match["a_stats"]
     text = (
-        f"📊 <b>ДЕТАЛЬНАЯ СВОДКА И ИТБ КОМАНД</b>\n\n"
-        f"🏟 <b>Арена:</b> {match['venue']}\n"
-        f"🕒 <b>Дата:</b> <code>{match['date']}</code>\n\n"
-        f"<blockquote>🏠 <b>{match['home_team']} (Хозяева)</b>\n"
-        f"• Баланс сезона: <code>{hs['record_str']}</code> (Очков: <b>{hs['points']}</b>)\n"
-        f"• Текущая форма: {hs['form_visual']}\n"
-        f"• Индивидуальный xG: <b><code>{match['lam_h']} гола</code></b></blockquote>\n"
-        f"<blockquote>✈️ <b>{match['away_team']} (Гости)</b>\n"
-        f"• Баланс сезона: <code>{as_['record_str']}</code> (Очков: <b>{as_['points']}</b>)\n"
-        f"• Текущая форма: {as_['form_visual']}\n"
-        f"• Индивидуальный xG: <b><code>{match['lam_a']} гола</code></b></blockquote>\n"
-        f"👇 <b>Поставить на Индивидуальный Тотал Больше (ИТБ1 — Хозяева, ИТБ2 — Гости):</b>"
+        f"📊 <b>ДЕТАЛЬНАЯ СВОДКА И ИТБ</b>\n\n"
+        f"🏟 <b>Арена:</b> {match['venue']}\n\n"
+        f"<blockquote>🏠 <b>{match['home_team']}</b>\n"
+        f"• Сезон: <code>{hs['record_str']}</code> ({hs['points']} очк.)\n"
+        f"• Форма: {hs['form_visual']} | xG: <b><code>{match['lam_h']}</code></b></blockquote>\n"
+        f"<blockquote>✈️ <b>{match['away_team']}</b>\n"
+        f"• Сезон: <code>{as_['record_str']}</code> ({as_['points']} очк.)\n"
+        f"• Форма: {as_['form_visual']} | xG: <b><code>{match['lam_a']}</code></b></blockquote>\n"
+        f"👇 <b>Индивидуальный Тотал Больше (ИТБ1 — Хозяева, ИТБ2 — Гости):</b>"
     )
     await callback.message.edit_text(text, reply_markup=stats_and_itb_kb(match), parse_mode="HTML")
     await callback.answer()
@@ -2737,11 +2845,11 @@ async def process_totals_menu(callback: CallbackQuery, state: FSMContext):
 
     dir_title = "📈 ТОТАЛ БОЛЬШЕ (ТБ)" if direction == "tb" else "📉 ТОТАЛ МЕНЬШЕ (ТМ)"
     text = (
-        f"⚽ <b>{dir_title} — КОНСТРУКТОР ЛИНИИ</b>\n\n"
-        f"<blockquote>🏟 <b>Матч:</b> {match['teams']}\n"
-        f"📊 <b>Ожидаемая результативность (xG):</b> <b><code>{match['exp_goals']} гола</code></b>\n"
-        f"🔄 <i>Целые тоталы (1.0, 2.0, 3.0, 4.0) рассчитываются с возвратом ставки при точном попадании!</i></blockquote>\n"
-        f"👇 <b>Выбери готовый тотал кнопкой ИЛИ просто напиши любое число в чат</b> (например: <code>2.5</code> или <code>3</code>):"
+        f"⚽ <b>{dir_title}</b>\n\n"
+        f"<blockquote>🏟 <b>{match['teams']}</b>\n"
+        f"📊 <b>Ожидаемые голы (xG):</b> <b><code>{match['exp_goals']}</code></b>\n"
+        f"🔄 <i>Целые тоталы (1.0, 2.0, 3.0) идут с возвратом при точном попадании!</i></blockquote>\n"
+        f"👇 <b>Выбери кнопкой ИЛИ напиши любое число в чат</b> (например: <code>2.5</code> или <code>3</code>):"
     )
     await callback.message.edit_text(text, reply_markup=totals_constructor_kb(match, direction), parse_mode="HTML")
     await callback.answer()
@@ -2762,7 +2870,7 @@ async def process_custom_total_input(message: Message, state: FSMContext):
 
     rounded_val = round(val * 2) / 2
     if rounded_val < 0.5 or rounded_val > 6.5:
-        await message.answer("⚠️ Допустимый диапазон тотала — от <code>0.5</code> до <code>6.5</code> голов. Введи другое число:", parse_mode="HTML")
+        await message.answer("⚠️ Допустимый диапазон — от <code>0.5</code> до <code>6.5</code> голов:", parse_mode="HTML")
         return
 
     db = await get_real_matches()
@@ -2780,7 +2888,7 @@ async def process_custom_total_input(message: Message, state: FSMContext):
     target_code = f"{league_key}-{match_id}-{pick_code}"
     info = await resolve_bet_target(target_code, message.from_user.id)
     if not info:
-        await message.answer("⚠️ Не удалось рассчитать котировку. Выбери матч заново.")
+        await message.answer("⚠️ Ошибка расчета котировки.")
         return
 
     user = await db_manager.get_user(message.from_user.id, message.from_user.username)
@@ -2789,10 +2897,10 @@ async def process_custom_total_input(message: Message, state: FSMContext):
     text = (
         f"🎫 <b>ОФОРМЛЕНИЕ КУПОНА</b>\n\n"
         f"<blockquote>{info['events_preview']}\n"
-        f"📈 <b>Рассчитанный коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
-        f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>\n"
+        f"📈 <b>Коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
+        f"⏱ <b>Расчет:</b> <i>~{end_str}</i></blockquote>\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
-        f"👇 <b>Выбери сумму для ординара или добавь этот тотал в Экспресс:</b>"
+        f"👇 <b>Выбери сумму ставки или добавь исход в Экспресс:</b>"
     )
     await message.answer(text, reply_markup=amount_selection_kb(target_code, user["balance"]), parse_mode="HTML")
 
@@ -2807,11 +2915,11 @@ async def process_extras_menu(callback: CallbackQuery, state: FSMContext):
         return
 
     text = (
-        f"🛡️ <b>ДОПОЛНИТЕЛЬНАЯ РОСПИСЬ МАТЧА</b>\n\n"
+        f"🛡️ <b>ФОРЫ, ДВОЙНОЙ ШАНС И ОЗ</b>\n\n"
         f"<blockquote>🏟 <b>{match['teams']}</b>\n"
         f"• <b>1Х / Х2</b> — команда не проиграет\n"
-        f"• <b>Фора (0)</b> — победа команды с возвратом ставки при ничьей\n"
-        f"• <b>Обе забьют</b> — забьют ли обе команды в матче</blockquote>\n"
+        f"• <b>Фора (0)</b> — победа с возвратом при ничьей\n"
+        f"• <b>ОЗ</b> — обе команды забьют</blockquote>\n"
         f"👇 <b>Выбери исход:</b>"
     )
     await callback.message.edit_text(text, reply_markup=extras_menu_kb(match), parse_mode="HTML")
@@ -2826,7 +2934,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         if not exp:
             return None
         preview_lines = [
-            f"<b>{i+1}. {leg['teams']}</b>\n   🎯 Исход: <code>{leg['pick_label']}</code> (кэф <code>{leg['odds']}</code>)"
+            f"<b>{i+1}. {leg['teams']}</b>\n   🎯 <code>{leg['pick_label']}</code> (кэф <code>{leg['odds']}</code>)"
             for i, leg in enumerate(exp["legs"])
         ]
         return {
@@ -2857,7 +2965,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
             if s["end_ts"] > max_ts:
                 max_ts = s["end_ts"]
             multiline_titles.append(f"{idx}. {s['match_title']} — {s['pick']} ({s['odds']})")
-            preview_lines.append(f"<b>{idx}. {s['match_title']}</b>\n   🎯 Исход: <code>{s['pick']}</code> (кэф <code>{s['odds']}</code>)")
+            preview_lines.append(f"<b>{idx}. {s['match_title']}</b>\n   🎯 <code>{s['pick']}</code> (кэф <code>{s['odds']}</code>)")
             legs.append({
                 "league_slug": s["league_slug"],
                 "event_id": s["event_id"],
@@ -2895,7 +3003,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         return {
             "match_title": f"{match['teams']} ({match['short_date']})",
             "pick": mkt["label"],
-            "events_preview": f"🏟 <b>Событие:</b> {match['teams']} ({match['short_date']})\n🎯 <b>Исход:</b> <code>{mkt['label']}</code>",
+            "events_preview": f"🏟 <b>Матч:</b> {match['teams']} ({match['short_date']})\n🎯 <b>Исход:</b> <code>{mkt['label']}</code>",
             "odds": mkt["odds"],
             "prob": mkt["prob"],
             "end_ts": match["end_ts"],
@@ -2927,8 +3035,8 @@ async def process_pick_outcome(callback: CallbackQuery, state: FSMContext):
     text = (
         f"🎫 <b>ОФОРМЛЕНИЕ КУПОНА</b>\n\n"
         f"<blockquote>{info['events_preview']}\n"
-        f"📈 <b>Базовый коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
-        f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>"
+        f"📈 <b>Коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
+        f"⏱ <b>Расчет:</b> <i>~{end_str}</i></blockquote>"
         f"{booster_note}\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
         f"👇 <b>Выбери сумму ставки или введи свою:</b>"
@@ -2943,18 +3051,18 @@ async def build_bet_accepted_response(user_id: int, bet_id: int, info: dict, amo
         BOT_USERNAME = me.username
 
     end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
-    b_note = f"\n🚀 <b>Применен бустер:</b> <code>{BOOSTER_NAMES.get(res['booster_used'], '')}</code>" if res.get("booster_used") else ""
-    fav_note = "\n⭐ <b>Матч любимого клуба:</b> <i>+10% к чистой прибыли при победе!</i>" if res.get("is_fav_club") else ""
+    b_note = f"\n🚀 <b>Бустер:</b> <code>{BOOSTER_NAMES.get(res['booster_used'], '')}</code>" if res.get("booster_used") else ""
+    fav_note = "\n⭐ <b>Матч любимого клуба:</b> <i>+10% к чистой прибыли!</i>" if res.get("is_fav_club") else ""
 
     text = (
         f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{bet_id})</b>\n\n"
         f"<blockquote>{info['events_preview']}\n\n"
-        f"📈 <b>Итоговый коэффициент:</b> <b><code>{res['final_odds']}</code></b>\n"
+        f"📈 <b>Итоговый кэф:</b> <b><code>{res['final_odds']}</code></b>\n"
         f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
         f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>"
         f"{b_note}{fav_note}\n"
         f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
-        f"📡 <b>Расчет после завершения матча:</b> <i>~{end_str}</i>"
+        f"📡 <b>Расчет:</b> <i>~{end_str}</i>"
     )
 
     ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user_id}"
@@ -3003,7 +3111,7 @@ async def process_place_fixed_amount(callback: CallbackQuery):
 
     text, builder = await build_bet_accepted_response(callback.from_user.id, res["bet_id"], info, amount, res)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer("🎫 Купон зарегистрирован в системе!")
+    await callback.answer("🎫 Купон зарегистрирован!")
 
 @dp.callback_query(F.data.startswith("custom_amt:"))
 async def process_custom_amount_prompt(callback: CallbackQuery, state: FSMContext):
@@ -3089,10 +3197,10 @@ async def cmd_admin(message: Message, state: FSMContext):
     st = await db_manager.get_project_stats()
     text = (
         f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
-        f"<blockquote>👥 Всего игроков в базе: <b><code>{st['users']}</code></b>\n"
-        f"🎫 Всего оформлено купонов: <b><code>{st['bets']}</code></b>\n"
-        f"⏳ Купонов сейчас в игре: <b><code>{st['active_bets']}</code></b>\n"
-        f"🏦 Суммарный банк игроков: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
+        f"<blockquote>👥 Игроков в базе: <b><code>{st['users']}</code></b>\n"
+        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b>\n"
+        f"⏳ Активных купонов: <b><code>{st['active_bets']}</code></b>\n"
+        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
         f"👇 Выбери действие:"
     )
     await message.answer(text, reply_markup=admin_kb(), parse_mode="HTML")
@@ -3106,10 +3214,10 @@ async def process_admin_panel(callback: CallbackQuery, state: FSMContext):
     st = await db_manager.get_project_stats()
     text = (
         f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
-        f"<blockquote>👥 Всего игроков в базе: <b><code>{st['users']}</code></b>\n"
-        f"🎫 Всего оформлено купонов: <b><code>{st['bets']}</code></b>\n"
-        f"⏳ Купонов сейчас в игре: <b><code>{st['active_bets']}</code></b>\n"
-        f"🏦 Суммарный банк игроков: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
+        f"<blockquote>👥 Игроков в базе: <b><code>{st['users']}</code></b>\n"
+        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b>\n"
+        f"⏳ Активных купонов: <b><code>{st['active_bets']}</code></b>\n"
+        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
         f"👇 Выбери действие:"
     )
     await callback.message.edit_text(text, reply_markup=admin_kb(), parse_mode="HTML")
@@ -3144,7 +3252,7 @@ async def process_admin_broadcast_send(message: Message, state: FSMContext):
             await asyncio.sleep(0.05)
         except Exception:
             continue
-    await message.answer(f"✅ Рассылка завершена! Доставлено: <b>{sent}</b> из {len(uids)} пользователей.", reply_markup=admin_kb(), parse_mode="HTML")
+    await message.answer(f"✅ Рассылка завершена! Доставлено: <b>{sent}</b> из {len(uids)}.", reply_markup=admin_kb(), parse_mode="HTML")
 
 @dp.callback_query(F.data == "admin_gift")
 async def process_admin_gift_ask(callback: CallbackQuery, state: FSMContext):
@@ -3178,9 +3286,9 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             await bot.send_message(target_uid, f"🎁 Администратор начислил тебе <b><code>+{add_amt} FC</code></b> на баланс!", parse_mode="HTML")
         except Exception:
             pass
-        await message.answer(f"✅ Игроку <code>{target_uid}</code> успешно начислено <b>{add_amt} FC</b>!", reply_markup=admin_kb(), parse_mode="HTML")
+        await message.answer(f"✅ Игроку <code>{target_uid}</code> начислено <b>{add_amt} FC</b>!", reply_markup=admin_kb(), parse_mode="HTML")
     else:
-        await message.answer("⚠️ Игрок с таким ID не найден в базе.", reply_markup=admin_kb(), parse_mode="HTML")
+        await message.answer("⚠️ Игрок с таким ID не найден.", reply_markup=admin_kb(), parse_mode="HTML")
 
 # ================= ВЕБ-СЕРВЕР И ЗАПУСК =================
 async def handle_ping(request):
