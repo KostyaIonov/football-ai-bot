@@ -43,6 +43,12 @@ groq_client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
+# Заголовки браузера, чтобы спортивный API не блокировал запросы бота
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*"
+}
+
 # ================= КОНФИГУРАЦИЯ РЕАЛЬНЫХ ЛИГ (ESPN LIVE API) =================
 MSK_TZ = timezone(timedelta(hours=3))
 
@@ -55,7 +61,6 @@ LEAGUES_CONFIG = {
     "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
 }
 
-# Словарь перевода реальных названий клубов на русский язык
 TEAM_TRANSLATIONS = {
     # Англия
     "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
@@ -65,7 +70,8 @@ TEAM_TRANSLATIONS = {
     "Manchester City": "Манчестер Сити", "Manchester United": "Манчестер Юнайтед",
     "Newcastle United": "Ньюкасл", "Nottingham Forest": "Ноттингем Форест", "Southampton": "Саутгемптон",
     "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон",
-    "Leeds United": "Лидс", "Burnley": "Бернли", "Sunderland": "Сандерленд",
+    "Leeds United": "Лидс Юнайтед", "Burnley": "Бернли", "Sunderland": "Сандерленд",
+    "Coventry City": "Ковентри Сити", "Hull City": "Халл Сити", "Sheffield United": "Шеффилд Юнайтед",
     # Испания
     "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико Мадрид",
     "Atletico Madrid": "Атлетико Мадрид", "Athletic Club": "Атлетик Бильбао", "Real Sociedad": "Реал Сосьедад",
@@ -87,7 +93,7 @@ TEAM_TRANSLATIONS = {
     "Heidenheim": "Хайденхайм", "1. FC Heidenheim 1846": "Хайденхайм", "FC Augsburg": "Аугсбург",
     "VfL Wolfsburg": "Вольфсбург", "Borussia Mönchengladbach": "Боруссия М", "Mainz": "Майнц",
     "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
-    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль",
+    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль", "Hamburger SV": "Гамбург", "FC Cologne": "Кельн",
     # Франция и ЛЧ
     "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако", "Marseille": "Марсель",
     "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль", "Lyon": "Лион",
@@ -96,7 +102,6 @@ TEAM_TRANSLATIONS = {
     "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур", "RC Strasbourg Alsace": "Страсбур",
     "Toulouse": "Тулуза", "Montpellier": "Монпелье", "Nantes": "Нант", "FC Nantes": "Нант",
     "Auxerre": "Осер", "AJ Auxerre": "Осер", "Angers": "Анже", "Saint-Étienne": "Сент-Этьен", "Le Havre": "Гавр",
-    # Другие гранды ЛЧ
     "Sporting CP": "Спортинг", "Benfica": "Бенфика", "FC Porto": "Порту", "PSV Eindhoven": "ПСВ",
     "Feyenoord": "Фейеноорд", "Ajax": "Аякс", "Celtic": "Селтик", "Club Brugge": "Брюгге",
     "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац",
@@ -104,7 +109,6 @@ TEAM_TRANSLATIONS = {
     "Dinamo Zagreb": "Динамо Загреб", "Crvena Zvezda": "Црвена Звезда", "Galatasaray": "Галатасарай"
 }
 
-# Элитные клубы для корректировки силы в еврокубках
 ELITE_CLUBS = {
     "Реал Мадрид": 0.45, "Манчестер Сити": 0.45, "Бавария": 0.42, "Барселона": 0.40,
     "Ливерпуль": 0.40, "Арсенал": 0.38, "Интер": 0.36, "ПСЖ": 0.35, "Байер": 0.30,
@@ -126,32 +130,35 @@ def clean_ai_text(text: str) -> str:
 
 # ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И КОЭФФИЦИЕНТОВ =================
 SCHEDULE_CACHE = {"data": {}, "updated_at": 0}
-CACHE_TTL = 900  # Кэш расписания на 15 минут
+CACHE_TTL = 900  # 15 минут
 
 def parse_american_odd(val) -> float | None:
-    """Конвертирует американский или дробный коэффициент ESPN в привычный десятичный (европейский)"""
-    if val is None:
+    if val is None or isinstance(val, (dict, list, bool)):
         return None
     try:
         s = str(val).strip().upper()
         if s in ("EVEN", "EV"):
             return 2.00
         num = float(s)
-        if abs(num) < 15:  # Уже десятичный
-            return round(num, 2) if num > 1.01 else None
-        if num > 0:
+        if 1.01 < num < 15.0:
+            return round(num, 2)
+        if num >= 100:
             return round(1.0 + (num / 100.0), 2)
-        else:
+        if num <= -100:
             return round(1.0 + (100.0 / abs(num)), 2)
     except Exception:
-        return None
+        pass
+    return None
 
 def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
-    """Вычисляет реальную силу команды по очкам в текущем сезоне (W-D-L из API ESPN)"""
     base = 1.45 + ELITE_CLUBS.get(ru_name, 0.0)
-    records = comp_dict.get("records", [])
+    if not isinstance(comp_dict, dict):
+        return base
+    records = comp_dict.get("records") or []
     for r in records:
-        summary = r.get("summary", "")
+        if not isinstance(r, dict):
+            continue
+        summary = str(r.get("summary") or "")
         parts = summary.split("-")
         if len(parts) == 3 and all(p.isdigit() for p in parts):
             w, d, l = int(parts[0]), int(parts[1]), int(parts[2])
@@ -162,30 +169,35 @@ def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
     return base
 
 def compute_realistic_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_name: str, a_name: str) -> dict:
-    """Извлекает реальные букмекерские кэфы из ESPN, либо рассчитывает их по реальной статистике сезона"""
-    odds_list = comp_obj.get("odds", [])
-    for o in odds_list:
-        h_odd = parse_american_odd(o.get("homeTeamOdds", {}).get("moneyLine"))
-        a_odd = parse_american_odd(o.get("awayTeamOdds", {}).get("moneyLine"))
-        d_odd = parse_american_odd(o.get("drawOdds", {}).get("moneyLine"))
-        if h_odd and a_odd and d_odd and 1.05 <= h_odd <= 25 and 1.05 <= a_odd <= 25:
-            return {"p1": h_odd, "x": d_odd, "p2": a_odd}
+    """Безопасно извлекает реальные букмекерские кэфы или рассчитывает их по турнирной статистике"""
+    try:
+        odds_list = comp_obj.get("odds") or []
+        for o in odds_list:
+            if not isinstance(o, dict):
+                continue
+            h_dict = o.get("homeTeamOdds") if isinstance(o.get("homeTeamOdds"), dict) else {}
+            a_dict = o.get("awayTeamOdds") if isinstance(o.get("awayTeamOdds"), dict) else {}
+            d_raw = o.get("drawOdds")
+            d_val = d_raw.get("moneyLine") if isinstance(d_raw, dict) else d_raw
 
-    # Математический расчет линии по реальной форме и очкам команд в сезоне
-    h_strength = parse_team_ppg(home_comp, h_name) + 0.22  # Фактор домашнего поля
+            h_odd = parse_american_odd(h_dict.get("moneyLine"))
+            a_odd = parse_american_odd(a_dict.get("moneyLine"))
+            d_odd = parse_american_odd(d_val)
+            if h_odd and a_odd and d_odd and 1.05 <= h_odd <= 25 and 1.05 <= a_odd <= 25:
+                return {"p1": h_odd, "x": d_odd, "p2": a_odd}
+    except Exception as e:
+        logging.debug(f"Парсинг прямых кэфов пропущен: {e}")
+
+    h_strength = parse_team_ppg(home_comp, h_name) + 0.22
     a_strength = parse_team_ppg(away_comp, a_name)
     diff = h_strength - a_strength
 
-    # Вероятность ничьей выше в равных матчах
     prob_x = max(0.17, min(0.31, 0.28 - abs(diff) * 0.07))
     rem = 1.0 - prob_x
-
-    # Логистическое распределение вероятностей П1 и П2
     ratio = 1.0 / (1.0 + (2.71828 ** (-diff * 1.15)))
     prob_p1 = max(0.08, min(0.80, rem * ratio))
     prob_p2 = max(0.08, min(0.80, rem - prob_p1))
 
-    # Закладываем стандартную букмекерскую маржу 4.5%
     margin = 1.045
     return {
         "p1": round(max(1.12, 1.0 / (prob_p1 * margin)), 2),
@@ -193,90 +205,155 @@ def compute_realistic_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_n
         "p2": round(max(1.12, 1.0 / (prob_p2 * margin)), 2)
     }
 
-async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str, cfg: dict, date_range: str, now_ts: int) -> tuple[str, dict]:
-    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={date_range}&limit=100"
-    matches = {}
+def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dict | None:
+    """Безопасно разбирает один матч из JSON ответа ESPN"""
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                events = data.get("events", [])
-                # Сортируем матчи строго по времени начала
-                events.sort(key=lambda x: x.get("date", ""))
-                for ev in events:
-                    comp = ev.get("competitions", [{}])[0]
-                    status_state = comp.get("status", {}).get("type", {}).get("state", "pre")
-                    # В линию прематч берем только те матчи, которые еще НЕ начались
-                    if status_state != "pre":
-                        continue
+        if not isinstance(ev, dict):
+            return None
+        comps = ev.get("competitions") or []
+        comp = comps[0] if (comps and isinstance(comps[0], dict)) else {}
 
-                    raw_date = ev.get("date", "")
-                    try:
-                        dt_utc = datetime.strptime(raw_date[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
-                        dt_msk = dt_utc.astimezone(MSK_TZ)
-                        start_ts = int(dt_msk.timestamp())
-                    except Exception:
-                        continue
+        st_obj = (comp.get("status") or ev.get("status") or {}).get("type") or {}
+        status_state = str(st_obj.get("state", "pre")).lower()
+        completed = bool(st_obj.get("completed", False))
+        if completed or status_state in ("post", "in"):
+            return None
 
-                    if start_ts <= now_ts:
-                        continue
+        raw_date = str(ev.get("date") or comp.get("date") or "")
+        if len(raw_date) < 16:
+            return None
+        dt_utc = datetime.strptime(raw_date[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
+        dt_msk = dt_utc.astimezone(MSK_TZ)
+        start_ts = int(dt_msk.timestamp())
 
-                    competitors = comp.get("competitors", [])
-                    if len(competitors) < 2:
-                        continue
+        if start_ts <= now_ts:
+            return None
 
-                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
-                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+        competitors = comp.get("competitors") or []
+        if len(competitors) < 2:
+            return None
 
-                    h_name = translate_team(home_c.get("team", {}).get("displayName", "Команда 1"))
-                    a_name = translate_team(away_c.get("team", {}).get("displayName", "Команда 2"))
+        home_c = next((c for c in competitors if isinstance(c, dict) and c.get("homeAway") == "home"), competitors[0])
+        away_c = next((c for c in competitors if isinstance(c, dict) and c.get("homeAway") == "away"), competitors[1])
 
-                    ev_id = str(ev.get("id"))
-                    odds = compute_realistic_odds(comp, home_c, away_c, h_name, a_name)
+        h_team_obj = home_c.get("team") or {}
+        a_team_obj = away_c.get("team") or {}
+        h_name = translate_team(h_team_obj.get("displayName") or h_team_obj.get("name") or "Команда 1")
+        a_name = translate_team(a_team_obj.get("displayName") or a_team_obj.get("name") or "Команда 2")
 
-                    # Получаем реальное положение/очки команд для ИИ-аналитика
-                    h_rec = home_c.get("records", [{}])[0].get("summary", "") if home_c.get("records") else ""
-                    a_rec = away_c.get("records", [{}])[0].get("summary", "") if away_c.get("records") else ""
+        ev_id = str(ev.get("id") or "")
+        if not ev_id:
+            return None
 
-                    matches[ev_id] = {
-                        "event_id": ev_id,
-                        "league_key": league_key,
-                        "league_slug": cfg["slug"],
-                        "teams": f"{h_name} vs {a_name}",
-                        "home_team": h_name,
-                        "away_team": a_name,
-                        "records_info": f"{h_name} (В-Н-П: {h_rec or 'н/д'}), {a_name} (В-Н-П: {a_rec or 'н/д'})",
-                        "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
-                        "start_ts": start_ts,
-                        "end_ts": start_ts + (115 * 60),
-                        "odds": odds
-                    }
+        odds = compute_realistic_odds(comp, home_c, away_c, h_name, a_name)
+
+        h_recs = home_c.get("records") or []
+        a_recs = away_c.get("records") or []
+        h_rec = h_recs[0].get("summary", "") if (h_recs and isinstance(h_recs[0], dict)) else ""
+        a_rec = a_recs[0].get("summary", "") if (a_recs and isinstance(a_recs[0], dict)) else ""
+
+        return {
+            "event_id": ev_id,
+            "league_key": league_key,
+            "league_slug": cfg["slug"],
+            "teams": f"{h_name} vs {a_name}",
+            "home_team": h_name,
+            "away_team": a_name,
+            "records_info": f"{h_name} (В-Н-П: {h_rec or 'н/д'}), {a_name} (В-Н-П: {a_rec or 'н/д'})",
+            "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
+            "start_ts": start_ts,
+            "end_ts": start_ts + (115 * 60),
+            "odds": odds
+        }
     except Exception as e:
-        logging.warning(f"Ошибка загрузки расписания {league_key}: {e}")
+        logging.debug(f"Пропущено событие в {league_key}: {e}")
+        return None
 
-    return league_key, {"title": cfg["title"], "slug": cfg["slug"], "matches": matches}
+async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str, cfg: dict, now_dt: datetime, now_ts: int) -> tuple[str, dict]:
+    """
+    Запрашивает расписание на месяц в формате YYYYMM (который поддерживается ESPN без ошибки 400),
+    а при необходимости добирает по дням YYYYMMDD.
+    """
+    all_upcoming = {}
+    months_to_check = [now_dt.strftime("%Y%m")]
+    next_month_dt = now_dt + timedelta(days=25)
+    if next_month_dt.strftime("%Y%m") not in months_to_check:
+        months_to_check.append(next_month_dt.strftime("%Y%m"))
+
+    # 1. Запрос по месяцу (YYYYMM) — отдает сразу все туры месяца одним запросом
+    for ym in months_to_check:
+        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={ym}&limit=200"
+        try:
+            async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    for ev in (data.get("events") or []):
+                        parsed = parse_event_object(ev, league_key, cfg, now_ts)
+                        if parsed:
+                            all_upcoming[parsed["event_id"]] = parsed
+        except Exception as e:
+            logging.warning(f"Ошибка запроса месяца {ym} для {league_key}: {e}")
+
+    # 2. Если по месяцу ничего не вернулось — проверяем ближайшие 7 дней поштучно (YYYYMMDD)
+    if not all_upcoming:
+        for day_offset in range(0, 8):
+            day_str = (now_dt + timedelta(days=day_offset)).strftime("%Y%m%d")
+            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={day_str}"
+            try:
+                async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        for ev in (data.get("events") or []):
+                            parsed = parse_event_object(ev, league_key, cfg, now_ts)
+                            if parsed:
+                                all_upcoming[parsed["event_id"]] = parsed
+            except Exception:
+                continue
+
+    sorted_events = sorted(all_upcoming.values(), key=lambda x: x["start_ts"])
+    seven_days_limit = now_ts + (7 * 86400)
+
+    matches_7d = {m["event_id"]: m for m in sorted_events if m["start_ts"] <= seven_days_limit}
+    if matches_7d:
+        logging.info(f"[{league_key}] Загружено {len(matches_7d)} матчей на ближайшие 7 дней.")
+        return league_key, {
+            "title": cfg["title"],
+            "slug": cfg["slug"],
+            "matches": matches_7d,
+            "extended": False
+        }
+
+    # Если в ближайшие 7 дней в этой лиге пауза (например, между турами ЛЧ или на сборные) — берем ближайший тур
+    next_round_matches = {m["event_id"]: m for m in sorted_events[:14]}
+    logging.info(f"[{league_key}] В 7 днях пауза, загружено {len(next_round_matches)} матчей ближайшего тура.")
+    return league_key, {
+        "title": cfg["title"],
+        "slug": cfg["slug"],
+        "matches": next_round_matches,
+        "extended": True
+    }
 
 async def get_real_matches(force_refresh: bool = False) -> dict:
-    """Возвращает актуальную базу реальных матчей на ближайшие 7 дней"""
     now_dt = now_msk()
     now_ts = int(now_dt.timestamp())
 
     if not force_refresh and SCHEDULE_CACHE["data"] and (now_ts - SCHEDULE_CACHE["updated_at"] < CACHE_TTL):
-        # Отфильтровываем уже начавшиеся матчи из кэша
         filtered = {}
         for l_k, l_v in SCHEDULE_CACHE["data"].items():
             active_m = {m_id: m for m_id, m in l_v["matches"].items() if m["start_ts"] > now_ts}
-            filtered[l_k] = {"title": l_v["title"], "slug": l_v["slug"], "matches": active_m}
-        return filtered
-
-    start_str = (now_dt - timedelta(hours=3)).strftime("%Y%m%d")
-    end_str = (now_dt + timedelta(days=7)).strftime("%Y%m%d")
-    date_range = f"{start_str}-{end_str}"
+            filtered[l_k] = {
+                "title": l_v["title"],
+                "slug": l_v["slug"],
+                "matches": active_m,
+                "extended": l_v.get("extended", False)
+            }
+        if any(len(v["matches"]) > 0 for v in filtered.values()):
+            return filtered
 
     result_db = {}
     async with aiohttp.ClientSession() as session:
         tasks = [
-            fetch_league_schedule(session, l_key, cfg, date_range, now_ts)
+            fetch_league_schedule(session, l_key, cfg, now_dt, now_ts)
             for l_key, cfg in LEAGUES_CONFIG.items()
         ]
         responses = await asyncio.gather(*tasks)
@@ -290,28 +367,27 @@ async def get_real_matches(force_refresh: bool = False) -> dict:
     return result_db
 
 async def fetch_real_match_result(session: aiohttp.ClientSession, league_slug: str, event_id: str) -> dict:
-    """Проверяет реальный статус и счет конкретного матча через API ESPN"""
     url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{league_slug}/summary?event={event_id}"
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                header = data.get("header", {})
-                comps = header.get("competitions", [{}])
-                if comps:
+                header = data.get("header") or {}
+                comps = header.get("competitions") or []
+                if comps and isinstance(comps[0], dict):
                     comp = comps[0]
-                    status_obj = comp.get("status", {})
-                    st_type = status_obj.get("type", {})
-                    state = st_type.get("state", "pre")  # 'pre', 'in', 'post'
+                    status_obj = comp.get("status") or {}
+                    st_type = status_obj.get("type") or {}
+                    state = str(st_type.get("state", "pre")).lower()
                     completed = bool(st_type.get("completed", False))
-                    detail = st_type.get("shortDetail", "")
+                    detail = str(st_type.get("shortDetail") or "")
 
-                    competitors = comp.get("competitors", [])
-                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0] if competitors else {})
-                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1] if len(competitors) > 1 else {})
+                    competitors = comp.get("competitors") or []
+                    home_c = next((c for c in competitors if isinstance(c, dict) and c.get("homeAway") == "home"), competitors[0] if competitors else {})
+                    away_c = next((c for c in competitors if isinstance(c, dict) and c.get("homeAway") == "away"), competitors[1] if len(competitors) > 1 else {})
 
-                    h_score = int(home_c.get("score", 0) or 0)
-                    a_score = int(away_c.get("score", 0) or 0)
+                    h_score = int(home_c.get("score") or 0)
+                    a_score = int(away_c.get("score") or 0)
                     return {
                         "ok": True,
                         "state": state,
@@ -628,7 +704,6 @@ async def ask_ai(prompt: str, system_prompt: str = "Ты элитный футб
 
 # ================= ПРОВЕРКА РЕАЛЬНЫХ РЕЗУЛЬТАТОВ И РАСЧЕТ КУПОНОВ =================
 def evaluate_leg_pick(pick_code: str, home_score: int, away_score: int) -> bool:
-    """Проверяет, сыграл ли выбранный исход при реальном счете матча"""
     code = pick_code.lower()
     if code in ("p1", "п1"):
         return home_score > away_score
@@ -643,10 +718,6 @@ def evaluate_leg_pick(pick_code: str, home_score: int, away_score: int) -> bool:
     return home_score > away_score
 
 async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
-    """
-    Проверяет все события внутри купона по реальным данным ESPN.
-    Возвращает статус: {'settled': True/False, 'live_summary': '...'}
-    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -670,7 +741,7 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
         if not res["completed"]:
             all_completed = False
             if res["state"] == "in":
-                live_parts.append(f"🔴 LIVE: {leg['teams']} — <b>{res['score_str']}</b> ({res['detail']})")
+                live_parts.append(f"🔴 LIVE: {leg['teams']} — {res['score_str']} ({res['detail']})")
             else:
                 live_parts.append(f"📅 {leg['teams']} — матч еще не начался")
         else:
@@ -682,9 +753,8 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
                 score_parts.append(f"{res['score_str']}")
             else:
                 score_parts.append(f"{leg['teams']} {res['score_str']} ({icon})")
-            live_parts.append(f"🏁 {leg['teams']} — <b>{res['score_str']}</b> {icon}")
+            live_parts.append(f"🏁 {leg['teams']} — {res['score_str']} {icon}")
 
-    # Рассчитываем купон ТОЛЬКО когда все реальные матчи в нем официально завершились
     if all_completed:
         final_score_str = " | ".join(score_parts)
         db_res = await db_manager.settle_bet_in_db(bet, all_won, final_score_str)
@@ -727,7 +797,6 @@ async def send_settlement_notification(bet: dict, is_win: bool, score_str: str, 
         logging.warning(f"Не удалось отправить пуш пользователю {bet['user_id']}: {e}")
 
 async def match_settlement_worker():
-    """Фоновый агент: каждые 3 минуты проверяет реальное завершение матчей через ESPN API"""
     while True:
         try:
             pending_bets = await db_manager.get_all_pending_bets()
@@ -739,7 +808,7 @@ async def match_settlement_worker():
             logging.error(f"Ошибка фонового расчета реальных матчей: {e}")
         await asyncio.sleep(180)
 
-# ================= МАТЕМАТИКА И ФОРМИРОВАНИЕ ЭКСПРЕССА ДНЯ =================
+# ================= МАТЕМАТИКА И ЭКСПРЕСС ДНЯ =================
 def calculate_ai_probabilities(odds: dict) -> dict:
     raw_p1, raw_x, raw_p2 = 1 / odds["p1"], 1 / odds["x"], 1 / odds["p2"]
     margin_sum = raw_p1 + raw_x + raw_p2
@@ -751,13 +820,11 @@ def calculate_ai_probabilities(odds: dict) -> dict:
     }
 
 def build_daily_express_data(db: dict) -> dict | None:
-    """Собирает Экспресс дня из 6 ближайших реальных топ-матчей"""
     all_upcoming = []
     for l_val in db.values():
-        for m in l_val["matches"].values():
+        for m in l_val.get("matches", {}).values():
             all_upcoming.append(m)
 
-    # Сортируем по дате, чтобы в экспресс попадали ближайшие реальные матчи
     all_upcoming.sort(key=lambda x: x["start_ts"])
     selected = all_upcoming[:6]
     if not selected:
@@ -869,11 +936,9 @@ def matches_kb(league_key: str, matches_dict: dict):
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
-    # 1-й ряд: Ординар (компактно П1, Х, П2)
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    # 2-й ряд: В экспресс
     builder.button(text="➕ П1", callback_data=f"slipadd:{league_key}:{match_id}:p1")
     builder.button(text="➕ Х", callback_data=f"slipadd:{league_key}:{match_id}:x")
     builder.button(text="➕ П2", callback_data=f"slipadd:{league_key}:{match_id}:p2")
@@ -920,7 +985,7 @@ async def cmd_start(message: Message, state: FSMContext):
         f"<blockquote>👤 Игрок: <b>{user['username']}</b>\n"
         f"💰 Доступный банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
         f"🏆 Выиграно купонов: <b><code>{user['wins']}</code></b></blockquote>\n"
-        f"📡 <b>Live-синхронизация:</b> Реальное расписание матчей на 7 дней вперед и автоматический расчет ставок по настоящему финальному счету.\n\n"
+        f"📡 <b>Live-синхронизация:</b> Реальное расписание матчей и автоматический расчет ставок по настоящему финальному счету.\n\n"
         f"👇 <b>Выбери раздел:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
@@ -1000,7 +1065,6 @@ async def process_active_bets(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "check_live_status")
 async def process_check_live_status(callback: CallbackQuery):
-    """Проверяет реальный статус матчей на сервере ESPN: если завершились — рассчитывает, если идут — показывает LIVE-счет"""
     bets = await db_manager.get_user_bets(callback.from_user.id, active_only=True)
     if not bets:
         await callback.answer("У тебя нет активных купонов!", show_alert=True)
@@ -1014,10 +1078,10 @@ async def process_check_live_status(callback: CallbackQuery):
             if res["settled"]:
                 settled_count += 1
             else:
-                live_info.append(f"Купон #{b['bet_id']}: {res.get('live_summary', '')}")
+                live_info.append(f"#{b['bet_id']}: {res.get('live_summary', '')}")
 
     if settled_count > 0:
-        await callback.answer(f"✅ Рассчитано завершенных купонов: {settled_count}! Проверь сообщение в чате.", show_alert=True)
+        await callback.answer(f"✅ Рассчитано завершенных купонов: {settled_count}! Проверь чат.", show_alert=True)
         await process_profile(callback)
     else:
         clean_alert = re.sub(r"<.*?>", "", "\n".join(live_info))[:195]
@@ -1199,7 +1263,9 @@ async def process_refresh_league(callback: CallbackQuery):
     league_data = db.get(league_key, {})
     matches = league_data.get("matches", {})
     if not matches:
-        text = f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие 7 дней официальных матчей в этом турнире нет (перерыв в календаре).</blockquote>"
+        text = f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие дни официальных матчей не найдено.</blockquote>"
+    elif league_data.get("extended"):
+        text = f"<b>{league_data['title']}</b>\n📅 <i>В ближайшие 7 дней перерыв между турами — показаны матчи ближайшего тура (МСК):</i>"
     else:
         text = f"<b>{league_data['title']}</b>\n📅 Реальное расписание на ближайшие 7 дней (МСК):"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
@@ -1214,9 +1280,10 @@ async def process_league_select(callback: CallbackQuery):
     if not matches:
         text = (
             f"<b>{league_data.get('title', 'Турнир')}</b>\n\n"
-            f"<blockquote>📅 В ближайшие 7 дней матчей в этой лиге нет в официальном календаре УЕФА.</blockquote>\n"
-            f"Выбери другую лигу в главном меню!"
+            f"<blockquote>📅 На ближайшие дни матчей не найдено. Нажми «Обновить расписание».</blockquote>"
         )
+    elif league_data.get("extended"):
+        text = f"<b>{league_data['title']}</b>\n📅 <i>В ближайшие 7 дней перерыв между турами — показаны матчи ближайшего тура (время МСК):</i>"
     else:
         text = f"<b>{league_data['title']}</b>\n📅 Реальные матчи на ближайшие 7 дней (время МСК):"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
@@ -1293,7 +1360,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         legs = []
         for s in slip:
             if s["start_ts"] <= now_ts:
-                return None  # Один из матчей в корзине уже начался
+                return None
             total_odd *= s["odds"]
             comb_prob *= (s["prob"] / 100.0)
             if s["end_ts"] > max_ts:
