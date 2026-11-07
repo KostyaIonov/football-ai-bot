@@ -5,11 +5,12 @@ import json
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 import aiohttp
 from aiohttp import web
 import aiosqlite
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
@@ -23,17 +24,22 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 GROQ_KEY = os.getenv("GROQ_API_KEY", "gsk_" + "4Tsu0D9a7WpeKXgsfCEBWGdyb3FYh36zWsKthL2t6jJ1ROtV1dqH")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Или автоматически назначится первому, кто вызовет /admin
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Корзина экспрессов и кэш ответов ИИ
 USER_SLIPS = {}
 AI_CACHE = {}
+BOT_USERNAME = ""
 
 class BetStates(StatesGroup):
     waiting_for_custom_total = State()
     waiting_for_custom_amount = State()
+
+class AdminStates(StatesGroup):
+    waiting_for_broadcast = State()
+    waiting_for_gift_data = State()
 
 # Клиенты ИИ
 gemini_client = AsyncOpenAI(
@@ -50,7 +56,7 @@ HTTP_HEADERS = {
     "Accept": "application/json, text/plain, */*"
 }
 
-# ================= КОНФИГУРАЦИЯ ЛИГ И ЧИСТЫХ НАЗВАНИЙ КЛУБОВ =================
+# ================= КОНФИГУРАЦИЯ ЛИГ И НАЗВАНИЙ КЛУБОВ =================
 MSK_TZ = timezone(timedelta(hours=3))
 
 LEAGUES_CONFIG = {
@@ -62,7 +68,6 @@ LEAGUES_CONFIG = {
     "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
 }
 
-# Чистые названия клубов без пестрых эмодзи
 TEAM_TRANSLATIONS = {
     # Англия
     "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут",
@@ -145,7 +150,6 @@ def clean_ai_text(text: str) -> str:
     return text.strip()
 
 def get_user_rank_info(balance: float, is_vip: int) -> tuple[str, int]:
-    """Определяет ранг каппера и размер ежедневного бонуса"""
     if is_vip or balance >= 15000:
         return "💎 Легенда Уолл-Стрит", 1000
     elif balance >= 5000:
@@ -155,20 +159,61 @@ def get_user_rank_info(balance: float, is_vip: int) -> tuple[str, int]:
     else:
         return "🥉 Новичок лиги", 250
 
-# ================= МАТЕМАТИЧЕСКАЯ МОДЕЛЬ ПУАССОНА (ЛЮБЫЕ ТОТАЛЫ И ФОРЫ) =================
+# ================= ФОРМАТИРОВАНИЕ ПОСТРОЧНЫХ СПИСКОВ СОБЫТИЙ =================
+def format_bet_legs_multiline(bet: dict, with_result: bool = False) -> str:
+    """
+    Красиво форматирует каждый матч из купона (особенно экспресса) на отдельной строчке
+    """
+    try:
+        legs = json.loads(bet.get("legs_json") or "[]")
+    except Exception:
+        legs = []
+
+    # Если сохраненных деталей по событиям больше 1 (Экспресс)
+    if len(legs) > 1:
+        lines = []
+        for idx, leg in enumerate(legs, 1):
+            t_name = leg.get("teams", "Матч")
+            p_lbl = leg.get("pick_label") or leg.get("pick_code", "")
+            l_odd = leg.get("odds", "")
+            odd_str = f" (кэф <code>{l_odd}</code>)" if l_odd else ""
+            if with_result and leg.get("final_score"):
+                st = leg.get("final_status", "")
+                icon = "✅" if st == "win" else ("🔄 Возврат" if st == "push" else "❌")
+                lines.append(
+                    f"<b>{idx}. {t_name}</b>\n"
+                    f"   🎯 <code>{p_lbl}</code>{odd_str} • Счет: <b><code>{leg['final_score']}</code></b> {icon}"
+                )
+            else:
+                lines.append(
+                    f"<b>{idx}. {t_name}</b>\n"
+                    f"   🎯 Исход: <code>{p_lbl}</code>{odd_str}"
+                )
+        return "\n".join(lines)
+
+    # Для ординара
+    score_part = f"\n🏁 Реальный счет: <b><code>{bet['score_result']}</code></b>" if (with_result and bet.get("score_result") and bet.get("status") != "cashout") else ""
+    return (
+        f"🏟 <b>Матч:</b> {bet['match_title']}\n"
+        f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <b><code>{bet['odds']}</code></b>){score_part}"
+    )
+
+# ================= МАТЕМАТИЧЕСКАЯ МОДЕЛЬ ПУАССОНА (ЛЮБЫЕ ТОТАЛЫ, ИТБ, ФОРЫ) =================
 def poisson_pmf(k: int, lam: float) -> float:
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
 
 def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
     """
-    Вычисляет точный коэффициент и вероятность для ЛЮБОГО рынка:
-    - p1, x, p2, 1x, x2, f10 (Фора 1 (0)), f20 (Фора 2 (0)), btts, btts_no
-    - tb_X.X (любой Тотал Больше, включая целые 1.0, 2.0, 3.0)
-    - tm_X.X (любой Тотал Меньше, включая целые 1.0, 2.0, 3.0)
+    Рассчитывает точный коэффициент и вероятность для:
+    - p1, x, p2, 1x, x2, f10, f20, btts, btts_no
+    - tb_X.X / tm_X.X (общие тоталы матча)
+    - itb1_X.X / itb2_X.X (индивидуальные тоталы 1-й и 2-й команды)
     """
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
     lam_total = match.get("exp_goals", 2.65)
+    lam_h = match.get("lam_h", 1.45)
+    lam_a = match.get("lam_a", 1.20)
     t1, t2 = match["home_team"], match["away_team"]
 
     code = pick_code.lower()
@@ -191,7 +236,29 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             "prob": probs.get(code, 50.0)
         }
 
-    # Динамический расчет любого Тотала по распределению Пуассона
+    # Индивидуальные тоталы команд (ИТБ1 / ИТБ2)
+    if code.startswith("itb1_") or code.startswith("itb2_"):
+        is_home = code.startswith("itb1_")
+        try:
+            line = float(code.split("_")[1])
+        except Exception:
+            return None
+        lam_team = lam_h if is_home else lam_a
+        team_name = t1 if is_home else t2
+        prefix_lbl = f"ИТБ1 ({team_name})" if is_home else f"ИТБ2 ({team_name})"
+
+        goal_probs = [poisson_pmf(k, lam_team) for k in range(12)]
+        min_goals = int(math.floor(line)) + 1
+        p_win = max(0.06, min(0.90, sum(goal_probs[k] for k in range(min_goals, 12))))
+        calc_odd = round(max(1.10, min(15.0, 1.0 / (p_win * 1.045))), 2)
+        return {
+            "pick_code": f"{'itb1' if is_home else 'itb2'}_{line:.1f}",
+            "label": f"{prefix_lbl} Больше {line:.1f}",
+            "odds": calc_odd,
+            "prob": round(p_win * 100, 1)
+        }
+
+    # Общие тоталы матча (ТБ / ТМ)
     if code.startswith("tb_") or code.startswith("tm_"):
         direction = "tb" if code.startswith("tb_") else "tm"
         try:
@@ -202,7 +269,6 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
         if line < 0.5 or line > 7.5:
             return None
 
-        # Считаем вероятности каждого количества голов от 0 до 14
         goal_probs = [poisson_pmf(k, lam_total) for k in range(15)]
         is_integer_line = abs(line - round(line)) < 1e-5
         int_line = int(round(line))
@@ -226,7 +292,6 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
                 p_push = 0.0
             label_prefix = "ТМ"
 
-        # Условная вероятность выигрыша без учета возврата (Push)
         denom = max(0.04, 1.0 - p_push)
         effective_win_prob = max(0.05, min(0.92, p_win / denom))
         margin = 1.045
@@ -243,7 +308,7 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
 
     return None
 
-# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И ЛИНИИ =================
+# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ И ДЕТАЛЬНОЙ СТАТИСТИКИ =================
 SCHEDULE_CACHE = {"data": {}, "updated_at": 0}
 CACHE_TTL = 900
 
@@ -265,36 +330,73 @@ def parse_american_odd(val) -> float | None:
         pass
     return None
 
-def parse_team_ppg(comp_dict: dict, ru_name: str) -> float:
-    base = 1.45 + get_elite_bonus(ru_name)
-    if not isinstance(comp_dict, dict):
-        return base
-    records = comp_dict.get("records") or []
-    for r in records:
-        if not isinstance(r, dict):
-            continue
-        summary = str(r.get("summary") or "")
-        parts = summary.split("-")
-        if len(parts) == 3 and all(p.isdigit() for p in parts):
-            w, d, l = int(parts[0]), int(parts[1]), int(parts[2])
-            games = w + d + l
-            if games >= 3:
-                ppg = (w * 3 + d) / games
-                return (ppg * 0.7) + (base * 0.3)
-    return base
+def parse_team_stats_detail(comp_dict: dict, ru_name: str) -> dict:
+    """Извлекает реальные очки за игру (PPG), В-Н-П и визуальную форму команды"""
+    base_ppg = 1.45 + get_elite_bonus(ru_name)
+    record_str = "н/д"
+    games_played = 0
+    w, d, l = 0, 0, 0
 
-def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_name: str, a_name: str) -> tuple[dict, float, float, float, str]:
-    """Рассчитывает котировки, ожидаемые голы xG и наиболее вероятный точный счет"""
-    h_strength = parse_team_ppg(home_comp, h_name) + 0.22
-    a_strength = parse_team_ppg(away_comp, a_name)
+    if isinstance(comp_dict, dict):
+        records = comp_dict.get("records") or []
+        for r in records:
+            if not isinstance(r, dict):
+                continue
+            summary = str(r.get("summary") or "")
+            parts = summary.split("-")
+            if len(parts) == 3 and all(p.isdigit() for p in parts):
+                w, d, l = int(parts[0]), int(parts[1]), int(parts[2])
+                games_played = w + d + l
+                record_str = f"{w}В - {d}Н - {l}П"
+                if games_played >= 3:
+                    ppg = (w * 3 + d) / games_played
+                    base_ppg = (ppg * 0.7) + (base_ppg * 0.3)
+                break
+
+        form_raw = str(comp_dict.get("form") or "").upper()
+    else:
+        form_raw = ""
+
+    # Генерируем наглядную полоску формы из 5 последних матчей
+    if form_raw and len(form_raw) >= 3:
+        icons = []
+        for ch in form_raw[-5:]:
+            if ch == "W":
+                icons.append("✅В")
+            elif ch == "D":
+                icons.append("➖Н")
+            elif ch == "L":
+                icons.append("❌П")
+        form_visual = " ".join(icons) if icons else "н/д"
+    elif games_played > 0:
+        # Восстанавливаем пропорциональный индикатор формы по статистике сезона
+        seq = (["✅В"] * min(5, round((w / games_played) * 5)) +
+               ["➖Н"] * min(5, round((d / games_played) * 5)) +
+               ["❌П"] * 5)[:5]
+        form_visual = " ".join(seq)
+    else:
+        form_visual = "📊 Первые туры"
+
+    points = w * 3 + d
+    return {
+        "ppg": base_ppg,
+        "record_str": record_str,
+        "points": points,
+        "games": games_played,
+        "form_visual": form_visual
+    }
+
+def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: dict, h_name: str, a_name: str):
+    h_stats = parse_team_stats_detail(home_comp, h_name)
+    a_stats = parse_team_stats_detail(away_comp, a_name)
+    h_strength = h_stats["ppg"] + 0.22
+    a_strength = a_stats["ppg"]
     diff = h_strength - a_strength
 
-    # Ожидаемые голы команд (xG)
     lam_h = round(max(0.65, min(2.65, 1.38 + (h_strength - 1.50) * 0.62 - (a_strength - 1.45) * 0.22)), 2)
     lam_a = round(max(0.50, min(2.35, 1.12 + (a_strength - 1.45) * 0.58 - (h_strength - 1.50) * 0.22)), 2)
     exp_goals = round(lam_h + lam_a, 2)
 
-    # Поиск наиболее вероятного точного счета по сетке Пуассона
     best_score = "1:1"
     best_p = 0.0
     for gh in range(5):
@@ -304,7 +406,6 @@ def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: d
                 best_p = p
                 best_score = f"{gh}:{ga}"
 
-    # 1. Основные исходы (П1, Х, П2)
     p1_odd, x_odd, p2_odd = None, None, None
     try:
         odds_list = comp_obj.get("odds") or []
@@ -336,7 +437,6 @@ def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: d
         x_odd = round(max(2.85, 1.0 / (prob_x * margin)), 2)
         p2_odd = round(max(1.14, 1.0 / (prob_p2 * margin)), 2)
 
-    # 2. Чистые вероятности для расчета Двойных шансов и Нулевых фор
     raw_1, raw_x, raw_2 = 1.0 / p1_odd, 1.0 / x_odd, 1.0 / p2_odd
     m_sum = raw_1 + raw_x + raw_2
     p1_clean, px_clean, p2_clean = raw_1 / m_sum, raw_x / m_sum, raw_2 / m_sum
@@ -347,9 +447,7 @@ def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: d
     odd_f10 = round(max(1.08, 1.0 / ((p1_clean / (p1_clean + p2_clean)) * margin)), 2)
     odd_f20 = round(max(1.08, 1.0 / ((p2_clean / (p1_clean + p2_clean)) * margin)), 2)
 
-    # 3. Базовые тоталы и Обе забьют
-    p_btts = (1.0 - math.exp(-lam_h)) * (1.0 - math.exp(-lam_a))
-    p_btts = max(0.35, min(0.68, p_btts))
+    p_btts = max(0.35, min(0.68, (1.0 - math.exp(-lam_h)) * (1.0 - math.exp(-lam_a))))
     odd_btts = round(max(1.40, 1.0 / (p_btts * margin)), 2)
     odd_btts_no = round(max(1.40, 1.0 / ((1.0 - p_btts) * margin)), 2)
 
@@ -366,7 +464,7 @@ def compute_match_metrics_and_odds(comp_obj: dict, home_comp: dict, away_comp: d
         "tb15": odd_tb15, "tb25": odd_tb25, "tm25": odd_tm25,
         "btts": odd_btts, "btts_no": odd_btts_no
     }
-    return odds_dict, exp_goals, lam_h, lam_a, best_score
+    return odds_dict, exp_goals, lam_h, lam_a, best_score, h_stats, a_stats
 
 def calculate_ai_probabilities(odds: dict) -> dict:
     raw_p1, raw_x, raw_p2 = 1 / odds["p1"], 1 / odds["x"], 1 / odds["p2"]
@@ -427,12 +525,14 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
         if not ev_id:
             return None
 
-        odds, exp_goals, lam_h, lam_a, best_score = compute_match_metrics_and_odds(comp, home_c, away_c, h_name, a_name)
+        venue_obj = comp.get("venue") or {}
+        venue_name = venue_obj.get("fullName") or "Центральная арена"
+        venue_city = (venue_obj.get("address") or {}).get("city") or ""
+        venue_str = f"{venue_name} ({venue_city})" if venue_city else venue_name
 
-        h_recs = home_c.get("records") or []
-        a_recs = away_c.get("records") or []
-        h_rec = h_recs[0].get("summary", "") if (h_recs and isinstance(h_recs[0], dict)) else ""
-        a_rec = a_recs[0].get("summary", "") if (a_recs and isinstance(a_recs[0], dict)) else ""
+        odds, exp_goals, lam_h, lam_a, best_score, h_stats, a_stats = compute_match_metrics_and_odds(
+            comp, home_c, away_c, h_name, a_name
+        )
 
         return {
             "event_id": ev_id,
@@ -441,7 +541,10 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
             "teams": f"{h_name} — {a_name}",
             "home_team": h_name,
             "away_team": a_name,
-            "records_info": f"{h_name} (В-Н-П: {h_rec or 'н/д'}), {a_name} (В-Н-П: {a_rec or 'н/д'})",
+            "venue": venue_str,
+            "h_stats": h_stats,
+            "a_stats": a_stats,
+            "records_info": f"{h_name} ({h_stats['record_str']}), {a_name} ({a_stats['record_str']})",
             "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
             "short_date": dt_msk.strftime("%d.%m • %H:%M"),
             "start_ts": start_ts,
@@ -579,7 +682,7 @@ async def fetch_real_match_result(session: aiohttp.ClientSession, league_slug: s
         logging.warning(f"Ошибка проверки результата матча {event_id}: {e}")
     return {"ok": False, "state": "unknown", "completed": False}
 
-# ================= БАЗА ДАННЫХ (PostgreSQL + SQLite) =================
+# ================= БАЗА ДАННЫХ (PostgreSQL + SQLite + Рефералы + Админка) =================
 class Database:
     def __init__(self):
         self.use_pg = bool(DATABASE_URL)
@@ -600,8 +703,13 @@ class Database:
                         losses INT DEFAULT 0,
                         profit DOUBLE PRECISION DEFAULT 0.0,
                         is_vip INT DEFAULT 0,
-                        last_bonus TEXT DEFAULT ''
+                        last_bonus TEXT DEFAULT '',
+                        referred_by BIGINT DEFAULT 0,
+                        referrals_count INT DEFAULT 0
                     );
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT DEFAULT 0;
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS referrals_count INT DEFAULT 0;
+
                     CREATE TABLE IF NOT EXISTS bets (
                         bet_id SERIAL PRIMARY KEY,
                         user_id BIGINT,
@@ -630,7 +738,9 @@ class Database:
                         losses INTEGER DEFAULT 0,
                         profit REAL DEFAULT 0.0,
                         is_vip INTEGER DEFAULT 0,
-                        last_bonus TEXT DEFAULT ''
+                        last_bonus TEXT DEFAULT '',
+                        referred_by INTEGER DEFAULT 0,
+                        referrals_count INTEGER DEFAULT 0
                     )
                 """)
                 await db.execute("""
@@ -651,6 +761,14 @@ class Database:
                     )
                 """)
                 for col_def in [
+                    "referred_by INTEGER DEFAULT 0",
+                    "referrals_count INTEGER DEFAULT 0"
+                ]:
+                    try:
+                        await db.execute(f"ALTER TABLE users ADD COLUMN {col_def}")
+                    except Exception:
+                        pass
+                for col_def in [
                     "bet_type TEXT DEFAULT 'single'",
                     "win_prob REAL DEFAULT 50.0",
                     "settle_ts INTEGER DEFAULT 0",
@@ -665,36 +783,69 @@ class Database:
                 await db.commit()
             logging.info("Локальная БД SQLite подключена!")
 
-    async def get_or_create_user(self, user_id: int, username: str = ""):
+    async def get_or_create_user(self, user_id: int, username: str = "", referrer_id: int = 0) -> tuple[dict, bool]:
+        """Возвращает (user_dict, is_new_referral_rewarded)"""
         uname = username or f"Player_{str(user_id)[-4:]}"
+        rewarded = False
+
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
                 row = await conn.fetchrow("SELECT * FROM users WHERE user_id = $1", user_id)
                 if not row:
+                    valid_ref = 0
+                    if referrer_id and referrer_id != user_id:
+                        ref_exists = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", referrer_id)
+                        if ref_exists:
+                            valid_ref = referrer_id
+
+                    start_bal = 1500.0 if valid_ref else 1000.0
                     await conn.execute(
-                        "INSERT INTO users (user_id, username, balance) VALUES ($1, $2, 1000.0)",
-                        user_id, uname
+                        "INSERT INTO users (user_id, username, balance, referred_by) VALUES ($1, $2, $3, $4)",
+                        user_id, uname, start_bal, valid_ref
                     )
+                    if valid_ref:
+                        await conn.execute(
+                            "UPDATE users SET balance = balance + 500.0, referrals_count = referrals_count + 1 WHERE user_id = $1",
+                            valid_ref
+                        )
+                        rewarded = True
                     row = await conn.fetchrow("SELECT * FROM users WHERE user_id = $1", user_id)
-                return dict(row)
+                return dict(row), rewarded
         else:
             async with aiosqlite.connect(self.sqlite_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cur:
                     row = await cur.fetchone()
                 if not row:
+                    valid_ref = 0
+                    if referrer_id and referrer_id != user_id:
+                        async with db.execute("SELECT user_id FROM users WHERE user_id = ?", (referrer_id,)) as c2:
+                            if await c2.fetchone():
+                                valid_ref = referrer_id
+
+                    start_bal = 1500.0 if valid_ref else 1000.0
                     await db.execute(
-                        "INSERT INTO users (user_id, username, balance) VALUES (?, ?, 1000.0)",
-                        (user_id, uname)
+                        "INSERT INTO users (user_id, username, balance, referred_by) VALUES (?, ?, ?, ?)",
+                        (user_id, uname, start_bal, valid_ref)
                     )
+                    if valid_ref:
+                        await db.execute(
+                            "UPDATE users SET balance = balance + 500.0, referrals_count = referrals_count + 1 WHERE user_id = ?",
+                            (valid_ref,)
+                        )
+                        rewarded = True
                     await db.commit()
                     async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cur:
                         row = await cur.fetchone()
-                return dict(row)
+                return dict(row), rewarded
+
+    async def get_user(self, user_id: int, username: str = "") -> dict:
+        u, _ = await self.get_or_create_user(user_id, username)
+        return u
 
     async def claim_daily_bonus(self, user_id: int) -> tuple[bool, int, str]:
         today_str = now_msk().strftime("%Y-%m-%d")
-        user = await self.get_or_create_user(user_id)
+        user = await self.get_user(user_id)
         rank_name, bonus = get_user_rank_info(user["balance"], user["is_vip"])
         if user["last_bonus"] == today_str:
             return False, 0, rank_name
@@ -719,7 +870,7 @@ class Database:
         amount: int, odds: float, win_prob: float, settle_ts: int,
         bet_type: str = "single", legs_json: str = "[]"
     ) -> dict:
-        user = await self.get_or_create_user(user_id, username)
+        user = await self.get_user(user_id, username)
         if amount < 10:
             return {"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}
         if user["balance"] < amount:
@@ -790,12 +941,10 @@ class Database:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
 
-    async def settle_bet_in_db(self, bet: dict, outcome_status: str, effective_odds: float, score_str: str) -> dict:
-        """
-        outcome_status: 'win', 'loss', 'push' (возврат) или 'cashout'
-        """
-        user = await self.get_or_create_user(bet["user_id"])
+    async def settle_bet_in_db(self, bet: dict, outcome_status: str, effective_odds: float, score_str: str, updated_legs_json: str | None = None) -> dict:
+        user = await self.get_user(bet["user_id"])
         amount = bet["amount"]
+        legs_str = updated_legs_json if updated_legs_json is not None else bet.get("legs_json", "[]")
 
         if outcome_status == "win":
             payout = round(amount * effective_odds, 1)
@@ -808,7 +957,7 @@ class Database:
             new_balance = round(user["balance"] + payout, 1)
             w_inc, l_inc = 0, 0
         elif outcome_status == "cashout":
-            payout = round(effective_odds, 1)  # В режиме cashout передается сумма выкупа
+            payout = round(effective_odds, 1)
             net_profit = round(payout - amount, 1)
             new_balance = round(user["balance"] + payout, 1)
             w_inc, l_inc = (1, 0) if net_profit > 0 else (0, 0)
@@ -821,8 +970,8 @@ class Database:
         if self.use_pg:
             async with self.pg_pool.acquire() as conn:
                 await conn.execute(
-                    "UPDATE bets SET status = $1, score_result = $2, odds = $3 WHERE bet_id = $4",
-                    outcome_status, score_str, round(effective_odds, 2) if outcome_status != "cashout" else bet["odds"], bet["bet_id"]
+                    "UPDATE bets SET status = $1, score_result = $2, odds = $3, legs_json = $4 WHERE bet_id = $5",
+                    outcome_status, score_str, round(effective_odds, 2) if outcome_status != "cashout" else bet["odds"], legs_str, bet["bet_id"]
                 )
                 await conn.execute(
                     "UPDATE users SET balance = $1, wins = wins + $2, losses = losses + $3, profit = profit + $4 WHERE user_id = $5",
@@ -831,8 +980,8 @@ class Database:
         else:
             async with aiosqlite.connect(self.sqlite_path) as db:
                 await db.execute(
-                    "UPDATE bets SET status = ?, score_result = ?, odds = ? WHERE bet_id = ?",
-                    (outcome_status, score_str, round(effective_odds, 2) if outcome_status != "cashout" else bet["odds"], bet["bet_id"])
+                    "UPDATE bets SET status = ?, score_result = ?, odds = ?, legs_json = ? WHERE bet_id = ?",
+                    (outcome_status, score_str, round(effective_odds, 2) if outcome_status != "cashout" else bet["odds"], legs_str, bet["bet_id"])
                 )
                 await db.execute(
                     "UPDATE users SET balance = ?, wins = wins + ?, losses = losses + ?, profit = profit + ? WHERE user_id = ?",
@@ -853,6 +1002,59 @@ class Database:
                 async with db.execute("SELECT username, balance, wins, losses, is_vip FROM users ORDER BY balance DESC LIMIT 10") as cur:
                     rows = await cur.fetchall()
                     return [dict(r) for r in rows]
+
+    # Функции для Админ-панели
+    async def get_project_stats(self) -> dict:
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                total_u = await conn.fetchval("SELECT COUNT(*) FROM users")
+                total_b = await conn.fetchval("SELECT COUNT(*) FROM bets")
+                active_b = await conn.fetchval("SELECT COUNT(*) FROM bets WHERE status = 'pending'")
+                total_fc = await conn.fetchval("SELECT COALESCE(SUM(balance), 0) FROM users")
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                async with db.execute("SELECT COUNT(*) FROM users") as c:
+                    total_u = (await c.fetchone())[0]
+                async with db.execute("SELECT COUNT(*) FROM bets") as c:
+                    total_b = (await c.fetchone())[0]
+                async with db.execute("SELECT COUNT(*) FROM bets WHERE status = 'pending'") as c:
+                    active_b = (await c.fetchone())[0]
+                async with db.execute("SELECT COALESCE(SUM(balance), 0) FROM users") as c:
+                    total_fc = (await c.fetchone())[0]
+        return {
+            "users": total_u,
+            "bets": total_b,
+            "active_bets": active_b,
+            "total_fc": round(float(total_fc), 1)
+        }
+
+    async def get_all_user_ids(self) -> list[int]:
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                rows = await conn.fetch("SELECT user_id FROM users")
+                return [r["user_id"] for r in rows]
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                async with db.execute("SELECT user_id FROM users") as cur:
+                    rows = await cur.fetchall()
+                    return [r[0] for r in rows]
+
+    async def add_balance_to_user(self, target_uid: int, add_amt: float) -> bool:
+        if self.use_pg:
+            async with self.pg_pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", target_uid)
+                if not row:
+                    return False
+                await conn.execute("UPDATE users SET balance = balance + $1 WHERE user_id = $2", add_amt, target_uid)
+                return True
+        else:
+            async with aiosqlite.connect(self.sqlite_path) as db:
+                async with db.execute("SELECT user_id FROM users WHERE user_id = ?", (target_uid,)) as c:
+                    if not await c.fetchone():
+                        return False
+                await db.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (add_amt, target_uid))
+                await db.commit()
+                return True
 
 db_manager = Database()
 
@@ -907,11 +1109,8 @@ async def ask_ai_cached(cache_key: str, prompt: str, system_prompt: str = "Ты 
 
     return None
 
-# ================= ПРОВЕРКА РЕЗУЛЬТАТОВ (WIN / LOSS / PUSH) И CASHOUT =================
+# ================= ПРОВЕРКА РЕАЛЬНЫХ РЕЗУЛЬТАТОВ (ВКЛЮЧАЯ ИТБ, ТОТАЛЫ, ФОРЫ) =================
 def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str:
-    """
-    Возвращает 'win', 'loss' или 'push' (возврат по целому тоталу или нулевой форе)
-    """
     code = pick_code.lower()
     total_goals = home_score + away_score
 
@@ -943,6 +1142,14 @@ def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str
         return "win" if total_goals >= 3 else "loss"
     elif code == "tm25":
         return "win" if total_goals <= 2 else "loss"
+    elif code.startswith("itb1_") or code.startswith("itb2_"):
+        is_home = code.startswith("itb1_")
+        try:
+            line = float(code.split("_")[1])
+        except Exception:
+            return "loss"
+        team_goals = home_score if is_home else away_score
+        return "win" if team_goals > line else "loss"
     elif code.startswith("tb_") or code.startswith("tm_"):
         direction = "tb" if code.startswith("tb_") else "tm"
         try:
@@ -959,7 +1166,6 @@ def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str
     return "win" if home_score > away_score else "loss"
 
 async def calculate_cashout_offer(session: aiohttp.ClientSession, bet: dict) -> float:
-    """Рассчитывает честную сумму досрочной выплаты (CashOut) в прематче и LIVE"""
     amount = bet["amount"]
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
@@ -989,7 +1195,6 @@ async def calculate_cashout_offer(session: aiohttp.ClientSession, bet: dict) -> 
             else:
                 return 0.0
         else:
-            # Матч идет в LIVE прямо сейчас
             if cur_state == "win":
                 multiplier *= (1.0 + (leg_odd - 1.0) * 0.68)
             elif cur_state == "push":
@@ -1035,6 +1240,8 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
                 live_parts.append(f"📅 {leg['teams']} — еще не начался")
         else:
             st = evaluate_leg_result(leg["pick_code"], res["home_score"], res["away_score"])
+            leg["final_score"] = res["score_str"]
+            leg["final_status"] = st
             leg_odd = float(leg.get("odds") or bet["odds"])
             if st == "win":
                 effective_odds *= leg_odd
@@ -1066,42 +1273,42 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
         if len(legs) == 1 and outcome_status == "win":
             effective_odds = float(bet["odds"])
 
-        db_res = await db_manager.settle_bet_in_db(bet, outcome_status, effective_odds, final_score_str)
-        await send_settlement_notification(bet, outcome_status, effective_odds, final_score_str, db_res)
+        updated_legs_str = json.dumps(legs, ensure_ascii=False)
+        bet["legs_json"] = updated_legs_str
+        bet["score_result"] = final_score_str
+        db_res = await db_manager.settle_bet_in_db(bet, outcome_status, effective_odds, final_score_str, updated_legs_str)
+        await send_settlement_notification(bet, outcome_status, effective_odds, db_res)
         return {"settled": True, "status": outcome_status, "score_str": final_score_str}
 
     return {"settled": False, "live_summary": "\n".join(live_parts)}
 
-async def send_settlement_notification(bet: dict, outcome_status: str, effective_odds: float, score_str: str, res: dict):
+async def send_settlement_notification(bet: dict, outcome_status: str, effective_odds: float, res: dict):
+    """Отправляет уведомление, где каждое событие экспресса выведено на отдельной строке"""
     type_label = "⚡ ЭКСПРЕСС" if bet.get("bet_type") == "express" else "⚽ ОРДИНАР"
+    events_block = format_bet_legs_multiline(bet, with_result=True)
+
     if outcome_status == "win":
         msg = (
-            f"🎉 <b>СТАВКА СЫГРАЛА! ({type_label})</b>\n\n"
-            f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code>\n"
-            f"🏟 <b>Событие:</b> {bet['match_title']}\n"
-            f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{round(effective_odds, 2)}</code>)\n"
-            f"🏁 <b>Реальный счет:</b> <code>{score_str}</code></blockquote>\n"
+            f"🎉 <b>СТАВКА СЫГРАЛА! ({type_label})</b>\n"
+            f"🎫 <b>Купон #{bet['bet_id']}</b>  •  Итоговый кэф: <b><code>{round(effective_odds, 2)}</code></b>\n\n"
+            f"<blockquote>{events_block}</blockquote>\n"
             f"💵 <b>Сумма ставки:</b> <code>{bet['amount']} FC</code>\n"
             f"💰 <b>Выплата:</b> <b><code>+{res['payout']} FC</code></b> <i>(чистыми: +{res['net_profit']} FC)</i>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
         )
     elif outcome_status == "push":
         msg = (
-            f"🔄 <b>ВОЗВРАТ СТАВКИ (РАСХОД • КЭФ 1.00)</b>\n\n"
-            f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code>\n"
-            f"🏟 <b>Событие:</b> {bet['match_title']}\n"
-            f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code>\n"
-            f"🏁 <b>Реальный счет:</b> <code>{score_str}</code></blockquote>\n"
+            f"🔄 <b>ВОЗВРАТ СТАВКИ (РАСХОД • КЭФ 1.00)</b>\n"
+            f"🎫 <b>Купон #{bet['bet_id']}</b>\n\n"
+            f"<blockquote>{events_block}</blockquote>\n"
             f"💵 <b>Возвращено на счет:</b> <b><code>+{res['payout']} FC</code></b>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
         )
     else:
         msg = (
-            f"📢 <b>МАТЧ ЗАВЕРШЕН ({type_label})</b>\n\n"
-            f"<blockquote>🎫 <b>Купон:</b> <code>#{bet['bet_id']}</code> — ❌ <i>Не сыграл</i>\n"
-            f"🏟 <b>Событие:</b> {bet['match_title']}\n"
-            f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
-            f"🏁 <b>Реальный счет:</b> <code>{score_str}</code></blockquote>\n"
+            f"📢 <b>КУПОН РАССЧИТАН ({type_label}) — ❌ НЕ СЫГРАЛ</b>\n"
+            f"🎫 <b>Купон #{bet['bet_id']}</b>  •  Кэф: <code>{bet['odds']}</code>\n\n"
+            f"<blockquote>{events_block}</blockquote>\n"
             f"💸 <b>Списано:</b> <code>-{bet['amount']} FC</code>\n"
             f"🏦 <b>Твой баланс:</b> <b><code>{res['new_balance']} FC</code></b>"
         )
@@ -1140,7 +1347,7 @@ def build_daily_express_data(db: dict) -> dict | None:
         return None
 
     picks_text = []
-    short_titles = []
+    multiline_pick = []
     legs = []
     total_odd = 1.0
     combined_prob = 100.0
@@ -1170,7 +1377,7 @@ def build_daily_express_data(db: dict) -> dict | None:
             f"<b>{len(picks_text)+1}. {m['teams']}</b> <i>({m['short_date']})</i>\n"
             f"   🎯 Прогноз: <code>{bet_str}</code> • Кэф: <b><code>{k}</code></b>"
         )
-        short_titles.append(f"{m['teams']} ({bet_str})")
+        multiline_pick.append(f"{idx+1}. {m['teams']} — {bet_str} ({k})")
         legs.append({
             "league_slug": m["league_slug"],
             "event_id": m["event_id"],
@@ -1187,7 +1394,7 @@ def build_daily_express_data(db: dict) -> dict | None:
         "prob": round(combined_prob * 100, 1),
         "end_ts": max_end_ts,
         "summary_title": f"Экспресс дня ({len(legs)} матчей)",
-        "summary_pick": " + ".join(short_titles[:3]) + (f" и еще {len(legs)-3}" if len(legs) > 3 else ""),
+        "summary_pick": "\n".join(multiline_pick),
         "legs": legs
     }
 
@@ -1213,7 +1420,7 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
         bet = f"🎯 <b>Лучший выбор:</b> Фора 1 (0) за <code>{odds['f10']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
     return f"{style}\n\n{bet}"
 
-# ================= КЛАВИАТУРЫ (МИНИМАЛИЗМ И КОНСТРУКТОР РЫНКОВ) =================
+# ================= КЛАВИАТУРЫ =================
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
@@ -1239,13 +1446,12 @@ def profile_kb(active_count: int = 0, bonus_amt: int = 250):
     builder.button(text=f"⏳ Активные ставки ({active_count})", callback_data="active_bets")
     builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
     builder.button(text=f"🎁 Забрать бонус (+{bonus_amt} FC)", callback_data="claim_bonus")
-    builder.button(text="💎 PRO-статус и Магазин", callback_data="vip_shop")
+    builder.button(text="🤝 Пригласить друга (+500 FC)", callback_data="referral_menu")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(2, 1, 1, 1)
     return builder.as_markup()
 
 def matches_kb(league_key: str, matches_dict: dict):
-    """Чистый список матчей без визуального шума"""
     builder = InlineKeyboardBuilder()
     for match_id, data in list(matches_dict.items())[:15]:
         builder.button(
@@ -1258,16 +1464,17 @@ def matches_kb(league_key: str, matches_dict: dict):
     return builder.as_markup()
 
 def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
-    """Лаконичная карточка матча: 1-й ряд — П1/Х/П2, 2-й ряд — Конструкторы ТБ, ТМ и Фор/ОЗ"""
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
     # Ряд 1: Основные исходы
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
-    # Ряд 2: Меню выбора любого Тотала (ТБ / ТМ) и Двойных шансов / Фор / ОЗ
+    # Ряд 2: Конструкторы Тоталов
     builder.button(text="📈 Тотал Больше (ТБ)", callback_data=f"totals_menu:{league_key}:{match_id}:tb")
     builder.button(text="📉 Тотал Меньше (ТМ)", callback_data=f"totals_menu:{league_key}:{match_id}:tm")
+    # Ряд 3: Сводка/ИТБ и Форы/ОЗ
+    builder.button(text="📊 Сводка и ИТБ команд", callback_data=f"stats_menu:{league_key}:{match_id}")
     builder.button(text="🛡️ Фора (0) / 1Х2 / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
 
     if slip_count > 0:
@@ -1277,13 +1484,29 @@ def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
     builder.button(text="🏠 Меню", callback_data="back_to_main")
 
     if slip_count > 0:
-        builder.adjust(3, 2, 1, 1, 2)
+        builder.adjust(3, 2, 2, 1, 2)
     else:
-        builder.adjust(3, 2, 1, 2)
+        builder.adjust(3, 2, 2, 2)
+    return builder.as_markup()
+
+def stats_and_itb_kb(match: dict):
+    """Клавиатура индивидуальных тоталов команд внутри сводки матча"""
+    league_key = match["league_key"]
+    match_id = match["event_id"]
+    builder = InlineKeyboardBuilder()
+
+    for line_val in ["0.5", "1.5", "2.5"]:
+        m1 = evaluate_custom_market(match, f"itb1_{line_val}")
+        m2 = evaluate_custom_market(match, f"itb2_{line_val}")
+        if m1 and m2:
+            builder.button(text=f"🏠 ИТБ1 > {line_val} ({m1['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb1_{line_val}")
+            builder.button(text=f"✈️ ИТБ2 > {line_val} ({m2['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb2_{line_val}")
+
+    builder.button(text="⬅️ Назад к разбору матча", callback_data=f"match:{league_key}:{match_id}")
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
 def totals_constructor_kb(match: dict, direction: str):
-    """Быстрая сетка популярных тоталов + возможность написать любое свое значение в чат"""
     league_key = match["league_key"]
     match_id = match["event_id"]
     prefix = "ТБ" if direction == "tb" else "ТМ"
@@ -1303,7 +1526,6 @@ def totals_constructor_kb(match: dict, direction: str):
     return builder.as_markup()
 
 def extras_menu_kb(match: dict):
-    """Подменю двойных шансов, нулевых фор и Обе забьют"""
     league_key = match["league_key"]
     match_id = match["event_id"]
     o = match["odds"]
@@ -1335,25 +1557,45 @@ def amount_selection_kb(target_code: str, balance: float):
         builder.button(text="⬅️ Назад к купону", callback_data="view_slip")
         builder.adjust(2, 2, 1, 1, 1)
     else:
-        l_key, m_id, p_code = target_code.split("-")
+        l_key, m_id, p_code = target_code.split("-", 2)
         builder.button(text="➕ Добавить этот исход в Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
         builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{l_key}:{m_id}")
         builder.adjust(2, 2, 1, 1, 1, 1)
 
     return builder.as_markup()
 
-# ================= ОБРАБОТЧИКИ СОБЫТИЙ =================
+# ================= СТАРТ И РЕФЕРАЛЬНАЯ СИСТЕМА =================
 @dp.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, command: CommandObject, state: FSMContext):
     await state.clear()
-    user = await db_manager.get_or_create_user(message.from_user.id, message.from_user.username)
+    ref_id = 0
+    if command.args and command.args.startswith("ref_"):
+        raw_ref = command.args.replace("ref_", "").strip()
+        if raw_ref.isdigit():
+            ref_id = int(raw_ref)
+
+    user, rewarded = await db_manager.get_or_create_user(message.from_user.id, message.from_user.username, ref_id)
+    if rewarded and ref_id:
+        try:
+            await bot.send_message(
+                ref_id,
+                f"🎉 <b>НОВЫЙ РЕФЕРАЛ!</b>\n\n"
+                f"Игрок <b>{user['username']}</b> присоединился по твоей ссылке!\n"
+                f"💰 На твой баланс начислено <b><code>+500 FC</code></b>!",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
     rank_name, _ = get_user_rank_info(user["balance"], user["is_vip"])
+    bonus_note = "\n🎁 <i>Тебе начислено +500 FC по приглашению друга!</i>" if rewarded else ""
     text = (
         f"⚽ <b>AI_BET_BOT — ФУТБОЛЬНАЯ АНАЛИТИКА И ЛИНИЯ</b>\n\n"
         f"<blockquote>👤 Каппер: <b>{user['username']}</b>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
-        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  |  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>\n"
-        f"📡 Реальное расписание матчей, конструктор любых тоталов и фор, CashOut в реальном времени и расчет по финальному свистку.\n\n"
+        f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  |  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>"
+        f"{bonus_note}\n"
+        f"📡 Реальное расписание матчей, конструктор любых тоталов и ИТБ, CashOut в реальном времени и расчет по финальному свистку.\n\n"
         f"👇 <b>Выбери раздел:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
@@ -1361,7 +1603,7 @@ async def cmd_start(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "back_to_main")
 async def process_back_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
     rank_name, _ = get_user_rank_info(user["balance"], user["is_vip"])
     text = (
         f"⚽ <b>ГЛАВНОЕ МЕНЮ • AI_BET_BOT</b>\n\n"
@@ -1372,11 +1614,11 @@ async def process_back_main(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text, reply_markup=main_menu_kb(callback.from_user.id), parse_mode="HTML")
     await callback.answer()
 
-# ================= ЛИЧНЫЙ КАБИНЕТ, LIVE-РАДАР И CASHOUT =================
+# ================= ЛИЧНЫЙ КАБИНЕТ, РЕФЕРАЛЫ И АКТИВНЫЕ СТАВКИ =================
 @dp.callback_query(F.data == "profile")
 async def process_profile(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
     active_bets = await db_manager.get_user_bets(callback.from_user.id, active_only=True)
     total_settled = user["wins"] + user["losses"]
     winrate = round((user["wins"] / total_settled) * 100, 1) if total_settled > 0 else 0.0
@@ -1392,10 +1634,44 @@ async def process_profile(callback: CallbackQuery, state: FSMContext):
         f"📊 <b>Статистика каппера:</b>\n"
         f"• Рассчитано ставок: <code>{total_settled}</code> (✅ <code>{user['wins']}</code> | ❌ <code>{user['losses']}</code>)\n"
         f"• Процент побед (Winrate): <b><code>{winrate}%</code></b>\n"
-        f"• Чистый профит (ROI): <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n\n"
-        f"<i>💡 Повышай банк, чтобы открывать новые ранги и увеличенный ежедневный бонус!</i>"
+        f"• Чистый профит (ROI): <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n"
+        f"• Приглашено друзей: <b><code>{user.get('referrals_count', 0)}</code></b>\n\n"
+        f"<i>💡 Приглашай друзей по своей ссылке и получай по +500 FC за каждого!</i>"
     )
     await callback.message.edit_text(text, reply_markup=profile_kb(len(active_bets), bonus_amt), parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "referral_menu")
+async def process_referral_menu(callback: CallbackQuery):
+    global BOT_USERNAME
+    if not BOT_USERNAME:
+        me = await bot.get_me()
+        BOT_USERNAME = me.username
+
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
+    ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user['user_id']}"
+    share_text = quote(
+        f"⚽ Залетайте в AI_BET_BOT! Реальная футбольная линия, ИИ-аналитика и турнир капперов.\n"
+        f"🎁 По моей ссылке стартовый банк 1 500 FC вместо 1 000 FC:"
+    )
+    share_url = f"https://t.me/share/url?url={quote(ref_link)}&text={share_text}"
+
+    text = (
+        f"🤝 <b> ПАРТНЕРСКАЯ ПРОГРАММА (+500 FC)</b>\n\n"
+        f"<blockquote>👥 Приглашено друзей: <b><code>{user.get('referrals_count', 0)}</code></b>\n"
+        f"💰 Заработано на бонусах: <b><code>{user.get('referrals_count', 0) * 500} FC</code></b></blockquote>\n"
+        f"🎁 <b>Как это работает:</b>\n"
+        f"Отправь свою ссылку другу. Как только он запустит бота:\n"
+        f"• Ты мгновенно получишь <b><code>+500 FC</code></b> на свой баланс!\n"
+        f"• Твой друг получит повышенный стартовый банк <b><code>1 500 FC</code></b>!\n\n"
+        f"🔗 <b>Твоя персональная ссылка:</b>\n"
+        f"<code>{ref_link}</code>"
+    )
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📤 Отправить приглашение другу", url=share_url)
+    builder.button(text="⬅️ Назад в Личный кабинет", callback_data="profile")
+    builder.adjust(1)
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data == "active_bets")
@@ -1415,10 +1691,10 @@ async def process_active_bets(callback: CallbackQuery):
             end_dt = datetime.fromtimestamp(b["settle_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
             btype = "⚡ Экспресс" if b.get("bet_type") == "express" else "⚽ Ординар"
             pot_win = round(b["amount"] * b["odds"], 1)
+            events_multiline = format_bet_legs_multiline(b, with_result=False)
             lines.append(
-                f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> ({btype})\n"
-                f"🏟 <b>{b['match_title']}</b>\n"
-                f"🎯 Исход: <code>{b['pick']}</code>  •  Кэф: <b><code>{b['odds']}</code></b>\n"
+                f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> ({btype}) • Общий кэф: <b><code>{b['odds']}</code></b>\n"
+                f"{events_multiline}\n"
                 f"💵 Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{pot_win} FC</code></b>\n"
                 f"⏱ Ориентир расчета: <i>{end_dt}</i></blockquote>"
             )
@@ -1448,11 +1724,11 @@ async def process_cashout_ask(callback: CallbackQuery):
         await callback.answer("⛔ CashOut недоступен: событие в купоне уже проиграло.", show_alert=True)
         return
 
+    events_multiline = format_bet_legs_multiline(bet, with_result=False)
     text = (
         f"💸 <b>ДОСРОЧНЫЙ ВЫКУП СТАВКИ (CASHOUT)</b>\n\n"
-        f"<blockquote>🎫 <b>Купон #{bet['bet_id']}</b>\n"
-        f"🏟 <b>Матч:</b> {bet['match_title']}\n"
-        f"🎯 <b>Прогноз:</b> <code>{bet['pick']}</code> (кэф <code>{bet['odds']}</code>)\n"
+        f"<blockquote>🎫 <b>Купон #{bet['bet_id']}</b> (Кэф <code>{bet['odds']}</code>)\n"
+        f"{events_multiline}\n"
         f"💵 <b>Сумма ставки:</b> <code>{bet['amount']} FC</code></blockquote>\n"
         f"💰 <b>Предложенная сумма выкупа сейчас:</b> <b><code>{offer} FC</code></b>\n\n"
         f"Забрать <code>{offer} FC</code> на баланс прямо сейчас, не дожидаясь окончания матча?"
@@ -1493,7 +1769,7 @@ async def process_check_live_status(callback: CallbackQuery):
             if res["settled"]:
                 settled_count += 1
             else:
-                live_info.append(f"#{b['bet_id']}: {res.get('live_summary', '')}")
+                live_info.append(f"#{b['bet_id']}:\n{res.get('live_summary', '')}")
 
     if settled_count > 0:
         await callback.answer(f"✅ Рассчитано завершенных купонов: {settled_count}! Проверь чат.", show_alert=True)
@@ -1523,11 +1799,11 @@ async def process_archive_bets(callback: CallbackQuery):
             else:
                 badge = f"❌ ПРОИГРЫШ (-{b['amount']} FC)"
 
-            score_info = f"\n🏁 Итог: <code>{b['score_result']}</code>" if b.get("score_result") and st != "cashout" else ""
+            events_multiline = format_bet_legs_multiline(b, with_result=True)
             lines.append(
                 f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> — <b>{badge}</b>\n"
-                f"🏟 {b['match_title']}{score_info}\n"
-                f"🎯 Исход: <code>{b['pick']}</code> (кэф <code>{b['odds']}</code>) | Сумма: <code>{b['amount']} FC</code></blockquote>"
+                f"{events_multiline}\n"
+                f"💵 Сумма: <code>{b['amount']} FC</code> • Итоговый кэф: <code>{b['odds']}</code></blockquote>"
             )
         text = "🗄 <b>АРХИВ РАССЧИТАННЫХ СТАВОК:</b>\n\n" + "\n".join(lines)
 
@@ -1546,24 +1822,6 @@ async def process_claim_bonus(callback: CallbackQuery, state: FSMContext):
         await process_profile(callback, state)
     else:
         await callback.answer("⏳ Ты уже забирал бонус сегодня! Возвращайся завтра.", show_alert=True)
-
-@dp.callback_query(F.data == "vip_shop")
-async def process_vip_shop(callback: CallbackQuery):
-    text = (
-        "💎 <b>СИСТЕМА РАНГОВ И МАГАЗИН</b>\n\n"
-        "<blockquote>🏅 <b>Ранги капперов (растут автоматически):</b>\n"
-        "• 🥉 Новичок лиги (до 1 500 FC) — бонус <code>250 FC/день</code>\n"
-        "• 🥈 Скаут (от 1 500 FC) — бонус <code>350 FC/день</code>\n"
-        "• 🥇 Профи-аналитик (от 5 000 FC) — бонус <code>500 FC/день</code>\n"
-        "• 💎 Легенда Уолл-Стрит (от 15 000 FC) — бонус <code>1 000 FC/день</code></blockquote>\n"
-        "💰 <b>Пакеты игровой валюты:</b>\n"
-        "• Пакет «Старт»: <code>+5 000 FC</code> — 99 ₽ (50 ⭐️)\n"
-        "• Пакет «Магнат»: <code>+25 000 FC</code> — 299 ₽ (150 ⭐️)"
-    )
-    builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
-    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    await callback.answer()
 
 @dp.callback_query(F.data == "leaderboard")
 async def process_leaderboard(callback: CallbackQuery):
@@ -1682,7 +1940,7 @@ async def process_clear_slip(callback: CallbackQuery, state: FSMContext):
     await callback.answer("🗑 Купон экспресса очищен!", show_alert=True)
     await process_back_main(callback, state)
 
-# ================= КАРТОЧКА МАТЧА И КОНСТРУКТОР ЛЮБЫХ ТОТАЛОВ =================
+# ================= КАРТОЧКА МАТЧА, СВОДКА И ИТБ, КОНСТРУКТОР ТОТАЛОВ =================
 @dp.callback_query(F.data.startswith("refresh_league:"))
 async def process_refresh_league(callback: CallbackQuery):
     league_key = callback.data.split(":")[1]
@@ -1748,7 +2006,7 @@ async def render_match_card(message_obj: Message, league_key: str, match_id: str
         f"<blockquote>📊 <b>Линия 1Х2:</b>  П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%)  |  Х: <b><code>{odds['x']}</code></b> ({probs['x']}%)  |  П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
         f"⚽ <b>Модель голов (xG):</b> <b><code>{match['exp_goals']}</code></b>  •  Точный счет ИИ: <b><code>{match['best_score']}</code></b></blockquote>\n"
         f"🤖 <b>Экспертный разбор:</b>\n{ai_verdict}\n\n"
-        f"👇 <b>Выбери исход или открой конструктор Тоталов / Фор:</b>"
+        f"👇 <b>Выбери исход или открой Сводку / Тоталы / Форы:</b>"
     )
     await message_obj.edit_text(
         text,
@@ -1768,6 +2026,35 @@ async def process_match_select(callback: CallbackQuery, state: FSMContext):
         return
     await callback.answer()
 
+@dp.callback_query(F.data.startswith("stats_menu:"))
+async def process_stats_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    _, league_key, match_id = callback.data.split(":")
+    db = await get_real_matches()
+    match = db.get(league_key, {}).get("matches", {}).get(match_id)
+    if not match:
+        await callback.answer("⛔ Матч уже начался!", show_alert=True)
+        return
+
+    hs = match["h_stats"]
+    as_ = match["a_stats"]
+    text = (
+        f"📊 <b>ДЕТАЛЬНАЯ СВОДКА И ИТБ КОМАНД</b>\n\n"
+        f"🏟 <b>Арена:</b> {match['venue']}\n"
+        f"🕒 <b>Дата:</b> <code>{match['date']}</code>\n\n"
+        f"<blockquote>🏠 <b>{match['home_team']} (Хозяева)</b>\n"
+        f"• Баланс сезона: <code>{hs['record_str']}</code> (Очков: <b>{hs['points']}</b>)\n"
+        f"• Текущая форма: {hs['form_visual']}\n"
+        f"• Индивидуальный xG: <b><code>{match['lam_h']} гола</code></b></blockquote>\n"
+        f"<blockquote>✈️ <b>{match['away_team']} (Гости)</b>\n"
+        f"• Баланс сезона: <code>{as_['record_str']}</code> (Очков: <b>{as_['points']}</b>)\n"
+        f"• Текущая форма: {as_['form_visual']}\n"
+        f"• Индивидуальный xG: <b><code>{match['lam_a']} гола</code></b></blockquote>\n"
+        f"👇 <b>Поставить на Индивидуальный Тотал Больше (ИТБ1 — Хозяева, ИТБ2 — Гости):</b>"
+    )
+    await callback.message.edit_text(text, reply_markup=stats_and_itb_kb(match), parse_mode="HTML")
+    await callback.answer()
+
 @dp.callback_query(F.data.startswith("totals_menu:"))
 async def process_totals_menu(callback: CallbackQuery, state: FSMContext):
     _, league_key, match_id, direction = callback.data.split(":")
@@ -1777,7 +2064,6 @@ async def process_totals_menu(callback: CallbackQuery, state: FSMContext):
         await callback.answer("⛔ Матч уже начался!", show_alert=True)
         return
 
-    # Включаем режим ожидания ввода любого числа тотала с клавиатуры
     await state.set_state(BetStates.waiting_for_custom_total)
     await state.update_data(league_key=league_key, match_id=match_id, direction=direction)
 
@@ -1806,7 +2092,6 @@ async def process_custom_total_input(message: Message, state: FSMContext):
         await message.answer("⚠️ Введи значение тотала числом (например: <code>1.5</code>, <code>2</code> или <code>3.5</code>):", parse_mode="HTML")
         return
 
-    # Округляем до шага 0.5 (стандартные половинные и целые тоталы)
     rounded_val = round(val * 2) / 2
     if rounded_val < 0.5 or rounded_val > 6.5:
         await message.answer("⚠️ Допустимый диапазон тотала — от <code>0.5</code> до <code>6.5</code> голов. Введи другое число:", parse_mode="HTML")
@@ -1830,13 +2115,12 @@ async def process_custom_total_input(message: Message, state: FSMContext):
         await message.answer("⚠️ Не удалось рассчитать котировку. Выбери матч заново.")
         return
 
-    user = await db_manager.get_or_create_user(message.from_user.id, message.from_user.username)
+    user = await db_manager.get_user(message.from_user.id, message.from_user.username)
     end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m.%Y в %H:%M МСК")
 
     text = (
         f"🎫 <b>ОФОРМЛЕНИЕ КУПОНА</b>\n\n"
-        f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
-        f"🎯 <b>Выбранный рынок:</b> <code>{info['pick']}</code>\n"
+        f"<blockquote>{info['events_preview']}\n"
         f"📈 <b>Рассчитанный коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
         f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
@@ -1873,9 +2157,14 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         exp = build_daily_express_data(db)
         if not exp:
             return None
+        preview_lines = [
+            f"<b>{i+1}. {leg['teams']}</b>\n   🎯 Исход: <code>{leg['pick_label']}</code> (кэф <code>{leg['odds']}</code>)"
+            for i, leg in enumerate(exp["legs"])
+        ]
         return {
             "match_title": exp["summary_title"],
             "pick": exp["summary_pick"],
+            "events_preview": "\n".join(preview_lines),
             "odds": exp["total_odd"],
             "prob": exp["prob"],
             "end_ts": exp["end_ts"],
@@ -1889,16 +2178,18 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         total_odd = 1.0
         comb_prob = 1.0
         max_ts = 0
-        titles = []
+        multiline_titles = []
+        preview_lines = []
         legs = []
-        for s in slip:
+        for idx, s in enumerate(slip, 1):
             if s["start_ts"] <= now_ts:
                 return None
             total_odd *= s["odds"]
             comb_prob *= (s["prob"] / 100.0)
             if s["end_ts"] > max_ts:
                 max_ts = s["end_ts"]
-            titles.append(f"{s['match_title']} ({s['pick']})")
+            multiline_titles.append(f"{idx}. {s['match_title']} — {s['pick']} ({s['odds']})")
+            preview_lines.append(f"<b>{idx}. {s['match_title']}</b>\n   🎯 Исход: <code>{s['pick']}</code> (кэф <code>{s['odds']}</code>)")
             legs.append({
                 "league_slug": s["league_slug"],
                 "event_id": s["event_id"],
@@ -1909,7 +2200,8 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
             })
         return {
             "match_title": f"Персональный экспресс ({len(slip)} матчей)",
-            "pick": " + ".join(titles),
+            "pick": "\n".join(multiline_titles),
+            "events_preview": "\n".join(preview_lines),
             "odds": round(total_odd, 2),
             "prob": round(comb_prob * 100, 1),
             "end_ts": max_ts,
@@ -1935,6 +2227,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
         return {
             "match_title": f"{match['teams']} ({match['short_date']})",
             "pick": mkt["label"],
+            "events_preview": f"🏟 <b>Событие:</b> {match['teams']} ({match['short_date']})\n🎯 <b>Исход:</b> <code>{mkt['label']}</code>",
             "odds": mkt["odds"],
             "prob": mkt["prob"],
             "end_ts": match["end_ts"],
@@ -1958,20 +2251,51 @@ async def process_pick_outcome(callback: CallbackQuery, state: FSMContext):
         await callback.answer("⛔ Матч уже начался или купон устарел!", show_alert=True)
         return
 
-    user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
     end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m.%Y в %H:%M МСК")
 
     text = (
         f"🎫 <b>ОФОРМЛЕНИЕ КУПОНА</b>\n\n"
-        f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
-        f"🎯 <b>Выбранный рынок:</b> <code>{info['pick']}</code>\n"
-        f"📈 <b>Коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
+        f"<blockquote>{info['events_preview']}\n"
+        f"📈 <b>Общий коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
         f"⏱ <b>Расчет по финальному свистку:</b> <i>~{end_str}</i></blockquote>\n"
         f"💰 <b>Доступный баланс:</b> <code>{round(user['balance'], 1)} FC</code>\n\n"
-        f"👇 <b>Выбери сумму для ординара или добавь исход в свой Экспресс:</b>"
+        f"👇 <b>Выбери сумму ставки или введи свою:</b>"
     )
     await callback.message.edit_text(text, reply_markup=amount_selection_kb(target_code, user["balance"]), parse_mode="HTML")
     await callback.answer()
+
+async def build_bet_accepted_response(user_id: int, bet_id: int, info: dict, amount: int, res: dict) -> tuple[str, InlineKeyboardBuilder]:
+    global BOT_USERNAME
+    if not BOT_USERNAME:
+        me = await bot.get_me()
+        BOT_USERNAME = me.username
+
+    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
+    text = (
+        f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{bet_id})</b>\n\n"
+        f"<blockquote>{info['events_preview']}\n\n"
+        f"📈 <b>Итоговый коэффициент:</b> <b><code>{info['odds']}</code></b>\n"
+        f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
+        f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>\n"
+        f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
+        f"📡 <b>Расчет после завершения матча:</b> <i>~{end_str}</i>"
+    )
+
+    ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user_id}"
+    share_txt = quote(
+        f"🎫 Мой купон #{bet_id} в AI_BET_BOT (Кэф {info['odds']})!\n"
+        f"💰 Потенциальная выплата: {res['potential_win']} FC.\n"
+        f"Заходи и получай 1 500 FC на старт:"
+    )
+    share_url = f"https://t.me/share/url?url={quote(ref_link)}&text={share_txt}"
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📤 Поделиться купоном с другом", url=share_url)
+    builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
+    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+    builder.adjust(1)
+    return text, builder
 
 @dp.callback_query(F.data.startswith("place:"))
 async def process_place_fixed_amount(callback: CallbackQuery):
@@ -2002,27 +2326,14 @@ async def process_place_fixed_amount(callback: CallbackQuery):
     if target_code == "custom-slip":
         USER_SLIPS.pop(callback.from_user.id, None)
 
-    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
-    text = (
-        f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{res['bet_id']})</b>\n\n"
-        f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
-        f"🎯 <b>Прогноз:</b> <code>{info['pick']}</code>  •  Кэф: <b><code>{info['odds']}</code></b>\n"
-        f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
-        f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>\n"
-        f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
-        f"📡 <b>Расчет после завершения реального матча:</b> <i>~{end_str}</i>"
-    )
-    builder = InlineKeyboardBuilder()
-    builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(1)
+    text, builder = await build_bet_accepted_response(callback.from_user.id, res["bet_id"], info, amount, res)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer("🎫 Купон зарегистрирован в системе!")
 
 @dp.callback_query(F.data.startswith("custom_amt:"))
 async def process_custom_amount_prompt(callback: CallbackQuery, state: FSMContext):
     target_code = callback.data.split(":")[1]
-    user = await db_manager.get_or_create_user(callback.from_user.id, callback.from_user.username)
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
     await state.set_state(BetStates.waiting_for_custom_amount)
     await state.update_data(target_code=target_code)
 
@@ -2076,21 +2387,125 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
     if target_code == "custom-slip":
         USER_SLIPS.pop(message.from_user.id, None)
 
-    end_str = datetime.fromtimestamp(info["end_ts"], tz=MSK_TZ).strftime("%d.%m в %H:%M МСК")
-    text = (
-        f"✅ <b>СТАВКА ПРИНЯТА! (КУПОН #{res['bet_id']})</b>\n\n"
-        f"<blockquote>🏟 <b>Событие:</b> {info['match_title']}\n"
-        f"🎯 <b>Прогноз:</b> <code>{info['pick']}</code>  •  Кэф: <b><code>{info['odds']}</code></b>\n"
-        f"💵 <b>Сумма ставки:</b> <code>{amount} FC</code>\n"
-        f"💰 <b>Возможная выплата:</b> <b><code>{res['potential_win']} FC</code></b></blockquote>\n"
-        f"🏦 <b>Остаток на балансе:</b> <code>{res['new_balance']} FC</code>\n"
-        f"📡 <b>Расчет после завершения реального матча:</b> <i>~{end_str}</i>"
-    )
+    text, builder = await build_bet_accepted_response(message.from_user.id, res["bet_id"], info, amount, res)
+    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+# ================= ЗАКРЫТАЯ АДМИН-ПАНЕЛЬ (/admin) =================
+def is_admin(user_id: int) -> bool:
+    global ADMIN_ID
+    if ADMIN_ID == 0:
+        ADMIN_ID = user_id
+    return user_id == ADMIN_ID
+
+def admin_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
+    builder.button(text="📢 Сделать рассылку всем", callback_data="admin_broadcast")
+    builder.button(text="🎁 Выдать FC игроку по ID", callback_data="admin_gift")
+    builder.button(text="🔄 Обновить статистику", callback_data="admin_panel")
     builder.button(text="🏠 В главное меню", callback_data="back_to_main")
     builder.adjust(1)
-    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    return builder.as_markup()
+
+@dp.message(Command("admin"))
+async def cmd_admin(message: Message, state: FSMContext):
+    await state.clear()
+    if not is_admin(message.from_user.id):
+        return
+    st = await db_manager.get_project_stats()
+    text = (
+        f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
+        f"<blockquote>👥 Всего игроков в базе: <b><code>{st['users']}</code></b>\n"
+        f"🎫 Всего оформлено купонов: <b><code>{st['bets']}</code></b>\n"
+        f"⏳ Купонов сейчас в игре: <b><code>{st['active_bets']}</code></b>\n"
+        f"🏦 Суммарный банк игроков: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
+        f"👇 Выбери действие:"
+    )
+    await message.answer(text, reply_markup=admin_kb(), parse_mode="HTML")
+
+@dp.callback_query(F.data == "admin_panel")
+async def process_admin_panel(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    st = await db_manager.get_project_stats()
+    text = (
+        f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
+        f"<blockquote>👥 Всего игроков в базе: <b><code>{st['users']}</code></b>\n"
+        f"🎫 Всего оформлено купонов: <b><code>{st['bets']}</code></b>\n"
+        f"⏳ Купонов сейчас в игре: <b><code>{st['active_bets']}</code></b>\n"
+        f"🏦 Суммарный банк игроков: <b><code>{st['total_fc']} FC</code></b></blockquote>\n"
+        f"👇 Выбери действие:"
+    )
+    await callback.message.edit_text(text, reply_markup=admin_kb(), parse_mode="HTML")
+    await callback.answer("Статистика обновлена")
+
+@dp.callback_query(F.data == "admin_broadcast")
+async def process_admin_broadcast_ask(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AdminStates.waiting_for_broadcast)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Отмена", callback_data="admin_panel")
+    await callback.message.edit_text(
+        "📢 <b>РАССЫЛКА ВСЕМ ПОЛЬЗОВАТЕЛЯМ</b>\n\n"
+        "Отправь в чат текст сообщения, которое получат все игроки бота (поддерживается HTML):",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_for_broadcast)
+async def process_admin_broadcast_send(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await state.clear()
+    uids = await db_manager.get_all_user_ids()
+    sent = 0
+    for uid in uids:
+        try:
+            await bot.send_message(uid, message.text, parse_mode="HTML", reply_markup=main_menu_kb(uid))
+            sent += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            continue
+    await message.answer(f"✅ Рассылка завершена! Доставлено: <b>{sent}</b> из {len(uids)} пользователей.", reply_markup=admin_kb(), parse_mode="HTML")
+
+@dp.callback_query(F.data == "admin_gift")
+async def process_admin_gift_ask(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AdminStates.waiting_for_gift_data)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Отмена", callback_data="admin_panel")
+    await callback.message.edit_text(
+        "🎁 <b>НАЧИСЛЕНИЕ ВАЛЮТЫ ИГРОКУ</b>\n\n"
+        "Отправь через пробел <code>ID_игрока Сумму</code> (например: <code>123456789 2000</code>):",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_for_gift_data)
+async def process_admin_gift_exec(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    parts = (message.text or "").strip().split()
+    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].lstrip("-").isdigit():
+        await message.answer("⚠️ Введи корректно два числа через пробел: <code>ID Сумма</code>", parse_mode="HTML")
+        return
+
+    target_uid, add_amt = int(parts[0]), float(parts[1])
+    ok = await db_manager.add_balance_to_user(target_uid, add_amt)
+    await state.clear()
+    if ok:
+        try:
+            await bot.send_message(target_uid, f"🎁 Администратор начислил тебе <b><code>+{add_amt} FC</code></b> на баланс!", parse_mode="HTML")
+        except Exception:
+            pass
+        await message.answer(f"✅ Игроку <code>{target_uid}</code> успешно начислено <b>{add_amt} FC</b>!", reply_markup=admin_kb(), parse_mode="HTML")
+    else:
+        await message.answer("⚠️ Игрок с таким ID не найден в базе.", reply_markup=admin_kb(), parse_mode="HTML")
 
 # ================= ВЕБ-СЕРВЕР И ЗАПУСК =================
 async def handle_ping(request):
