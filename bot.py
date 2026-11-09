@@ -18,6 +18,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from openai import AsyncOpenAI
+from aiogram.types import WebAppInfo
+
+WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
 # ================= НАСТРОЙКИ СЕРВЕРА И КЛЮЧИ =================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -26,6 +29,7 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 GROQ_KEY = os.getenv("GROQ_API_KEY", "gsk_" + "4Tsu0D9a7WpeKXgsfCEBWGdyb3FYh36zWsKthL2t6jJ1ROtV1dqH")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -2047,6 +2051,14 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
+
+    # Кнопка запуска графического Telegram Mini App
+    if WEBAPP_BASE_URL.startswith("https://"):
+        builder.button(
+            text="📱 Открыть WebApp (FUT • Арена • Live)",
+            web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app?uid={user_id}")
+        )
+
     builder.button(text="👤 Личный кабинет", callback_data="profile")
     builder.button(text="🏆 Лига Чемпионов", callback_data="league:ucl")
     builder.button(text="🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ", callback_data="league:epl")
@@ -2061,11 +2073,14 @@ def main_menu_kb(user_id: int = 0):
     builder.button(text="⚔️ PvP и Аукцион", callback_data="pvp_hub_menu")
     builder.button(text="🏆 Топ-10 капперов", callback_data="leaderboard")
 
+    has_webapp = WEBAPP_BASE_URL.startswith("https://")
+    base_layout = [1, 1, 2, 2, 2, 1, 2, 2, 1] if has_webapp else [1, 2, 2, 2, 1, 2, 2, 1]
+
     if slip_count > 0:
         builder.button(text=f"🧺 Купон экспресса ({slip_count})", callback_data="view_slip")
-        builder.adjust(1, 2, 2, 2, 1, 2, 2, 1, 1)
-    else:
-        builder.adjust(1, 2, 2, 2, 1, 2, 2, 1)
+        base_layout.append(1)
+
+    builder.adjust(*base_layout)
     return builder.as_markup()
 
 def other_leagues_kb(db: dict):
@@ -4154,56 +4169,249 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + REST API ШЛЮЗ ПОД WEBAPP (TELEGRAM MINI APP) =================
+# ================= ВЕБ-СЕРВЕР + ПОЛНЫЙ REST API ШЛЮЗ ДЛЯ WEBAPP (MINI APP) =================
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type"
 }
 
+async def handle_options(request):
+    return web.Response(status=200, headers=CORS_HEADERS)
+
 async def handle_ping(request):
     return web.Response(text="AI_BET_BOT Live Sports & WebApp Engine is running 24/7!", headers=CORS_HEADERS)
 
-async def api_get_user(request):
-    """Полный JSON-профиль игрока для синхронизации с Telegram WebApp"""
+async def serve_webapp_html(request):
+    """Отдает интерфейс Telegram Mini App из файла webapp.html"""
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
+    if not os.path.exists(html_path):
+        return web.Response(
+            text="<h2>Файл webapp.html еще не загружен на сервер.</h2>",
+            content_type="text/html",
+            headers=CORS_HEADERS
+        )
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return web.Response(text=content, content_type="text/html", headers=CORS_HEADERS)
+
+async def api_get_state(request):
+    """Комплексный эндпоинт: отдает в WebApp профиль, FUT-состав, стадион, матчи, аукцион и Топ-10"""
     uid_str = request.match_info.get("user_id", "0")
     if not uid_str.isdigit():
-        return web.json_response({"ok": False, "error": "Invalid user_id"}, status=400, headers=CORS_HEADERS)
+        return web.json_response({"ok": False, "error": "Некорректный ID"}, status=400, headers=CORS_HEADERS)
+
     uid = int(uid_str)
     user = await db_manager.get_user(uid)
     buffs = get_user_fut_buffs(user)
     st_lvl = int(user.get("stadium_level") or 1)
+    lab_lvl = int(user.get("lab_level") or 1)
+    rank_name, daily_bonus_amt = get_user_rank_info(user["balance"], user["is_vip"])
+    today_str = now_msk().strftime("%Y-%m-%d")
+
     active_bets = await db_manager.get_user_bets(uid, active_only=True)
+    lot = await db_manager.get_or_rotate_black_market()
+    lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 20})
+
+    top_raw = await db_manager.get_leaderboard()
+    leaderboard = []
+    for idx, u in enumerate(top_raw, 1):
+        incog = int(u.get("is_incognito") or 0) == 1
+        leaderboard.append({
+            "place": idx,
+            "name": f"🕶 Скрытый #{str(u['user_id'])[-4:]}" if incog else u["username"],
+            "club": "" if incog else (u.get("favorite_club") or ""),
+            "balance": round(u["balance"], 1),
+            "wins": u["wins"],
+            "is_me": u["user_id"] == uid
+        })
+
+    db_matches = await get_real_matches()
+    flat_matches = []
+    for l_key, l_data in db_matches.items():
+        for m_id, m in list(l_data.get("matches", {}).items())[:6]:
+            flat_matches.append({
+                "event_id": m["event_id"],
+                "league_key": l_key,
+                "league_title": l_data["title"],
+                "teams": m["teams"],
+                "home_team": m["home_team"],
+                "away_team": m["away_team"],
+                "is_live": bool(m.get("is_live")),
+                "live_score": m.get("live_score", "0:0"),
+                "live_detail": m.get("live_detail", ""),
+                "short_date": m["short_date"],
+                "start_ts": m["start_ts"],
+                "exp_goals": m["exp_goals"],
+                "best_score": m["best_score"],
+                "odds": m["odds"]
+            })
+    flat_matches.sort(key=lambda x: (0 if x["is_live"] else 1, x["start_ts"]))
+
     return web.json_response({
         "ok": True,
         "user": {
             "user_id": user["user_id"],
             "username": user["username"],
+            "rank": rank_name,
+            "daily_bonus_amt": daily_bonus_amt,
+            "can_claim_bonus": user.get("last_bonus") != today_str,
             "balance": round(user["balance"], 1),
             "wins": user["wins"],
             "losses": user["losses"],
             "profit": round(user["profit"], 1),
-            "streak": user.get("streak", 0),
+            "streak": int(user.get("streak") or 0),
             "favorite_club": user.get("favorite_club", ""),
             "stadium_level": st_lvl,
             "stadium_info": STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1]),
-            "stadiums_catalog": STADIUM_LEVELS,
-            "lab_level": user.get("lab_level", 1),
-            "fut_buffs": buffs,
-            "active_bets_count": len(active_bets)
-        }
+            "next_stadium": STADIUM_LEVELS.get(st_lvl + 1) if st_lvl < 10 else None,
+            "can_claim_stadium": user.get("last_stadium_claim") != today_str,
+            "lab_level": lab_lvl,
+            "lab_info": LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1]),
+            "next_lab": LAB_LEVELS.get(lab_lvl + 1) if lab_lvl < 5 else None,
+            "can_spin_roulette": user.get("last_spin") != today_str,
+            "active_booster": user.get("active_booster", ""),
+            "fut_buffs": buffs
+        },
+        "stadiums_catalog": STADIUM_LEVELS,
+        "black_market": {
+            "day_key": lot["day_key"],
+            "lot_id": lot["lot_id"],
+            "card": lot_card,
+            "highest_bid": lot["highest_bid"],
+            "leader_name": lot["leader_name"],
+            "min_next_bid": int(lot["highest_bid"]) + 500 if int(lot["leader_id"]) != 0 else int(lot["highest_bid"])
+        },
+        "active_bets": [
+            {
+                "bet_id": b["bet_id"],
+                "match_title": b["match_title"],
+                "pick": b["pick"],
+                "amount": b["amount"],
+                "odds": b["odds"],
+                "potential_win": round(b["amount"] * b["odds"], 1),
+                "bet_type": b.get("bet_type", "single")
+            }
+            for b in active_bets[:10]
+        ],
+        "leaderboard": leaderboard,
+        "matches": flat_matches[:24]
     }, headers=CORS_HEADERS)
 
-async def api_get_matches(request):
-    """Возвращает LIVE и предстоящие матчи всех лиг для WebApp"""
-    db = await get_real_matches()
-    return web.json_response({"ok": True, "leagues": db}, headers=CORS_HEADERS)
+async def api_handle_action(request):
+    """Обрабатывает интерактивные действия игрока прямо из интерфейса WebApp"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON"}, status=400, headers=CORS_HEADERS)
+
+    uid = int(body.get("user_id") or 0)
+    action = str(body.get("action") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "Не указан user_id"}, status=400, headers=CORS_HEADERS)
+
+    user = await db_manager.get_user(uid)
+
+    if action == "claim_bonus":
+        ok, amt, r_name = await db_manager.claim_daily_bonus(uid)
+        if not ok:
+            return web.json_response({"ok": False, "error": "Ежедневный бонус уже получен сегодня!"}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": f"🎁 Бонус ранга «{r_name}»: +{amt} FC зачислено!"}, headers=CORS_HEADERS)
+
+    elif action == "claim_stadium":
+        ok, inc, st_name = await db_manager.claim_stadium_income(uid)
+        if not ok:
+            return web.json_response({"ok": False, "error": "Касса арены сегодня уже собрана! Заходи завтра."}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": f"🏟 Выручка «{st_name}» собрана: +{inc} FC!"}, headers=CORS_HEADERS)
+
+    elif action == "upgrade_building":
+        b_type = str(body.get("b_type") or "stadium")
+        res = await db_manager.upgrade_empire_building(uid, b_type)
+        if not res["ok"]:
+            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": f"🎉 Построено: {res['name']} (Ур. {res['new_lvl']})!"}, headers=CORS_HEADERS)
+
+    elif action == "buy_pack":
+        p_type = str(body.get("pack_type") or "basic")
+        if p_type == "basic":
+            cost, pool, weights = 1500, ["fw_1", "gk_1", "co_1", "fw_2", "gk_2"], [30, 30, 25, 10, 5]
+        elif p_type == "gold":
+            cost, pool, weights = 5000, ["fw_1", "gk_1", "fw_2", "fw_3", "gk_2", "co_2", "fw_4"], [12, 12, 22, 20, 15, 14, 5]
+        else:
+            cost, pool, weights = 15000, ["fw_2", "gk_2", "co_2", "fw_4", "fw_5", "gk_3", "co_3"], [10, 10, 10, 20, 18, 16, 16]
+
+        card_id = random.choices(pool, weights=weights, k=1)[0]
+        res = await db_manager.open_fut_pack_db(uid, cost, card_id)
+        if not res["ok"]:
+            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+        clean_note = re.sub(r"<.*?>", "", res["status_note"])
+        return web.json_response({
+            "ok": True,
+            "card": res["card"],
+            "status_note": clean_note,
+            "new_balance": res["new_balance"]
+        }, headers=CORS_HEADERS)
+
+    elif action == "spin_roulette":
+        today_str = now_msk().strftime("%Y-%m-%d")
+        if user.get("last_spin") == today_str:
+            return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
+
+        sectors = [
+            {"idx": 0, "name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
+            {"idx": 1, "name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
+            {"idx": 2, "name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
+            {"idx": 3, "name": "⚡ Кэф-буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
+            {"idx": 4, "name": "🎟 Золотой билет (+100 FC + Спин)", "coins": 100, "booster": "", "respin": True, "weight": 10},
+            {"idx": 5, "name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
+            {"idx": 6, "name": "🔥 ДЖЕКПОТ +2 000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
+        ]
+        chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
+        res = await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
+        return web.json_response({
+            "ok": True,
+            "sector": chosen,
+            "new_balance": res["new_balance"]
+        }, headers=CORS_HEADERS)
+
+    elif action == "bm_bid":
+        amount = int(body.get("amount") or 0)
+        res = await db_manager.place_black_market_bid(uid, amount)
+        if not res["ok"]:
+            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": f"🔨 Ставка {amount} FC принята! Ты лидер аукциона!"}, headers=CORS_HEADERS)
+
+    elif action == "place_bet":
+        l_key = str(body.get("league_key") or "")
+        m_id = str(body.get("event_id") or "")
+        p_code = str(body.get("pick_code") or "")
+        amount = int(body.get("amount") or 0)
+
+        target_code = f"{l_key}-{m_id}-{p_code}"
+        info = await resolve_bet_target(target_code, uid)
+        if not info:
+            return web.json_response({"ok": False, "error": "Прием ставок на этот матч уже закрыт!"}, headers=CORS_HEADERS)
+
+        res = await db_manager.create_pending_bet(
+            uid, user["username"], info["match_title"], info["pick"],
+            amount, info["odds"], info["prob"], info["end_ts"], info["bet_type"], info["legs_json"]
+        )
+        if not res["ok"]:
+            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+        return web.json_response({
+            "ok": True,
+            "message": f"🎫 Купон #{res['bet_id']} принят! Возможная выплата: {res['potential_win']} FC"
+        }, headers=CORS_HEADERS)
+
+    return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
 async def start_web_server():
     app = web.Application()
+    app.router.add_route("OPTIONS", "/{tail:.*}", handle_options)
     app.router.add_get("/", handle_ping)
-    app.router.add_get("/api/user/{user_id}", api_get_user)
-    app.router.add_get("/api/matches", api_get_matches)
+    app.router.add_get("/app", serve_webapp_html)
+    app.router.add_get("/api/state/{user_id}", api_get_state)
+    app.router.add_post("/api/action", api_handle_action)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 8080))
@@ -4211,7 +4419,6 @@ async def start_web_server():
     await site.start()
 
 async def setup_bot_commands():
-    """Автоматически добавляет кнопку Меню с командами /start и /profile в Telegram"""
     commands = [
         BotCommand(command="start", description="⚽ Главное меню"),
         BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
