@@ -12,7 +12,7 @@ from aiohttp import web
 import aiosqlite
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command, CommandObject
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, BotCommand, BotCommandScopeDefault
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -47,6 +47,7 @@ class BetStates(StatesGroup):
 class AdminStates(StatesGroup):
     waiting_for_broadcast = State()
     waiting_for_gift_data = State()
+    waiting_for_user_lookup = State()
 
 gemini_client = AsyncOpenAI(
     api_key=GEMINI_API_KEY or "dummy",
@@ -62,19 +63,21 @@ HTTP_HEADERS = {
     "Accept": "application/json, text/plain, */*"
 }
 
-# ================= КОНФИГУРАЦИЯ ЛИГ, СТАДИОНОВ, FUT И ЧЕРНОГО РЫНКА =================
+# ================= КОНФИГУРАЦИЯ ЛИГ (С РПЛ И ЛИГОЙ НАЦИЙ) =================
 MSK_TZ = timezone(timedelta(hours=3))
 
 MAIN_LEAGUES = {
     "ucl": {"title": "🏆 Лига Чемпионов", "slug": "uefa.champions"},
-    "epl": {"title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ (Англия)", "slug": "eng.1"},
-    "laliga": {"title": "🇪🇸 Ла Лига (Испания)", "slug": "esp.1"},
-    "seriea": {"title": "🇮🇹 Серия А (Италия)", "slug": "ita.1"},
+    "epl": {"title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 АПЛ", "slug": "eng.1"},
+    "laliga": {"title": "🇪🇸 Ла Лига", "slug": "esp.1"},
+    "seriea": {"title": "🇮🇹 Серия А", "slug": "ita.1"},
     "bundesliga": {"title": "🇩🇪 Бундеслига", "slug": "ger.1"},
-    "ligue1": {"title": "🇫🇷 Лига 1 (Франция)", "slug": "fra.1"}
+    "ligue1": {"title": "🇫🇷 Лига 1", "slug": "fra.1"}
 }
 
 OTHER_LEAGUES = {
+    "rpl": {"title": "🇷🇺 РПЛ (Россия)", "slug": "rus.1"},
+    "unl": {"title": "🏆 Лига Наций УЕФА", "slug": "uefa.nations"},
     "uel": {"title": "🏆 Лига Европы", "slug": "uefa.europa"},
     "uecl": {"title": "🏆 Лига Конференций", "slug": "uefa.europa.conference"},
     "por": {"title": "🇵🇹 Португалия", "slug": "por.1"},
@@ -86,19 +89,18 @@ OTHER_LEAGUES = {
 
 LEAGUES_CONFIG = {**MAIN_LEAGUES, **OTHER_LEAGUES}
 
-# Каталог из 10 Стадионов: покупка строго по очереди, повышенная стоимость с 5-го уровня
-# price — стоимость покупки именно этого уровня (перехода с предыдущего)
+# 10 уровней Стадионов
 STADIUM_LEVELS = {
-    1: {"name": "Дворовая коробка", "cap": "500 зрителей", "income": 150, "price": 0},
-    2: {"name": "Тренировочное поле", "cap": "2 500 зрителей", "income": 300, "price": 1500},
-    3: {"name": "Городской стадион", "cap": "8 000 зрителей", "income": 500, "price": 4000},
-    4: {"name": "Арена Первой Лиги", "cap": "18 000 зрителей", "income": 800, "price": 10000},
-    5: {"name": "Футбольный Колизей", "cap": "32 000 зрителей", "income": 1200, "price": 25000},
-    6: {"name": "Национальный Парк", "cap": "45 000 зрителей", "income": 1800, "price": 60000},
-    7: {"name": "Элитная Арена", "cap": "55 000 зрителей", "income": 2500, "price": 130000},
-    8: {"name": "Гранд-Стэдиум УЕФА", "cap": "68 000 зрителей", "income": 3500, "price": 250000},
-    9: {"name": "Кибер-Дом Чемпионов", "cap": "80 000 зрителей", "income": 4800, "price": 450000},
-    10: {"name": "Мега-Арена Легенд", "cap": "95 000 зрителей", "income": 6500, "price": 800000}
+    1: {"name": "Дворовая коробка", "cap": "500 мест", "income": 150, "price": 0},
+    2: {"name": "Тренировочное поле", "cap": "2 500 мест", "income": 300, "price": 1500},
+    3: {"name": "Городской стадион", "cap": "8 000 мест", "income": 500, "price": 4000},
+    4: {"name": "Арена Первой Лиги", "cap": "18 000 мест", "income": 800, "price": 10000},
+    5: {"name": "Футбольный Колизей", "cap": "32 000 мест", "income": 1200, "price": 25000},
+    6: {"name": "Национальный Парк", "cap": "45 000 мест", "income": 1800, "price": 60000},
+    7: {"name": "Элитная Арена", "cap": "55 000 мест", "income": 2500, "price": 130000},
+    8: {"name": "Гранд-Стэдиум УЕФА", "cap": "68 000 мест", "income": 3500, "price": 250000},
+    9: {"name": "Кибер-Дом Чемпионов", "cap": "80 000 мест", "income": 4800, "price": 450000},
+    10: {"name": "Мега-Арена Легенд", "cap": "95 000 мест", "income": 6500, "price": 800000}
 }
 
 # 5 уровней ИИ-Лаборатории
@@ -136,7 +138,7 @@ POPULAR_CLUBS = [
     "Ман Сити", "Ман Юнайтед", "Челси", "Бавария",
     "Боруссия Д", "Байер", "Интер", "Милан",
     "Ювентус", "Наполи", "ПСЖ", "Атлетико",
-    "Бенфика", "Спортинг", "Галатасарай", "Фенербахче"
+    "ЦСКА", "Спартак", "Зенит", "Краснодар"
 ]
 
 FOOTBALL_NICK_BASES = [
@@ -176,6 +178,25 @@ BOOSTER_NAMES = {
 }
 
 TEAM_TRANSLATIONS = {
+    # РПЛ (Россия)
+    "CSKA Moscow": "ЦСКА", "PFC CSKA Moscow": "ЦСКА", "Spartak Moscow": "Спартак", "FC Spartak Moscow": "Спартак",
+    "Zenit St Petersburg": "Зенит", "FC Zenit Saint Petersburg": "Зенит", "Krasnodar": "Краснодар", "FC Krasnodar": "Краснодар",
+    "Dynamo Moscow": "Динамо М", "FC Dynamo Moscow": "Динамо М", "Lokomotiv Moscow": "Локомотив", "FC Lokomotiv Moscow": "Локомотив",
+    "Rostov": "Ростов", "FC Rostov": "Ростов", "Rubin Kazan": "Рубин", "FC Rubin Kazan": "Рубин",
+    "Krylia Sovetov": "Крылья Советов", "PFC Krylia Sovetov Samara": "Крылья Советов", "Akhmat Grozny": "Ахмат",
+    "Pari Nizhny Novgorod": "Пари НН", "FC Pari Nizhny Novgorod": "Пари НН", "Fakel Voronezh": "Факел",
+    "Orenburg": "Оренбург", "FC Orenburg": "Оренбург", "Khimki": "Химки", "FC Khimki": "Химки",
+    "Akron Togliatti": "Акрон", "Dynamo Makhachkala": "Динамо Мх", "Baltika Kaliningrad": "Балтика", "Torpedo Moscow": "Торпедо М",
+    # Сборные (Лига Наций УЕФА)
+    "France": "Франция", "Spain": "Испания", "England": "Англия", "Germany": "Германия", "Italy": "Италия",
+    "Portugal": "Португалия", "Netherlands": "Нидерланды", "Belgium": "Бельгия", "Croatia": "Хорватия",
+    "Switzerland": "Швейцария", "Denmark": "Дания", "Austria": "Австрия", "Serbia": "Сербия", "Hungary": "Венгрия",
+    "Poland": "Польша", "Scotland": "Шотландия", "Ukraine": "Украина", "Turkey": "Турция", "Türkiye": "Турция",
+    "Czechia": "Чехия", "Czech Republic": "Чехия", "Wales": "Уэльс", "Norway": "Норвегия", "Sweden": "Швеция",
+    "Greece": "Греция", "Romania": "Румыния", "Slovakia": "Словакия", "Slovenia": "Словения", "Georgia": "Грузия",
+    "Finland": "Финляндия", "Republic of Ireland": "Ирландия", "Ireland": "Ирландия", "Kazakhstan": "Казахстан",
+    "Armenia": "Армения", "Belarus": "Беларусь", "Azerbaijan": "Азербайджан", "Iceland": "Исландия",
+    # Топ-5 и другие лиги
     "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
     "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон", "Brighton": "Брайтон", "Chelsea": "Челси",
     "Crystal Palace": "Кристал Пэлас", "Everton": "Эвертон", "Fulham": "Фулхэм", "Ipswich Town": "Ипсвич",
@@ -183,9 +204,9 @@ TEAM_TRANSLATIONS = {
     "Manchester United": "Ман Юнайтед", "Newcastle United": "Ньюкасл", "Nottingham Forest": "Ноттингем",
     "Southampton": "Саутгемптон", "Tottenham Hotspur": "Тоттенхэм", "West Ham United": "Вест Хэм",
     "Wolverhampton Wanderers": "Вулверхэмптон", "Leeds United": "Лидс", "Burnley": "Бернли",
-    "Sunderland": "Сандерленд", "Sheffield United": "Шеффилд Ютд", "West Bromwich Albion": "Вест Бромвич",
+    "Sunderland": "Сандерленд", "Sheffield United": "Шеффилд Ютд", "West Bromwich Albion": "Вест Бром",
     "Middlesbrough": "Мидлсбро", "Norwich City": "Норвич", "Coventry City": "Ковентри",
-    "Watford": "Уотфорд", "Blackburn Rovers": "Блэкберн", "Bristol City": "Бристоль Сити",
+    "Watford": "Уотфорд", "Blackburn Rovers": "Блэкберн", "Bristol City": "Бристоль",
     "Hull City": "Халл Сити", "Stoke City": "Сток Сити", "Swansea City": "Суонси", "Millwall": "Миллуолл",
     "Queens Park Rangers": "КПР", "Preston North End": "Престон", "Cardiff City": "Кардифф",
     "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "Atlético Madrid": "Атлетико",
@@ -204,7 +225,7 @@ TEAM_TRANSLATIONS = {
     "SC Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Werder Bremen": "Вердер",
     "Heidenheim": "Хайденхайм", "1. FC Heidenheim 1846": "Хайденхайм", "FC Augsburg": "Аугсбург",
     "VfL Wolfsburg": "Вольфсбург", "Borussia Mönchengladbach": "Боруссия М", "Mainz": "Майнц",
-    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
+    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион", "VfL Bochum": "Бохум",
     "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн", "Hamburger SV": "Гамбург", "FC Cologne": "Кельн",
     "Paris Saint-Germain": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако", "Marseille": "Марсель",
     "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль", "Lyon": "Лион",
@@ -222,10 +243,18 @@ TEAM_TRANSLATIONS = {
     "Istanbul Basaksehir": "Башакшехир", "Samsunspor": "Самсунспор", "Antalyaspor": "Антальяспор",
     "Flamengo": "Фламенго", "Palmeiras": "Палмейрас", "Botafogo": "Ботафого", "São Paulo": "Сан-Паулу",
     "Corinthians": "Коринтианс", "Fluminense": "Флуминенсе", "Grêmio": "Гремио", "Internacional": "Интернасьонал",
-    "Atlético Mineiro": "Атлетико Минейро", "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко да Гама", "Santos": "Сантос",
+    "Atlético Mineiro": "Атлетико М", "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко", "Santos": "Сантос",
     "Celtic": "Селтик", "Rangers": "Рейнджерс", "Club Brugge": "Брюгге", "Anderlecht": "Андерлехт",
-    "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм Грац",
-    "Sparta Prague": "Спарта Прага", "Slavia Prague": "Славия Прага", "Olympiacos": "Олимпиакос", "PAOK": "ПАОК"
+    "Shakhtar Donetsk": "Шахтер", "Red Bull Salzburg": "Зальцбург", "Sturm Graz": "Штурм",
+    "Sparta Prague": "Спарта Пр", "Slavia Prague": "Славия Пр", "Olympiacos": "Олимпиакос", "PAOK": "ПАОК"
+}
+
+# Короткие названия специально для мобильных кнопок, чтобы текст никогда не уходил в троеточие (...)
+SHORT_BTN_NAMES = {
+    "Кристал Пэлас": "Кр. Пэлас", "Вулверхэмптон": "Вулвз", "Реал Сосьедад": "Р. Сосьедад",
+    "Райо Вальекано": "Райо", "Крылья Советов": "Крылья", "Интернасьонал": "Интер Бр",
+    "Атлетико Минейро": "Атлетико М", "Башакшехир": "Истанбул", "Трабзонспор": "Трабзон",
+    "Астон Вилла": "А. Вилла", "Ноттингем": "Ноттингем", "Вест Бром": "В. Бромвич"
 }
 
 ELITE_KEYWORDS = {
@@ -233,11 +262,18 @@ ELITE_KEYWORDS = {
     "Ливерпуль": 0.40, "Арсенал": 0.38, "Интер": 0.36, "ПСЖ": 0.35, "Байер": 0.30,
     "Атлетико": 0.28, "Ювентус": 0.26, "Наполи": 0.26, "Челси": 0.24, "Милан": 0.22,
     "Боруссия Д": 0.22, "Спортинг": 0.28, "Бенфика": 0.26, "Порту": 0.25,
-    "ПСВ": 0.28, "Аякс": 0.24, "Галатасарай": 0.26, "Фенербахче": 0.25, "Палмейрас": 0.24, "Фламенго": 0.24
+    "ПСВ": 0.28, "Аякс": 0.24, "Галатасарай": 0.26, "Фенербахче": 0.25,
+    "Зенит": 0.30, "Краснодар": 0.28, "ЦСКА": 0.26, "Спартак": 0.26, "Локомотив": 0.24,
+    "Франция": 0.40, "Испания": 0.42, "Англия": 0.38, "Германия": 0.38, "Португалия": 0.36
 }
 
 def translate_team(name: str) -> str:
     return TEAM_TRANSLATIONS.get(name, name)
+
+def short_team_btn(ru_name: str) -> str:
+    """Сокращает длинные названия команд на кнопках для идеального отображения со смартфона"""
+    s = SHORT_BTN_NAMES.get(ru_name, ru_name)
+    return s[:12] if len(s) > 13 else s
 
 def get_elite_bonus(ru_name: str) -> float:
     for kw, val in ELITE_KEYWORDS.items():
@@ -249,9 +285,7 @@ def now_msk() -> datetime:
     return datetime.now(MSK_TZ)
 
 def get_current_week_key() -> str:
-    """Генерирует уникальный ключ текущей недели (от пятницы до пятницы) для Суперэкспресса"""
     dt = now_msk()
-    # Сдвигаем точку отсчета так, чтобы новый тираж открывался в пятницу утром
     shifted = dt - timedelta(days=4, hours=10)
     iso_year, iso_week, _ = shifted.isocalendar()
     return f"se_{iso_year}_w{iso_week}"
@@ -315,12 +349,6 @@ def get_user_fut_buffs(user: dict) -> dict:
 
 # ================= ДОСРОЧНЫЙ LIVE-РАСЧЕТ И ФОРМАТИРОВАНИЕ СОБЫТИЙ =================
 def check_early_live_win(pick_code: str, home_score: int, away_score: int) -> bool:
-    """
-    Проверяет в реальном времени (не дожидаясь конца матча!), выполнены ли уже
-    необратимые условия для победы по ставке (Тотал Больше, ИТБ, Обе забьют: Да).
-    Так как забитые голы в футболе не отменяются после фиксации счета, такие ставки
-    рассчитываются победой мгновенно на любой минуте матча!
-    """
     code = pick_code.lower()
     total_goals = home_score + away_score
 
@@ -494,9 +522,9 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
         }
     return None
 
-# ================= ПОЛУЧЕНИЕ РЕАЛЬНЫХ МАТЧЕЙ (ESPN API) =================
+# ================= ПОЛУЧЕНИЕ ПРЕДСТОЯЩИХ И LIVE-МАТЧЕЙ (ESPN API) =================
 SCHEDULE_CACHE = {"data": {}, "updated_at": 0}
-CACHE_TTL = 900
+CACHE_TTL = 300  # Обновление кэша каждые 5 минут для актуальности LIVE-счета
 
 def parse_american_odd(val) -> float | None:
     if val is None or isinstance(val, (dict, list, bool)):
@@ -647,6 +675,7 @@ def calculate_ai_probabilities(odds: dict) -> dict:
     }
 
 def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dict | None:
+    """Парсит как предстоящие матчи, так и матчи, идущие в ПРЯМОМ ЭФИРЕ (state == 'in')"""
     try:
         if not isinstance(ev, dict):
             return None
@@ -655,8 +684,14 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
 
         st_obj = (comp.get("status") or ev.get("status") or {}).get("type") or {}
         status_state = str(st_obj.get("state", "pre")).lower()
-        if bool(st_obj.get("completed", False)) or status_state in ("post", "in"):
+        completed = bool(st_obj.get("completed", False))
+
+        # Отсекаем только завершенные матчи; LIVE-матчи ('in') оставляем в расписании!
+        if completed or status_state == "post":
             return None
+
+        is_live = (status_state == "in")
+        live_detail = str(st_obj.get("shortDetail") or "LIVE")
 
         raw_date = str(ev.get("date") or comp.get("date") or "")
         if len(raw_date) < 16:
@@ -664,7 +699,9 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
         dt_utc = datetime.strptime(raw_date[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
         dt_msk = dt_utc.astimezone(MSK_TZ)
         start_ts = int(dt_msk.timestamp())
-        if start_ts <= now_ts:
+
+        # Если матч не в LIVE и время старта уже прошло более 15 минут назад — пропускаем
+        if not is_live and start_ts <= now_ts:
             return None
 
         competitors = comp.get("competitors") or []
@@ -679,6 +716,10 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
         h_name = translate_team(h_team_obj.get("displayName") or h_team_obj.get("name") or "Команда 1")
         a_name = translate_team(a_team_obj.get("displayName") or a_team_obj.get("name") or "Команда 2")
 
+        h_score = int(home_c.get("score") or 0)
+        a_score = int(away_c.get("score") or 0)
+        live_score_str = f"{h_score}:{a_score}"
+
         ev_id = str(ev.get("id") or "")
         if not ev_id:
             return None
@@ -692,61 +733,95 @@ def parse_event_object(ev: dict, league_key: str, cfg: dict, now_ts: int) -> dic
             comp, home_c, away_c, h_name, a_name
         )
 
+        btn_teams = f"{short_team_btn(h_name)} — {short_team_btn(a_name)}"
+
         return {
-            "event_id": ev_id, "league_key": league_key, "league_slug": cfg["slug"],
-            "teams": f"{h_name} — {a_name}", "home_team": h_name, "away_team": a_name,
-            "venue": venue_str, "h_stats": h_stats, "a_stats": a_stats,
+            "event_id": ev_id,
+            "league_key": league_key,
+            "league_slug": cfg["slug"],
+            "teams": f"{h_name} — {a_name}",
+            "btn_teams": btn_teams,
+            "home_team": h_name,
+            "away_team": a_name,
+            "is_live": is_live,
+            "live_score": live_score_str,
+            "live_detail": live_detail,
+            "venue": venue_str,
+            "h_stats": h_stats,
+            "a_stats": a_stats,
             "records_info": f"{h_name} ({h_stats['record_str']}), {a_name} ({a_stats['record_str']})",
-            "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"), "short_date": dt_msk.strftime("%d.%m %H:%M"),
-            "start_ts": start_ts, "end_ts": start_ts + (115 * 60),
-            "exp_goals": exp_goals, "lam_h": lam_h, "lam_a": lam_a, "best_score": best_score, "odds": odds
+            "date": dt_msk.strftime("%d.%m.%Y, %H:%M МСК"),
+            "short_date": dt_msk.strftime("%d.%m %H:%M"),
+            "start_ts": start_ts,
+            "end_ts": start_ts + (115 * 60),
+            "exp_goals": exp_goals,
+            "lam_h": lam_h,
+            "lam_a": lam_a,
+            "best_score": best_score,
+            "odds": odds
         }
     except Exception:
         return None
 
 async def fetch_league_schedule(session: aiohttp.ClientSession, league_key: str, cfg: dict, now_dt: datetime, now_ts: int) -> tuple[str, dict]:
-    all_upcoming = {}
+    all_events = {}
     months_to_check = [now_dt.strftime("%Y%m")]
-    next_month_dt = now_dt + timedelta(days=25)
+    next_month_dt = now_dt + timedelta(days=20)
     if next_month_dt.strftime("%Y%m") not in months_to_check:
         months_to_check.append(next_month_dt.strftime("%Y%m"))
 
-    for ym in months_to_check:
-        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={ym}&limit=200"
+    # Запрашиваем расписание по месяцам + текущий день для точного перехвата LIVE-матчей
+    urls = [
+        f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={ now_dt.strftime('%Y%m%d') }",
+        *[f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={ym}&limit=200" for ym in months_to_check]
+    ]
+
+    for url in urls:
         try:
-            async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+            async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for ev in (data.get("events") or []):
                         parsed = parse_event_object(ev, league_key, cfg, now_ts)
                         if parsed:
-                            all_upcoming[parsed["event_id"]] = parsed
+                            all_events[parsed["event_id"]] = parsed
         except Exception:
             pass
 
-    if not all_upcoming:
-        for day_offset in range(0, 8):
-            day_str = (now_dt + timedelta(days=day_offset)).strftime("%Y%m%d")
-            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{cfg['slug']}/scoreboard?dates={day_str}"
-            try:
-                async with session.get(url, headers=HTTP_HEADERS, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        for ev in (data.get("events") or []):
-                            parsed = parse_event_object(ev, league_key, cfg, now_ts)
-                            if parsed:
-                                all_upcoming[parsed["event_id"]] = parsed
-            except Exception:
-                continue
-
-    sorted_events = sorted(all_upcoming.values(), key=lambda x: x["start_ts"])
+    # Сортируем: сначала LIVE-матчи, затем по времени начала
+    sorted_events = sorted(all_events.values(), key=lambda x: (0 if x.get("is_live") else 1, x["start_ts"]))
+    two_weeks_limit = now_ts + (14 * 86400)
     seven_days_limit = now_ts + (7 * 86400)
-    matches_7d = {m["event_id"]: m for m in sorted_events if m["start_ts"] <= seven_days_limit}
-    if matches_7d:
-        return league_key, {"title": cfg["title"], "slug": cfg["slug"], "matches": matches_7d, "extended": False}
 
-    next_round_matches = {m["event_id"]: m for m in sorted_events[:14]}
-    return league_key, {"title": cfg["title"], "slug": cfg["slug"], "matches": next_round_matches, "extended": True}
+    matches_14d = {m["event_id"]: m for m in sorted_events if m.get("is_live") or m["start_ts"] <= two_weeks_limit}
+    matches_7d = {m["event_id"]: m for m in sorted_events if m.get("is_live") or m["start_ts"] <= seven_days_limit}
+
+    if matches_7d:
+        return league_key, {
+            "title": cfg["title"],
+            "slug": cfg["slug"],
+            "matches": matches_7d,
+            "has_2w_matches": True,
+            "extended": False
+        }
+    elif matches_14d:
+        return league_key, {
+            "title": cfg["title"],
+            "slug": cfg["slug"],
+            "matches": matches_14d,
+            "has_2w_matches": True,
+            "extended": True
+        }
+
+    # Если в ближайшие 14 дней матчей нет (актуально для фильтра Других лиг)
+    next_round_matches = {m["event_id"]: m for m in sorted_events[:12]}
+    return league_key, {
+        "title": cfg["title"],
+        "slug": cfg["slug"],
+        "matches": next_round_matches,
+        "has_2w_matches": False,
+        "extended": True
+    }
 
 async def get_real_matches(force_refresh: bool = False) -> dict:
     now_dt = now_msk()
@@ -755,8 +830,17 @@ async def get_real_matches(force_refresh: bool = False) -> dict:
     if not force_refresh and SCHEDULE_CACHE["data"] and (now_ts - SCHEDULE_CACHE["updated_at"] < CACHE_TTL):
         filtered = {}
         for l_k, l_v in SCHEDULE_CACHE["data"].items():
-            active_m = {m_id: m for m_id, m in l_v["matches"].items() if m["start_ts"] > now_ts}
-            filtered[l_k] = {"title": l_v["title"], "slug": l_v["slug"], "matches": active_m, "extended": l_v.get("extended", False)}
+            active_m = {
+                m_id: m for m_id, m in l_v["matches"].items()
+                if m.get("is_live") or m["start_ts"] > now_ts
+            }
+            filtered[l_k] = {
+                "title": l_v["title"],
+                "slug": l_v["slug"],
+                "matches": active_m,
+                "has_2w_matches": l_v.get("has_2w_matches", len(active_m) > 0),
+                "extended": l_v.get("extended", False)
+            }
         if any(len(v["matches"]) > 0 for v in filtered.values()):
             return filtered
 
@@ -795,7 +879,7 @@ async def fetch_real_match_result(session: aiohttp.ClientSession, league_slug: s
     except Exception:
         pass
     return {"ok": False, "state": "unknown", "completed": False}
-# ================= УНИВЕРСАЛЬНАЯ БАЗА ДАННЫХ (PostgreSQL + SQLite) =================
+    # ================= УНИВЕРСАЛЬНАЯ БАЗА ДАННЫХ (PostgreSQL + SQLite) =================
 class Database:
     def __init__(self):
         self.use_pg = bool(DATABASE_URL)
@@ -1017,13 +1101,44 @@ class Database:
         return u
 
     async def find_user_by_query(self, query_str: str) -> dict | None:
-        """Ищет игрока по его ID или по никнейму (без учета регистра и символа @)"""
         q = query_str.strip().lstrip("@")
         if q.isdigit():
             row = await self.fetchrow("SELECT * FROM users WHERE user_id = $1", int(q))
             if row:
                 return row
         return await self.fetchrow("SELECT * FROM users WHERE LOWER(username) = LOWER($1)", q)
+
+    async def search_users_admin(self, query_str: str) -> list[dict]:
+        """Умный поиск игроков для Админа: ищет и по точному ID, и по части никнейма"""
+        q = query_str.strip().lstrip("@")
+        if q.isdigit():
+            row = await self.fetchrow("SELECT * FROM users WHERE user_id = $1", int(q))
+            if row:
+                return [row]
+        like_pat = f"%{q.lower()}%"
+        return await self.fetch("SELECT * FROM users WHERE LOWER(username) LIKE $1 ORDER BY balance DESC LIMIT 10", like_pat)
+
+    async def get_users_list_admin(self, limit: int = 15) -> list[dict]:
+        """Возвращает список игроков с их ID для быстрого копирования в админке"""
+        return await self.fetch("SELECT * FROM users ORDER BY balance DESC LIMIT $1", limit)
+
+    async def toggle_user_vip_admin(self, target_uid: int) -> int:
+        u = await self.fetchrow("SELECT * FROM users WHERE user_id = $1", target_uid)
+        if not u:
+            return -1
+        new_vip = 0 if int(u.get("is_vip") or 0) == 1 else 1
+        await self.exec("UPDATE users SET is_vip = $1 WHERE user_id = $2", new_vip, target_uid)
+        return new_vip
+
+    async def reset_user_cooldowns_admin(self, target_uid: int) -> bool:
+        u = await self.fetchrow("SELECT user_id FROM users WHERE user_id = $1", target_uid)
+        if not u:
+            return False
+        await self.exec(
+            "UPDATE users SET last_bonus = '', last_spin = '', last_stadium_claim = '' WHERE user_id = $1",
+            target_uid
+        )
+        return True
 
     async def update_nickname(self, user_id: int, new_nick: str):
         await self.exec("UPDATE users SET username = $1 WHERE user_id = $2", new_nick, user_id)
@@ -1065,7 +1180,7 @@ class Database:
     async def set_favorite_club(self, user_id: int, club_name: str):
         await self.exec("UPDATE users SET favorite_club = $1 WHERE user_id = $2", club_name, user_id)
 
-    # Методы Футбольной Империи, Каталога Стадионов и FUT
+    # Методы Футбольной Империи, Стадионов и FUT
     async def claim_stadium_income(self, user_id: int) -> tuple[bool, int, str]:
         today_str = now_msk().strftime("%Y-%m-%d")
         user = await self.get_user(user_id)
@@ -1086,11 +1201,11 @@ class Database:
         if b_type == "stadium":
             cur_lvl = int(user.get("stadium_level") or 1)
             if cur_lvl >= 10:
-                return {"ok": False, "error": "Твой стадион уже достиг максимального 10-го уровня!"}
+                return {"ok": False, "error": "У тебя уже построена максимальная арена!"}
             next_lvl = cur_lvl + 1
             cost = STADIUM_LEVELS[next_lvl]["price"]
             if user["balance"] < cost:
-                return {"ok": False, "error": f"Недостаточно средств! Для покупки «{STADIUM_LEVELS[next_lvl]['name']}» нужно {cost} FC."}
+                return {"ok": False, "error": f"Недостаточно средств! Для «{STADIUM_LEVELS[next_lvl]['name']}» нужно {cost} FC."}
             await self.exec(
                 "UPDATE users SET balance = balance - $1, stadium_level = $2 WHERE user_id = $3",
                 float(cost), next_lvl, user_id
@@ -1136,7 +1251,7 @@ class Database:
             status_note = "✅ <b>Карточка сразу встала в твой основной состав!</b>"
         else:
             cashback = int(cost * 0.45)
-            status_note = f"♻️ На этой позиции у тебя уже стоит не менее сильный игрок. Дубликат продан за <b>+{cashback} FC</b>!"
+            status_note = f"♻️ На этой позиции уже есть не менее сильный игрок. Дубликат продан за <b>+{cashback} FC</b>!"
 
         new_bal = round(user["balance"] - cost + cashback, 1)
         await self.exec(
@@ -1217,7 +1332,7 @@ class Database:
         )
         return {"ok": True, "bid": bid_amount}
 
-    # Методы PvP-Пенальти (Открытое лобби + Адресные вызовы конкретному игроку)
+    # Методы PvP-Пенальти
     async def create_pvp_duel(self, user_id: int, stake: int, kick_dir: str, save_dir: str, target_id: int = 0) -> dict:
         user = await self.get_user(user_id)
         if stake < 50:
@@ -1225,7 +1340,6 @@ class Database:
         if user["balance"] < stake:
             return {"ok": False, "error": f"Недостаточно средств! Баланс: {round(user['balance'], 1)} FC."}
 
-        # Защита от спама в общем лобби: не более 2 открытых дуэлей от одного игрока
         if target_id == 0:
             existing_open = await self.fetchval(
                 "SELECT COUNT(*) FROM pvp_duels WHERE creator_id = $1 AND target_id = 0 AND status = 'open'",
@@ -1252,7 +1366,6 @@ class Database:
         return {"ok": True, "duel_id": duel_id}
 
     async def get_open_pvp_duels(self, viewer_id: int = 0) -> list[dict]:
-        """Возвращает вызовы для конкретного игрока + до 6 вызовов общего лобби"""
         return await self.fetch(
             "SELECT * FROM pvp_duels WHERE status = 'open' AND (target_id = 0 OR target_id = $1 OR creator_id = $1) ORDER BY CASE WHEN target_id = $1 THEN 0 ELSE 1 END, duel_id DESC LIMIT 8",
             viewer_id
@@ -1474,17 +1587,17 @@ class Database:
             except Exception:
                 pass
 
-        # Если тираж на текущую неделю еще не зафиксирован — отбираем 6 главных матчей недели и блокируем их
         all_upcoming = []
         for l_val in db_schedule.values():
             for m in l_val.get("matches", {}).values():
-                all_upcoming.append({
-                    "event_id": m["event_id"],
-                    "league_slug": m["league_slug"],
-                    "teams": m["teams"],
-                    "short_date": m["short_date"],
-                    "start_ts": m["start_ts"]
-                })
+                if not m.get("is_live"):
+                    all_upcoming.append({
+                        "event_id": m["event_id"],
+                        "league_slug": m["league_slug"],
+                        "teams": m["teams"],
+                        "short_date": m["short_date"],
+                        "start_ts": m["start_ts"]
+                    })
         all_upcoming.sort(key=lambda x: x["start_ts"])
         selected_6 = all_upcoming[:6]
 
@@ -1527,26 +1640,32 @@ class Database:
         total_b = await self.fetchval("SELECT COUNT(*) FROM bets") or 0
         active_b = await self.fetchval("SELECT COUNT(*) FROM bets WHERE status = 'pending'") or 0
         total_fc = await self.fetchval("SELECT COALESCE(SUM(balance), 0) FROM users") or 0.0
-        return {"users": total_u, "bets": total_b, "active_bets": active_b, "total_fc": round(float(total_fc), 1)}
+        open_pvp = await self.fetchval("SELECT COUNT(*) FROM pvp_duels WHERE status = 'open'") or 0
+        return {
+            "users": total_u, "bets": total_b,
+            "active_bets": active_b, "total_fc": round(float(total_fc), 1),
+            "open_pvp": open_pvp
+        }
 
     async def get_all_user_ids(self) -> list[int]:
         rows = await self.fetch("SELECT user_id FROM users")
         return [r["user_id"] for r in rows]
 
     async def add_balance_to_user(self, target_uid: int, add_amt: float) -> bool:
-        row = await self.fetchrow("SELECT user_id FROM users WHERE user_id = $1", target_uid)
+        row = await self.fetchrow("SELECT user_id, balance FROM users WHERE user_id = $1", target_uid)
         if not row:
             return False
-        await self.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", add_amt, target_uid)
+        new_b = max(0.0, round(float(row["balance"]) + add_amt, 1))
+        await self.exec("UPDATE users SET balance = $1 WHERE user_id = $2", new_b, target_uid)
         return True
 
 db_manager = Database()
 
 # ================= СКОРОСТНОЙ МУЛЬТИ-ШЛЮЗ ИИ С КЭШИРОВАНИЕМ =================
-async def ask_ai_cached(cache_key: str, prompt: str, system_prompt: str = "Ты элитный футбольный аналитик.") -> str | None:
+async def ask_ai_cached(cache_key: str, prompt: str, system_prompt: str = "Ты элитный футбольный аналитик.", ttl: int = 10800) -> str | None:
     now_ts = int(now_msk().timestamp())
     cached = AI_CACHE.get(cache_key)
-    if cached and (now_ts - cached["ts"] < 10800):
+    if cached and (now_ts - cached["ts"] < ttl):
         return cached["text"]
 
     for groq_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
@@ -1672,11 +1791,6 @@ async def calculate_cashout_offer(session: aiohttp.ClientSession, bet: dict) -> 
     return min(round(amount * multiplier, 1), round(amount * bet["odds"] * 0.95, 1))
 
 async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -> dict:
-    """
-    Отслеживает матчи в реальном времени.
-    Если условие ставки выполнено досрочно (например, пробит ТБ или Обе забьют на 30-й минуте),
-    нога экспресса или ординар तुरंत фиксируется как победная без ожидания финального свистка!
-    """
     try:
         legs = json.loads(bet.get("legs_json") or "[]")
     except Exception:
@@ -1691,7 +1805,6 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
     for leg in legs:
         leg_odd = float(leg.get("odds") or bet["odds"])
 
-        # Если событие уже досрочно выиграло на предыдущей проверке — сохраняем его победу
         if leg.get("final_status") == "win" and leg.get("early_win"):
             effective_odds *= leg_odd
             all_pushed = False
@@ -1706,7 +1819,6 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
             live_parts.append(f"⏳ {leg['teams']} — ожидание")
             continue
 
-        # Проверяем ДОСРОЧНЫЙ заход во время идущего матча (state == 'in')
         is_early_win = (not res["completed"] and res["state"] == "in" and check_early_live_win(leg["pick_code"], res["home_score"], res["away_score"]))
 
         if not res["completed"] and not is_early_win:
@@ -1745,7 +1857,6 @@ async def check_and_settle_real_bet(session: aiohttp.ClientSession, bet: dict) -
 
     updated_legs_str = json.dumps(legs, ensure_ascii=False)
 
-    # Если все события в купоне рассчитаны (досрочно или по финальному свистку) — сразу выплачиваем!
     if all_resolved:
         final_score_str = " | ".join(score_parts)
         outcome_status = "loss" if any_lost else ("push" if all_pushed else "win")
@@ -1846,7 +1957,6 @@ async def check_and_settle_superexpress_entry(session: aiohttp.ClientSession, en
         pass
 
 async def match_settlement_worker():
-    """Фоновый Live-радар: каждые 90 секунд проверяет счет матчей для досрочных и финальных выплат"""
     while True:
         try:
             await db_manager.get_or_rotate_black_market()
@@ -1862,12 +1972,13 @@ async def match_settlement_worker():
             logging.error(f"Ошибка фонового воркера: {e}")
         await asyncio.sleep(90)
 
-# ================= АНАЛИТИКА И ЭКСПРЕСС ДНЯ =================
+# ================= АНАЛИТИКА (С ПОДДЕРЖКОЙ LIVE-СЧЕТА) И ЭКСПРЕСС ДНЯ =================
 def get_top_6_upcoming_matches(db: dict) -> list:
     all_upcoming = []
     for l_val in db.values():
         for m in l_val.get("matches", {}).values():
-            all_upcoming.append(m)
+            if not m.get("is_live"):
+                all_upcoming.append(m)
     all_upcoming.sort(key=lambda x: x["start_ts"])
     return all_upcoming[:6]
 
@@ -1914,6 +2025,15 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
     t1, t2 = match["home_team"], match["away_team"]
     odds = match["odds"]
     p1, p2 = probs["p1"], probs["p2"]
+
+    if match.get("is_live"):
+        sc = match.get("live_score", "0:0")
+        det = match.get("live_detail", "LIVE")
+        return (
+            f"🔴 <b>Матч в прямом эфире ({det}, счет {sc}):</b> Игра раскрывается на встречных курсах, суммарный потенциал модели составляет <code>{match['exp_goals']} xG</code>.\n\n"
+            f"🎯 <b>Ориентир по модели:</b> Фаворит пары — {t1 if p1 >= p2 else t2} ({max(p1, p2)}%), базовый тотал встречи ТБ 2.5 оценен кэфом <code>{odds['tb25']}</code>."
+        )
+
     if p1 >= 60:
         return f"⚔️ <b>Расклад:</b> {t1} имеет перевес домашнего поля и класса ({p1}%).\n\n🎯 <b>Выбор ИИ:</b> П1 ({t1}) за <code>{odds['p1']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
     elif p2 >= 53:
@@ -1923,7 +2043,7 @@ def smart_local_match_analysis(match: dict, probs: dict) -> str:
     elif abs(p1 - p2) <= 12:
         return f"⚔️ <b>Расклад:</b> Плотное противостояние ({p1}% на {p2}%). Высока вероятность обмена голами.\n\n🎯 <b>Выбор ИИ:</b> Обе забьют за <code>{odds['btts']}</code> или ТБ 2.0 (возврат)"
     return f"⚔️ <b>Расклад:</b> Инициатива у {t1} ({p1}%), но {t2} опасен на стандартах.\n\n🎯 <b>Выбор ИИ:</b> Фора 1 (0) за <code>{odds['f10']}</code> или ТБ 1.5 за <code>{odds['tb15']}</code>"
-# ================= МОБИЛЬНЫЕ КЛАВИАТУРЫ (СГЛАЖЕННЫЙ ИНТЕРФЕЙС) =================
+# ================= МОБИЛЬНЫЕ КЛАВИАТУРЫ (БЕЗ ОБРЕЗКИ И ТРОЕТОЧИЙ) =================
 def main_menu_kb(user_id: int = 0):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
@@ -1934,7 +2054,7 @@ def main_menu_kb(user_id: int = 0):
     builder.button(text="🇮🇹 Серия А", callback_data="league:seriea")
     builder.button(text="🇩🇪 Бундеслига", callback_data="league:bundesliga")
     builder.button(text="🇫🇷 Лига 1", callback_data="league:ligue1")
-    builder.button(text="🌐 Другие лиги (7)", callback_data="other_leagues")
+    builder.button(text="🌐 Другие лиги", callback_data="other_leagues")
     builder.button(text="⚡ Экспресс дня", callback_data="express_day")
     builder.button(text="🎯 Суперэкспресс", callback_data="superexpress_menu")
     builder.button(text="🏟 Империя и FUT", callback_data="empire_menu")
@@ -1942,28 +2062,42 @@ def main_menu_kb(user_id: int = 0):
     builder.button(text="🏆 Топ-10 капперов", callback_data="leaderboard")
 
     if slip_count > 0:
-        builder.button(text=f"🧺 Мой купон экспресса ({slip_count})", callback_data="view_slip")
+        builder.button(text=f"🧺 Купон экспресса ({slip_count})", callback_data="view_slip")
         builder.adjust(1, 2, 2, 2, 1, 2, 2, 1, 1)
     else:
         builder.adjust(1, 2, 2, 2, 1, 2, 2, 1)
     return builder.as_markup()
 
 def other_leagues_kb(db: dict):
+    """Отображает только те лиги, в которых есть матчи в ближайшие 14 дней"""
     builder = InlineKeyboardBuilder()
+    visible_count = 0
     for l_key, cfg in OTHER_LEAGUES.items():
-        cnt = len(db.get(l_key, {}).get("matches", {}))
-        badge = f" ({cnt})" if cnt > 0 else ""
-        builder.button(text=f"{cfg['title']}{badge}", callback_data=f"league:{l_key}")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(2, 2, 2, 1, 1)
+        l_data = db.get(l_key, {})
+        matches = l_data.get("matches", {})
+        has_2w = l_data.get("has_2w_matches", False)
+        if has_2w and len(matches) > 0:
+            live_cnt = sum(1 for m in matches.values() if m.get("is_live"))
+            badge = f" 🔴{live_cnt}" if live_cnt > 0 else f" ({len(matches)})"
+            builder.button(text=f"{cfg['title']}{badge}", callback_data=f"league:{l_key}")
+            visible_count += 1
+
+    builder.button(text="🔄 Обновить лиги", callback_data="refresh_other_leagues")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
+
+    rows = [2] * (visible_count // 2)
+    if visible_count % 2 == 1:
+        rows.append(1)
+    rows.append(2)
+    builder.adjust(*rows)
     return builder.as_markup()
 
 def profile_kb(active_count: int = 0, bonus_amt: int = 250, ach_count: int = 0, fav_club: str = ""):
-    club_btn = f"⭐ {fav_club}" if fav_club else "⭐ Мой клуб"
+    club_btn = f"⭐ {short_team_btn(fav_club)}" if fav_club else "⭐ Мой клуб"
     builder = InlineKeyboardBuilder()
     builder.button(text=f"⏳ Активные ({active_count})", callback_data="active_bets")
     builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
-    builder.button(text="🎰 Рулетка удачи", callback_data="roulette_menu")
+    builder.button(text="🎰 Рулетка", callback_data="roulette_menu")
     builder.button(text=f"🎁 Бонус (+{bonus_amt})", callback_data="claim_bonus")
     builder.button(text=f"🎖 Трофеи ({ach_count}/15)", callback_data="achievements_menu")
     builder.button(text=club_btn, callback_data="fav_club_menu")
@@ -1974,27 +2108,44 @@ def profile_kb(active_count: int = 0, bonus_amt: int = 250, ach_count: int = 0, 
     return builder.as_markup()
 
 def matches_kb(league_key: str, matches_dict: dict):
+    """Компактные кнопки матчей с поддержкой 🔴 LIVE-индикации"""
     builder = InlineKeyboardBuilder()
-    for match_id, data in list(matches_dict.items())[:15]:
-        builder.button(text=f"{data['teams']} • {data['short_date']}", callback_data=f"match:{league_key}:{match_id}")
+    items = list(matches_dict.items())[:15]
+    for match_id, data in items:
+        b_teams = data.get("btn_teams") or data["teams"]
+        if data.get("is_live"):
+            btn_label = f"🔴 {b_teams} • {data['live_score']} ({data['live_detail']})"
+        else:
+            btn_label = f"{b_teams} • {data['short_date']}"
+        builder.button(text=btn_label, callback_data=f"match:{league_key}:{match_id}")
+
     builder.button(text="🔄 Обновить", callback_data=f"refresh_league:{league_key}")
     if league_key in OTHER_LEAGUES:
         builder.button(text="⬅️ Другие лиги", callback_data="other_leagues")
     else:
         builder.button(text="🏠 В меню", callback_data="back_to_main")
-    builder.adjust(*([1] * min(15, len(matches_dict))), 2)
+    builder.adjust(*([1] * len(items)), 2)
     return builder.as_markup()
 
-def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
+def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int, is_live: bool = False):
     slip_count = len(USER_SLIPS.get(user_id, []))
     builder = InlineKeyboardBuilder()
+
+    if is_live:
+        builder.button(text="🔄 Обновить LIVE-счет", callback_data=f"match:{league_key}:{match_id}")
+        builder.button(text="📊 Сводка команд", callback_data=f"stats_menu:{league_key}:{match_id}")
+        builder.button(text="⬅️ К матчам", callback_data=f"league:{league_key}")
+        builder.button(text="🏠 Меню", callback_data="back_to_main")
+        builder.adjust(1, 1, 2)
+        return builder.as_markup()
+
     builder.button(text=f"П1 ({odds['p1']})", callback_data=f"pick:{league_key}:{match_id}:p1")
     builder.button(text=f"Х ({odds['x']})", callback_data=f"pick:{league_key}:{match_id}:x")
     builder.button(text=f"П2 ({odds['p2']})", callback_data=f"pick:{league_key}:{match_id}:p2")
     builder.button(text="📈 Тотал Б (ТБ)", callback_data=f"totals_menu:{league_key}:{match_id}:tb")
     builder.button(text="📉 Тотал М (ТМ)", callback_data=f"totals_menu:{league_key}:{match_id}:tm")
     builder.button(text="📊 Сводка и ИТБ", callback_data=f"stats_menu:{league_key}:{match_id}")
-    builder.button(text="🛡️ Форы / 1Х2 / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
+    builder.button(text="🛡️ Форы / ОЗ", callback_data=f"extras_menu:{league_key}:{match_id}")
     if slip_count > 0:
         builder.button(text=f"🧺 Купон экспресса ({slip_count})", callback_data="view_slip")
     builder.button(text="⬅️ К матчам", callback_data=f"league:{league_key}")
@@ -2005,13 +2156,17 @@ def match_outcomes_kb(league_key: str, match_id: str, odds: dict, user_id: int):
 def stats_and_itb_kb(match: dict):
     league_key, match_id = match["league_key"], match["event_id"]
     builder = InlineKeyboardBuilder()
-    for line_val in ["0.5", "1.5", "2.5"]:
-        m1, m2 = evaluate_custom_market(match, f"itb1_{line_val}"), evaluate_custom_market(match, f"itb2_{line_val}")
-        if m1 and m2:
-            builder.button(text=f"🏠 ИТБ1>{line_val} ({m1['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb1_{line_val}")
-            builder.button(text=f"✈️ ИТБ2>{line_val} ({m2['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb2_{line_val}")
-    builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{league_key}:{match_id}")
-    builder.adjust(2, 2, 2, 1)
+    if not match.get("is_live"):
+        for line_val in ["0.5", "1.5", "2.5"]:
+            m1, m2 = evaluate_custom_market(match, f"itb1_{line_val}"), evaluate_custom_market(match, f"itb2_{line_val}")
+            if m1 and m2:
+                builder.button(text=f"🏠 ИТБ1>{line_val} ({m1['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb1_{line_val}")
+                builder.button(text=f"✈️ ИТБ2>{line_val} ({m2['odds']})", callback_data=f"pick:{league_key}:{match_id}:itb2_{line_val}")
+        builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{league_key}:{match_id}")
+        builder.adjust(2, 2, 2, 1)
+    else:
+        builder.button(text="⬅️ Назад к LIVE-матчу", callback_data=f"match:{league_key}:{match_id}")
+        builder.adjust(1)
     return builder.as_markup()
 
 def totals_constructor_kb(match: dict, direction: str):
@@ -2047,22 +2202,22 @@ def amount_selection_kb(target_code: str, balance: float):
     all_in = int(balance) if balance >= 10 else 0
     if all_in >= 10:
         builder.button(text=f"🔥 Ва-банк ({all_in} FC)", callback_data=f"place:{target_code}:{all_in}")
-    builder.button(text="✍️ Ввести свою сумму", callback_data=f"custom_amt:{target_code}")
+    builder.button(text="✍️ Своя сумма", callback_data=f"custom_amt:{target_code}")
 
     if target_code == "express-day":
-        builder.button(text="⬅️ Назад к Экспрессу", callback_data="express_day")
+        builder.button(text="⬅️ Назад", callback_data="express_day")
         builder.adjust(2, 2, 1, 1, 1)
     elif target_code == "custom-slip":
-        builder.button(text="⬅️ Назад к купону", callback_data="view_slip")
+        builder.button(text="⬅️ Назад", callback_data="view_slip")
         builder.adjust(2, 2, 1, 1, 1)
     else:
         l_key, m_id, p_code = target_code.split("-", 2)
-        builder.button(text="➕ В мой Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
-        builder.button(text="⬅️ Назад к матчу", callback_data=f"match:{l_key}:{m_id}")
+        builder.button(text="➕ В Экспресс", callback_data=f"slipadd:{l_key}:{m_id}:{p_code}")
+        builder.button(text="⬅️ Назад", callback_data=f"match:{l_key}:{m_id}")
         builder.adjust(2, 2, 1, 1, 2)
     return builder.as_markup()
 
-# ================= ХАБ 1: 🏟 ИМПЕРИЯ, ОТДЕЛЬНЫЙ КАТАЛОГ СТАДИОНОВ И FUT =================
+# ================= ХАБ 1: 🏟 ИМПЕРИЯ, СТАДИОНЫ (С ГАЛОЧКАМИ) И FUT =================
 @dp.callback_query(F.data == "empire_menu")
 async def process_empire_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -2074,7 +2229,7 @@ async def process_empire_menu(callback: CallbackQuery, state: FSMContext):
 
     today_str = now_msk().strftime("%Y-%m-%d")
     can_claim = user.get("last_stadium_claim") != today_str
-    claim_status = f"🟢 <b>Доступно к сбору: +{st_cfg['income']} FC</b>" if can_claim else "⏳ <i>Касса собрана (копится максимум 1 день)</i>"
+    claim_status = f"🟢 <b>Готово к сбору: +{st_cfg['income']} FC</b>" if can_claim else "⏳ <i>Касса собрана (раз в сутки)</i>"
 
     buffs = get_user_fut_buffs(user)
     fw_txt = f"{buffs['fw_card']['name']} (+{buffs['totals_profit_pct']}% к ТБ)" if buffs["fw_card"] else "Пусто"
@@ -2082,12 +2237,12 @@ async def process_empire_menu(callback: CallbackQuery, state: FSMContext):
     co_txt = f"{buffs['co_card']['name']} (+{buffs['express_odd_boost']} к прессам)" if buffs["co_card"] else "Пусто"
 
     text = (
-        f"🏟 <b>ФУТБОЛЬНАЯ ИМПЕРИЯ И СОСТАВ FUT</b>\n\n"
-        f"<blockquote>💰 Твой банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
-        f"🏟 <b>Арена ({st_lvl}/10):</b> {st_cfg['name']} ({st_cfg['cap']})\n"
+        f"🏟 <b>ФУТБОЛЬНАЯ ИМПЕРИЯ И FUT</b>\n\n"
+        f"<blockquote>💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
+        f"✅ <b>Арена ({st_lvl}/10):</b> {st_cfg['name']} ({st_cfg['cap']})\n"
         f"💵 Доход: <code>+{st_cfg['income']} FC/день</code> • {claim_status}\n"
         f"🧠 <b>ИИ-Отдел ({lab_lvl}/5):</b> {lab_cfg['name']} (+{lab_cfg['odd_bonus']} к кэфам)</blockquote>\n"
-        f"👕 <b>Мой FUT-Состав (Активные баффы):</b>\n"
+        f"👕 <b>Мой FUT-Состав (Активные бонусы):</b>\n"
         f"• ⚡ Форвард: <b>{fw_txt}</b>\n"
         f"• 🧤 Вратарь: <b>{gk_txt}</b>\n"
         f"• 📋 Тренер: <b>{co_txt}</b>"
@@ -2099,51 +2254,56 @@ async def process_empire_menu(callback: CallbackQuery, state: FSMContext):
     else:
         builder.button(text="⏳ Касса собрана сегодня", callback_data="empire_claim")
 
-    builder.button(text="🏟 Стадионы (Каталог и покупка)", callback_data="stadiums_catalog")
+    builder.button(text="🏟 Стадионы", callback_data="stadiums_catalog")
     if lab_lvl < 5:
         next_lab_price = LAB_LEVELS[lab_lvl + 1]["price"]
-        builder.button(text=f"🧠 Улучшить ИИ Ур.{lab_lvl+1} ({next_lab_price} FC)", callback_data="empire_up:lab")
+        builder.button(text=f"🧠 ИИ Ур.{lab_lvl+1} ({next_lab_price} FC)", callback_data="empire_up:lab")
 
     builder.button(text="🃏 Паки FUT", callback_data="fut_packs_menu")
-    builder.button(text="🔥 Валуй дня ИИ", callback_data="ai_value_pick")
+    builder.button(text="🔥 Валуй ИИ", callback_data="ai_value_pick")
     builder.button(text="🏠 Главное меню", callback_data="back_to_main")
-    builder.adjust(1, 1, 1 if lab_lvl < 5 else 2, 2 if lab_lvl < 5 else 1, 1)
+
+    if lab_lvl < 5:
+        builder.adjust(1, 2, 2, 1)
+    else:
+        builder.adjust(1, 1, 2, 1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data == "stadiums_catalog")
 async def process_stadiums_catalog(callback: CallbackQuery):
-    """Отдельный каталог всех 10 стадионов с ценами, вместимостью и пошаговой покупкой"""
+    """Раздел «🏟 Стадионы» — без лишних слов и с галочками ✅ у всех купленных арен"""
     user = await db_manager.get_user(callback.from_user.id)
     cur_lvl = int(user.get("stadium_level") or 1)
 
     lines = []
     for lvl, cfg in STADIUM_LEVELS.items():
-        price_str = "Бесплатно" if cfg["price"] == 0 else f"{cfg['price']:,} FC".replace(",", " ")
+        price_str = "Базовая" if cfg["price"] == 0 else f"{cfg['price']:,} FC".replace(",", " ")
         inc_str = f"+{cfg['income']} FC/день"
+
         if lvl < cur_lvl:
             status_icon = "✅"
-            note = "<i>(Пройден)</i>"
+            note = "<i>Куплена</i>"
         elif lvl == cur_lvl:
-            status_icon = "🏟"
-            note = "<b>[ТВОЯ АРЕНА]</b>"
+            status_icon = "✅"
+            note = "<b>Твоя текущая арена</b>"
         elif lvl == cur_lvl + 1:
             status_icon = "🔓"
-            note = f"<b>Доступен к покупке: <code>{price_str}</code></b>"
+            note = f"<b>Доступна: <code>{price_str}</code></b>"
         else:
             status_icon = "🔒"
-            note = f"Цена: <code>{price_str}</code>"
+            note = f"Стоимость: <code>{price_str}</code>"
 
         lines.append(
             f"{status_icon} <b>{lvl}. {cfg['name']}</b> ({cfg['cap']})\n"
-            f"   💵 Доход: <b><code>{inc_str}</code></b> • {note}"
+            f"   💵 Выручка: <b><code>{inc_str}</code></b> • {note}"
         )
 
     text = (
-        f"🏟 <b>КАТАЛОГ СТАДИОНОВ (СТРОГО ПО ОЧЕРЕДИ)</b>\n"
-        f"💰 Твой баланс: <b><code>{round(user['balance'], 1)} FC</code></b>\n\n"
+        f"🏟 <b>СТАДИОНЫ</b>\n"
+        f"💰 Твой банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n\n"
         f"<blockquote>" + "\n\n".join(lines) + "</blockquote>\n"
-        f"<i>💡 Касса арены собирается вручную раз в сутки и не копится больше 1 дня.</i>"
+        f"<i>💡 Выручка от билетов собирается раз в сутки.</i>"
     )
 
     builder = InlineKeyboardBuilder()
@@ -2151,7 +2311,7 @@ async def process_stadiums_catalog(callback: CallbackQuery):
         nxt = STADIUM_LEVELS[cur_lvl + 1]
         p_fmt = f"{nxt['price']:,}".replace(",", " ")
         builder.button(
-            text=f"🏗 Купить #{cur_lvl+1} «{nxt['name']}» за {p_fmt} FC",
+            text=f"🏗 Купить «{nxt['name']}» ({p_fmt} FC)",
             callback_data="empire_up:stadium"
         )
     builder.button(text="⬅️ Назад в Империю", callback_data="empire_menu")
@@ -2163,10 +2323,10 @@ async def process_stadiums_catalog(callback: CallbackQuery):
 async def process_empire_claim(callback: CallbackQuery, state: FSMContext):
     ok, inc, name = await db_manager.claim_stadium_income(callback.from_user.id)
     if ok:
-        await callback.answer(f"🏟 Собрана билетная выручка «{name}»: +{inc} FC!", show_alert=True)
+        await callback.answer(f"🏟 Выручка «{name}» получена: +{inc} FC!", show_alert=True)
         await process_empire_menu(callback, state)
     else:
-        await callback.answer("⏳ Ты уже забирал выручку арены сегодня! Доход не копится больше 1 дня — заходи завтра.", show_alert=True)
+        await callback.answer("⏳ Касса сегодня уже собрана! Новая выручка поступит завтра.", show_alert=True)
 
 @dp.callback_query(F.data.startswith("empire_up:"))
 async def process_empire_upgrade(callback: CallbackQuery, state: FSMContext):
@@ -2175,7 +2335,7 @@ async def process_empire_upgrade(callback: CallbackQuery, state: FSMContext):
     if not res["ok"]:
         await callback.answer(f"⚠️ {res['error']}", show_alert=True)
         return
-    await callback.answer(f"🎉 Поздравляем! Уровень повышен до #{res['new_lvl']}: {res['name']}!", show_alert=True)
+    await callback.answer(f"✅ Приобретено: {res['name']} (Ур. {res['new_lvl']})!", show_alert=True)
     if b_type == "stadium":
         await process_stadiums_catalog(callback)
     else:
@@ -2185,7 +2345,7 @@ async def process_empire_upgrade(callback: CallbackQuery, state: FSMContext):
 async def process_ai_value_pick(callback: CallbackQuery):
     user = await db_manager.get_user(callback.from_user.id)
     if int(user.get("lab_level") or 1) < 2:
-        await callback.answer("🔒 Для доступа к «Валую дня» прокачай ИИ-Отдел минимум до 2-го уровня!", show_alert=True)
+        await callback.answer("🔒 Прокачай ИИ-Отдел до 2-го уровня для доступа к «Валую дня»!", show_alert=True)
         return
 
     db = await get_real_matches()
@@ -2197,15 +2357,14 @@ async def process_ai_value_pick(callback: CallbackQuery):
     best_m = max(top_m, key=lambda x: x["exp_goals"])
     mkt = evaluate_custom_market(best_m, "tb_2.0")
     text = (
-        f"🧠 <b>СЕКРЕТНЫЙ ВАЛУЙ ДНЯ ОТ ИИ-ЛАБОРАТОРИИ</b>\n\n"
+        f"🧠 <b>СЕКРЕТНЫЙ ВАЛУЙ ДНЯ ОТ ИИ</b>\n\n"
         f"<blockquote>🏟 <b>{best_m['teams']}</b> <i>({best_m['date']})</i>\n"
-        f"📊 Ожидаемая результативность: <b><code>{best_m['exp_goals']} xG</code></b>\n"
-        f"🎯 Выбор алгоритма: <b><code>{mkt['label']}</code></b> за <b><code>{mkt['odds']}</code></b>\n"
-        f"📈 Вероятность прохода: <b>{mkt['prob']}%</b></blockquote>\n"
-        f"👇 <i>Перейти к оформлению ставки в 1 клик:</i>"
+        f"📊 Ожидаемые голы: <b><code>{best_m['exp_goals']} xG</code></b>\n"
+        f"🎯 Рекомендация: <b><code>{mkt['label']}</code></b> за <b><code>{mkt['odds']}</code></b>\n"
+        f"📈 Вероятность: <b>{mkt['prob']}%</b></blockquote>"
     )
     builder = InlineKeyboardBuilder()
-    builder.button(text=f"🎯 Поставить на {mkt['label']} ({mkt['odds']})", callback_data=f"pick:{best_m['league_key']}:{best_m['event_id']}:tb_2.0")
+    builder.button(text=f"🎯 Поставить {mkt['label']} ({mkt['odds']})", callback_data=f"pick:{best_m['league_key']}:{best_m['event_id']}:tb_2.0")
     builder.button(text="⬅️ Назад в Империю", callback_data="empire_menu")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -2215,13 +2374,12 @@ async def process_ai_value_pick(callback: CallbackQuery):
 async def process_fut_packs_menu(callback: CallbackQuery):
     user = await db_manager.get_user(callback.from_user.id)
     text = (
-        f"🃏 <b>МАГАЗИН ПАКОВ «FUT-КАППЕР»</b>\n\n"
-        f"<blockquote>💰 Твой баланс: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
-        f"Карточки футболистов и тренеров навсегда усиливают твои ставки на реальные матчи!</blockquote>\n"
-        f"📦 <b>Доступные наборы:</b>\n"
+        f"🃏 <b>ПАКИ КАРТОЧЕК «FUT-КАППЕР»</b>\n\n"
+        f"<blockquote>💰 Твой банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
+        f"Карточки навсегда усиливают твои ставки на реальные матчи!</blockquote>\n"
         f"• 🥉 <b>Базовый пак (1 500 FC)</b> — игроки основы (+5%..+10%)\n"
         f"• 🥇 <b>Золотой пак (5 000 FC)</b> — звезды Топ-5 лиг (+10%..+16%)\n"
-        f"• 💎 <b>Элитный пак ЛЧ (15 000 FC)</b> — высокий шанс на TOTY и Иконы (до +20% кэшбэка и +0.30 к прессам!)"
+        f"• 💎 <b>Элитный пак ЛЧ (15 000 FC)</b> — высокий шанс на TOTY и Иконы"
     )
     builder = InlineKeyboardBuilder()
     builder.button(text="🥉 Базовый пак (1 500 FC)", callback_data="buy_pack:basic")
@@ -2280,7 +2438,7 @@ async def process_buy_pack(callback: CallbackQuery):
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-# ================= ХАБ 2: ⚔️ PVP-ПЕНАЛЬТИ (ЛИЧНЫЕ ВЫЗОВЫ + ЛОББИ) И ЧЕРНЫЙ РЫНОК =================
+# ================= ХАБ 2: ⚔️ PVP-ПЕНАЛЬТИ И ЧЕРНЫЙ РЫНОК =================
 @dp.callback_query(F.data == "pvp_hub_menu")
 async def process_pvp_hub_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -2292,27 +2450,27 @@ async def process_pvp_hub_menu(callback: CallbackQuery, state: FSMContext):
 
     text = (
         f"⚔️ <b>PVP-АРЕНА И ЧЕРНЫЙ РЫНОК</b>\n\n"
-        f"<blockquote>💰 Твой баланс: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед в PvP: <b><code>{user.get('pvp_wins', 0)}</code></b>\n"
-        f"🎯 Ты можешь бросить <b>личный вызов конкретному игроку</b> (ему придет уведомление) или сыграть в лобби!</blockquote>\n"
-        f"🔨 <b>Сегодня на Черном рынке (до 23:59 МСК):</b>\n"
+        f"<blockquote>💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед в PvP: <b><code>{user.get('pvp_wins', 0)}</code></b>\n"
+        f"🎯 Бросай личный вызов по Нику/ID или играй в лобби!</blockquote>\n"
+        f"🔨 <b>Черный рынок (до 23:59 МСК):</b>\n"
         f"• Лот: <b>{lot_card['name']}</b> ({lot_card['desc']})\n"
-        f"• Текущая ставка: <b><code>{lot['highest_bid']} FC</code></b> (Лидер: <b>{lot['leader_name']}</b>)"
+        f"• Ставка: <b><code>{lot['highest_bid']} FC</code></b> (Лидер: <b>{lot['leader_name']}</b>)"
     )
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="⚽ Создать дуэль Пенальти (Вызов / Лобби)", callback_data="pvp_create_start")
-    builder.button(text=f"🔨 Черный рынок • Ставка {lot['highest_bid']} FC", callback_data="black_market_menu")
+    builder.button(text="⚽ Создать дуэль Пенальти", callback_data="pvp_create_start")
+    builder.button(text=f"🔨 Аукцион • {lot['highest_bid']} FC", callback_data="black_market_menu")
 
     for d in open_duels[:6]:
         if d["creator_id"] == uid:
             target_tag = "Личный" if int(d.get("target_id") or 0) > 0 else "Лобби"
-            builder.button(text=f"❌ Отменить мой вызов #{d['duel_id']} ({d['stake']} FC • {target_tag})", callback_data=f"pvp_cancel:{d['duel_id']}")
+            builder.button(text=f"❌ Отменить #{d['duel_id']} ({d['stake']} FC • {target_tag})", callback_data=f"pvp_cancel:{d['duel_id']}")
         elif int(d.get("target_id") or 0) == uid:
-            builder.button(text=f"🔥 ЛИЧНЫЙ ВЫЗОВ от {d['creator_name']} • {d['stake']} FC!", callback_data=f"pvp_accept_start:{d['duel_id']}")
+            builder.button(text=f"🔥 ВЫЗОВ ТЕБЕ: {d['creator_name']} ({d['stake']} FC)", callback_data=f"pvp_accept_start:{d['duel_id']}")
         else:
             builder.button(text=f"⚔️ Принять: {d['creator_name']} • {d['stake']} FC", callback_data=f"pvp_accept_start:{d['duel_id']}")
 
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
@@ -2328,10 +2486,10 @@ async def process_pvp_create_start(callback: CallbackQuery, state: FSMContext):
     builder.adjust(2, 2, 1)
 
     await callback.message.edit_text(
-        f"⚽ <b>СОЗДАНИЕ PVP-ДУЭЛИ (СЕРИЯ ПЕНАЛЬТИ)</b>\n\n"
+        f"⚽ <b>СОЗДАНИЕ PVP-ДУЭЛИ (ПЕНАЛЬТИ)</b>\n\n"
         f"<blockquote>💰 Твой баланс: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
         f"Минимальная ставка: <code>50 FC</code></blockquote>\n"
-        f"👇 <b>Выбери сумму кнопкой ИЛИ напиши любую свою ставку числом в чат:</b>",
+        f"👇 <b>Выбери сумму кнопкой ИЛИ напиши любую ставку числом в чат:</b>",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
@@ -2386,11 +2544,11 @@ async def process_pvp_accept_start(callback: CallbackQuery, state: FSMContext):
 
 async def send_pvp_kick_selection(msg_obj: Message, stake: int, is_edit: bool = True):
     builder = InlineKeyboardBuilder()
-    builder.button(text="↖️ Левый угол", callback_data="pvp_kick:L")
+    builder.button(text="↖️ Влево", callback_data="pvp_kick:L")
     builder.button(text="⬆️ По центру", callback_data="pvp_kick:C")
-    builder.button(text="↗️ Правый угол", callback_data="pvp_kick:R")
+    builder.button(text="↗️ Вправо", callback_data="pvp_kick:R")
     builder.adjust(3)
-    txt = f"⚽ <b>ШАГ 1 ИЗ 2: КУДА БЬЕШЬ ПЕНАЛЬТИ?</b>\n\n<blockquote>💵 Ставка на кону: <b><code>{stake} FC</code></b></blockquote>\n👇 Выбери направление своего удара:"
+    txt = f"⚽ <b>ШАГ 1 ИЗ 2: КУДА БЬЕШЬ ПЕНАЛЬТИ?</b>\n\n<blockquote>💵 Ставка на кону: <b><code>{stake} FC</code></b></blockquote>\n👇 Выбери угол своего удара:"
     if is_edit:
         await msg_obj.edit_text(txt, reply_markup=builder.as_markup(), parse_mode="HTML")
     else:
@@ -2407,11 +2565,11 @@ async def process_pvp_kick_choice(callback: CallbackQuery):
 
     builder = InlineKeyboardBuilder()
     builder.button(text="↖️ Прыжок влево", callback_data="pvp_save:L")
-    builder.button(text="⬆️ Остаться в центре", callback_data="pvp_save:C")
+    builder.button(text="⬆️ Центр", callback_data="pvp_save:C")
     builder.button(text="↗️ Прыжок вправо", callback_data="pvp_save:R")
     builder.adjust(3)
     await callback.message.edit_text(
-        f"🧤 <b>ШАГ 2 ИЗ 2: КУДА ПРЫГАЕТ ТВОЙ ВРАТАРЬ?</b>\n\n<blockquote>💵 Ставка: <b><code>{draft['stake']} FC</code></b></blockquote>\n👇 Угадай направление удара соперника:",
+        f"🧤 <b>ШАГ 2 ИЗ 2: КУДА ПРЫГАЕТ ВРАТАРЬ?</b>\n\n<blockquote>💵 Ставка: <b><code>{draft['stake']} FC</code></b></blockquote>\n👇 Угадай угол удара соперника:",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
@@ -2421,8 +2579,8 @@ def resolve_penalty_shootout(k1: str, s1: str, k2: str, s2: str) -> tuple[int, i
     dir_names = {"L": "↖️ Левый", "C": "⬆️ Центр", "R": "↗️ Правый"}
     g1 = 0 if k1 == s2 else 1
     g2 = 0 if k2 == s1 else 1
-    r1_txt = f"⚽ Игрок 1 бьет ({dir_names[k1]}) vs Кипер 2 ({dir_names[s2]}) — {'<b>ГОЛ! ✅</b>' if g1 else '<b>СЕЙВ! ❌</b>'}"
-    r2_txt = f"⚽ Игрок 2 бьет ({dir_names[k2]}) vs Кипер 1 ({dir_names[s1]}) — {'<b>ГОЛ! ✅</b>' if g2 else '<b>СЕЙВ! ❌</b>'}"
+    r1_txt = f"⚽ Игрок 1 ({dir_names[k1]}) vs Кипер 2 ({dir_names[s2]}) — {'<b>ГОЛ! ✅</b>' if g1 else '<b>СЕЙВ! ❌</b>'}"
+    r2_txt = f"⚽ Игрок 2 ({dir_names[k2]}) vs Кипер 1 ({dir_names[s1]}) — {'<b>ГОЛ! ✅</b>' if g2 else '<b>СЕЙВ! ❌</b>'}"
     return g1, g2, f"{r1_txt}\n{r2_txt}"
 
 @dp.callback_query(F.data.startswith("pvp_save:"))
@@ -2463,7 +2621,7 @@ async def process_pvp_save_choice(callback: CallbackQuery, state: FSMContext):
         else:
             await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), d["creator_id"])
             await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), uid)
-            res_headline = f"🤝 Боевая ничья ({g1}:{g2})! Ставки ({stake} FC) возвращены."
+            res_headline = f"🤝 Ничья ({g1}:{g2})! Ставки ({stake} FC) возвращены."
 
         summary_msg = (
             f"⚔️ <b>ИТОГ PVP-ДУЭЛИ #{duel_id}</b>\n"
@@ -2477,19 +2635,19 @@ async def process_pvp_save_choice(callback: CallbackQuery, state: FSMContext):
             pass
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="⚔️ Обратно в PvP-Арену", callback_data="pvp_hub_menu")
+        builder.button(text="⚔️ В PvP-Арену", callback_data="pvp_hub_menu")
         await callback.message.edit_text(summary_msg, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer()
         return
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="🎯 Вызвать конкретного игрока (По Нику / ID)", callback_data="pvp_finish:direct")
-    builder.button(text="🌐 Опубликовать в общем Лобби", callback_data="pvp_finish:lobby")
-    builder.button(text="🤖 Сыграть мгновенно (Против Кипера Лиги)", callback_data="pvp_finish:bot")
+    builder.button(text="🎯 Вызвать игрока (По Нику / ID)", callback_data="pvp_finish:direct")
+    builder.button(text="🌐 Опубликовать в Лобби", callback_data="pvp_finish:lobby")
+    builder.button(text="🤖 Сыграть с Кипером Лиги", callback_data="pvp_finish:bot")
     builder.button(text="🔙 Отмена", callback_data="pvp_hub_menu")
     builder.adjust(1)
     await callback.message.edit_text(
-        f"✅ <b>УДАР И ПРЫЖОК ЗАФИКСИРОВАНЫ ({draft['stake']} FC)</b>\n\n"
+        f"✅ <b>УГЛЫ ВЫБРАНЫ ({draft['stake']} FC)</b>\n\n"
         f"👇 <b>Выбери, кому отправить вызов:</b>",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
@@ -2509,8 +2667,8 @@ async def process_pvp_finish(callback: CallbackQuery, state: FSMContext):
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Отмена", callback_data="pvp_hub_menu")
         await callback.message.edit_text(
-            f"🎯 <b>ЛИЧНЫЙ ВЫЗОВ НА ДУЭЛЬ ({draft['stake']} FC)</b>\n\n"
-            f"Напиши в чат <b>Никнейм</b> (из Топ-10 / профиля) или <b>ID игрока</b>, которому хочешь бросить вызов:",
+            f"🎯 <b>ЛИЧНЫЙ ВЫЗОВ ({draft['stake']} FC)</b>\n\n"
+            f"Напиши в чат <b>Никнейм</b> или <b>ID игрока</b>, которому хочешь бросить вызов:",
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
@@ -2523,7 +2681,7 @@ async def process_pvp_finish(callback: CallbackQuery, state: FSMContext):
         if not res["ok"]:
             await callback.answer(res["error"], show_alert=True)
             return
-        await callback.answer(f"⚔️ Вызов #{res['duel_id']} на {draft['stake']} FC выставлен в лобби!", show_alert=True)
+        await callback.answer(f"⚔️ Вызов #{res['duel_id']} ({draft['stake']} FC) выставлен в лобби!", show_alert=True)
         await process_pvp_hub_menu(callback, state)
     else:
         user = await db_manager.get_user(uid)
@@ -2547,7 +2705,7 @@ async def process_pvp_finish(callback: CallbackQuery, state: FSMContext):
 
         builder = InlineKeyboardBuilder()
         builder.button(text="⚽ Сыграть еще раз", callback_data="pvp_create_start")
-        builder.button(text="⚔️ В меню PvP и Аукциона", callback_data="pvp_hub_menu")
+        builder.button(text="⚔️ В PvP-Арену", callback_data="pvp_hub_menu")
         builder.adjust(1)
         await callback.message.edit_text(
             f"⚽ <b>СЕРИЯ ПЕНАЛЬТИ ЗАВЕРШЕНА!</b>\n\n<blockquote>{log_txt}</blockquote>\n{res_line}",
@@ -2566,10 +2724,10 @@ async def process_pvp_target_input(message: Message, state: FSMContext):
 
     target_user = await db_manager.find_user_by_query(message.text or "")
     if not target_user:
-        await message.answer("⚠️ Игрок с таким Ником или ID не найден в базе бота. Проверь написание и отправь еще раз:")
+        await message.answer("⚠️ Игрок с таким Ником или ID не найден. Проверь написание и отправь еще раз:")
         return
     if target_user["user_id"] == uid:
-        await message.answer("⚠️ Нельзя бросить вызов самому себе! Введи Ник или ID другого игрока:")
+        await message.answer("⚠️ Нельзя вызвать самого себя! Введи Ник или ID другого игрока:")
         return
 
     PVP_DRAFTS.pop(uid, None)
@@ -2582,19 +2740,18 @@ async def process_pvp_target_input(message: Message, state: FSMContext):
     sender = await db_manager.get_user(uid)
     duel_id = res["duel_id"]
 
-    # Отправляем мгновенное пуш-уведомление вызванному сопернику
     try:
         t_kb = InlineKeyboardBuilder()
         t_kb.button(text=f"⚔️ Принять вызов ({draft['stake']} FC)", callback_data=f"pvp_accept_start:{duel_id}")
-        t_kb.button(text="❌ Отклонить вызов", callback_data=f"pvp_cancel:{duel_id}")
+        t_kb.button(text="❌ Отклонить", callback_data=f"pvp_cancel:{duel_id}")
         t_kb.adjust(1)
         await bot.send_message(
             target_user["user_id"],
-            f"🔥 <b>ТЕБЕ БРОШЕН ЛИЧНЫЙ ВЫЗОВ В ПЕНАЛЬТИ!</b>\n\n"
-            f"<blockquote>👤 Соперник: <b>{sender['username']}</b>\n"
-            f"💵 Ставка на кону: <b><code>{draft['stake']} FC</code></b>\n"
-            f"🏆 Банк победителя: <b><code>{round(draft['stake'] * 2 * 0.95, 1)} FC</code></b></blockquote>\n"
-            f"👇 Прими дуэль прямо сейчас или отклони её:",
+            f"🔥 <b>ЛИЧНЫЙ ВЫЗОВ В ПЕНАЛЬТИ!</b>\n\n"
+            f"<blockquote>👤 Соперник: <b>{sender['username']}</b> (ID: <code>{sender['user_id']}</code>)\n"
+            f"💵 Ставка: <b><code>{draft['stake']} FC</code></b>\n"
+            f"🏆 Банк: <b><code>{round(draft['stake'] * 2 * 0.95, 1)} FC</code></b></blockquote>\n"
+            f"👇 Прими дуэль или отклони вызов:",
             reply_markup=t_kb.as_markup(),
             parse_mode="HTML"
         )
@@ -2602,10 +2759,10 @@ async def process_pvp_target_input(message: Message, state: FSMContext):
         pass
 
     b_back = InlineKeyboardBuilder()
-    b_back.button(text="⚔️ Вернуться в PvP-Арену", callback_data="pvp_hub_menu")
+    b_back.button(text="⚔️ В PvP-Арену", callback_data="pvp_hub_menu")
     await message.answer(
         f"✅ <b>Вызов #{duel_id} отправлен игроку {target_user['username']}!</b>\n"
-        f"Как только он пробьет ответный пенальти, тебе придет уведомление с результатом.",
+        f"Как только он ответит, тебе придет уведомление.",
         reply_markup=b_back.as_markup(),
         parse_mode="HTML"
     )
@@ -2620,13 +2777,13 @@ async def process_pvp_cancel(callback: CallbackQuery, state: FSMContext):
             try:
                 await bot.send_message(
                     cancelled_duel["creator_id"],
-                    f"📢 Игрок отклонил твой личный вызов #{duel_id}. Ставка <b><code>+{cancelled_duel['stake']} FC</code></b> возвращена на баланс.",
+                    f"📢 Игрок отклонил твой вызов #{duel_id}. Ставка <b><code>+{cancelled_duel['stake']} FC</code></b> возвращена.",
                     parse_mode="HTML"
                 )
             except Exception:
                 pass
         else:
-            await callback.answer("✅ Вызов отменен, ставка возвращена на баланс!", show_alert=True)
+            await callback.answer("✅ Вызов отменен, ставка возвращена!", show_alert=True)
     await process_pvp_hub_menu(callback, state)
 
 # ================= ЧЕРНЫЙ РЫНОК (ЕЖЕДНЕВНЫЙ АУКЦИОН) =================
@@ -2640,19 +2797,19 @@ async def process_black_market_menu(callback: CallbackQuery, state: FSMContext):
     min_next = cur_bid + 500 if int(lot["leader_id"]) != 0 else cur_bid
 
     text = (
-        f"🔨 <b>ЧЕРНЫЙ РЫНОК — ЕЖЕДНЕВНЫЙ АУКЦИОН</b>\n\n"
-        f"<blockquote>🌟 <b>Эксклюзивный лот дня:</b>\n"
+        f"🔨 <b>ЧЕРНЫЙ РЫНОК — АУКЦИОН ДНЯ</b>\n\n"
+        f"<blockquote>🌟 <b>Эксклюзивный лот:</b>\n"
         f"<b>{c['name']}</b>\n"
         f"⚡ Бонус навсегда: <b>{c['desc']}</b></blockquote>\n"
-        f"📊 <b>Текущий ход торгов:</b>\n"
-        f"• Текущая цена: <b><code>{cur_bid} FC</code></b>\n"
-        f"• Лидер торгов: <b>{lot['leader_name']}</b>\n"
+        f"📊 <b>Текущие торги:</b>\n"
+        f"• Текущая ставка: <b><code>{cur_bid} FC</code></b>\n"
+        f"• Лидер: <b>{lot['leader_name']}</b>\n"
         f"• Твой баланс: <b><code>{round(user['balance'], 1)} FC</code></b>\n\n"
-        f"<i>💡 В 00:00 МСК лидер торгов забирает легендарную карточку в свой состав! Если твою ставку перебьют, деньги мгновенно вернутся на баланс.</i>"
+        f"<i>💡 В 00:00 МСК лидер забирает карточку! Перебитая ставка мгновенно возвращается.</i>"
     )
     builder = InlineKeyboardBuilder()
-    builder.button(text=f"🔨 Сделать ставку {min_next} FC", callback_data=f"bm_bid:{min_next}")
-    builder.button(text=f"🔥 Перебить мощно ({min_next + 1500} FC)", callback_data=f"bm_bid:{min_next + 1500}")
+    builder.button(text=f"🔨 Поставить {min_next} FC", callback_data=f"bm_bid:{min_next}")
+    builder.button(text=f"🔥 Шаг +2 000 ({min_next + 1500} FC)", callback_data=f"bm_bid:{min_next + 1500}")
     builder.button(text="✍️ Ввести свою ставку", callback_data="bm_custom")
     builder.button(text="⬅️ Назад в PvP-Арену", callback_data="pvp_hub_menu")
     builder.adjust(1)
@@ -2666,7 +2823,7 @@ async def process_bm_bid(callback: CallbackQuery, state: FSMContext):
     if not res["ok"]:
         await callback.answer(f"⚠️ {res['error']}", show_alert=True)
         return
-    await callback.answer(f"🔨 Твоя ставка {amt} FC принята! Ты лидер аукциона!", show_alert=True)
+    await callback.answer(f"🔨 Ставка {amt} FC принята! Ты лидер торгов!", show_alert=True)
     await process_black_market_menu(callback, state)
 
 @dp.callback_query(F.data == "bm_custom")
@@ -2677,7 +2834,7 @@ async def process_bm_custom_ask(callback: CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="black_market_menu")
     await callback.message.edit_text(
-        f"✍️ <b>ВВОД СТАВКИ НА ЧЕРНОМ РЫНКЕ</b>\n\nНапиши сумму ставки в чат (минимум <code>{min_next}</code> FC):",
+        f"✍️ <b>СТАВКА НА АУКЦИОНЕ</b>\n\nНапиши сумму в чат (минимум <code>{min_next}</code> FC):",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
@@ -2695,10 +2852,10 @@ async def process_bm_custom_input(message: Message, state: FSMContext):
         return
     await state.clear()
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔨 Вернуться на Черный рынок", callback_data="black_market_menu")
+    builder.button(text="🔨 На Черный рынок", callback_data="black_market_menu")
     await message.answer(f"🔨 Ставка <b>{raw} FC</b> принята! Ты возглавил торги!", reply_markup=builder.as_markup(), parse_mode="HTML")
 
-# ================= СТАРТ И НАВИГАЦИЯ =================
+# ================= СТАРТ, КОМАНДА /PROFILE И НАВИГАЦИЯ =================
 @dp.message(CommandStart())
 async def cmd_start(message: Message, command: CommandObject, state: FSMContext):
     await state.clear()
@@ -2730,10 +2887,11 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
     text = (
         f"⚽ <b>AI_BET_BOT • ФУТБОЛЬНАЯ ЭКОСИСТЕМА</b>\n\n"
         f"<blockquote>👤 Каппер: <b>{user['username']}</b>\n"
+        f"🆔 Твой ID: <code>{user['user_id']}</code> <i>(нажми для копирования)</i>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>"
         f"{bonus_note}"
-        f"👇 <b>Выбери реальный турнир, Империю FUT или PvP-Арену:</b>"
+        f"👇 <b>Выбери турнир, Империю FUT или PvP-Арену:</b>"
     )
     await message.answer(text, reply_markup=main_menu_kb(message.from_user.id), parse_mode="HTML")
 
@@ -2744,7 +2902,8 @@ async def process_back_main(callback: CallbackQuery, state: FSMContext):
     rank_name, _ = get_user_rank_info(user["balance"], user["is_vip"])
     text = (
         f"⚽ <b>ГЛАВНОЕ МЕНЮ • AI_BET_BOT</b>\n\n"
-        f"<blockquote>🏅 <b>{rank_name}</b>\n"
+        f"<blockquote>👤 <b>{user['username']}</b>  •  ID: <code>{user['user_id']}</code>\n"
+        f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>  •  🏆 Побед: <b><code>{user['wins']}</code></b></blockquote>\n"
         f"👇 <b>Выбери турнир или игровой режим:</b>"
     )
@@ -2756,19 +2915,26 @@ async def process_other_leagues(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     db = await get_real_matches()
     text = (
-        "🌐 <b>ДРУГИЕ ЧЕМПИОНАТЫ И ЕВРОКУБКИ</b>\n\n"
-        "<blockquote>В скобках указано количество доступных матчей в расписании.</blockquote>\n"
+        "🌐 <b>ДРУГИЕ ЧЕМПИОНАТЫ И СБОРНЫЕ</b>\n\n"
+        "<blockquote>Показаны турниры с матчами в ближайшие 14 дней (включая РПЛ и Лигу Наций). Лиги на паузе скрываются автоматически.</blockquote>\n"
         "👇 <b>Выбери турнир:</b>"
     )
     await callback.message.edit_text(text, reply_markup=other_leagues_kb(db), parse_mode="HTML")
     await callback.answer()
 
-# ================= ЛИЧНЫЙ КАБИНЕТ, СМЕНА НИКА И РУЛЕТКА =================
-@dp.callback_query(F.data == "profile")
-async def process_profile(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
-    active_bets = await db_manager.get_user_bets(callback.from_user.id, active_only=True)
+@dp.callback_query(F.data == "refresh_other_leagues")
+async def process_refresh_other_leagues(callback: CallbackQuery, state: FSMContext):
+    await callback.answer("📡 Обновляю расписание всех турниров...")
+    db = await get_real_matches(force_refresh=True)
+    text = (
+        "🌐 <b>ДРУГИЕ ЧЕМПИОНАТЫ И СБОРНЫЕ</b>\n\n"
+        "<blockquote>Показаны турниры с матчами в ближайшие 14 дней (включая РПЛ и Лигу Наций).</blockquote>\n"
+        "👇 <b>Выбери турнир:</b>"
+    )
+    await callback.message.edit_text(text, reply_markup=other_leagues_kb(db), parse_mode="HTML")
+
+# ================= ЛИЧНЫЙ КАБИНЕТ (С КОПИРОВАНИЕМ ID В 1 КАСАНИЕ) =================
+def build_profile_View_data(user: dict, active_bets: list) -> tuple[str, InlineKeyboardMarkup]:
     total_settled = user["wins"] + user["losses"]
     winrate = round((user["wins"] / total_settled) * 100, 1) if total_settled > 0 else 0.0
     rank_name, bonus_amt = get_user_rank_info(user["balance"], user["is_vip"])
@@ -2788,7 +2954,8 @@ async def process_profile(callback: CallbackQuery, state: FSMContext):
 
     text = (
         f"👤 <b>КАБИНЕТ КАППЕРА</b>\n\n"
-        f"<blockquote>🆔 <b>{user['username']}</b> (<code>{user['user_id']}</code>)\n"
+        f"<blockquote>👤 Ник: <b>{user['username']}</b>\n"
+        f"🆔 Твой ID: <code>{user['user_id']}</code> <i>(нажми для копирования)</i>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"{club_line}"
         f"💰 Свободный банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
@@ -2800,17 +2967,30 @@ async def process_profile(callback: CallbackQuery, state: FSMContext):
         f"• Винрейт: <b><code>{winrate}%</code></b>  |  ROI: <b><code>{profit_sign}{round(user['profit'], 1)} FC</code></b>\n"
         f"• Трофеи: <b><code>{len(unlocked)}/15</code></b>  |  Друзья: <b><code>{user.get('referrals_count', 0)}</code></b>"
     )
-    await callback.message.edit_text(
-        text,
-        reply_markup=profile_kb(len(active_bets), bonus_amt, len(unlocked), fav_club),
-        parse_mode="HTML"
-    )
+    kb = profile_kb(len(active_bets), bonus_amt, len(unlocked), fav_club)
+    return text, kb
+
+@dp.message(Command("profile"))
+async def cmd_profile(message: Message, state: FSMContext):
+    await state.clear()
+    user = await db_manager.get_user(message.from_user.id, message.from_user.username)
+    active_bets = await db_manager.get_user_bets(message.from_user.id, active_only=True)
+    text, kb = build_profile_View_data(user, active_bets)
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@dp.callback_query(F.data == "profile")
+async def process_profile(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    user = await db_manager.get_user(callback.from_user.id, callback.from_user.username)
+    active_bets = await db_manager.get_user_bets(callback.from_user.id, active_only=True)
+    text, kb = build_profile_View_data(user, active_bets)
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
 
 def nick_menu_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="🎲 Случайный ник", callback_data="nick_random")
-    builder.button(text="🔄 Сбросить к Telegram", callback_data="nick_reset")
+    builder.button(text="🔄 Имя из Telegram", callback_data="nick_reset")
     builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(2, 1)
     return builder.as_markup()
@@ -2823,7 +3003,7 @@ async def process_nick_menu(callback: CallbackQuery, state: FSMContext):
         f"✏️ <b>НАСТРОЙКА ПСЕВДОНИМА</b>\n\n"
         f"<blockquote>👤 Текущий никнейм: <b>{user['username']}</b></blockquote>\n"
         f"• Напиши в чат любой свой псевдоним (3–16 символов).\n"
-        f"• Или используй генератор футбольных ников кнопкой ниже:"
+        f"• Или выбери случайный футбольный ник кнопкой ниже:"
     )
     await callback.message.edit_text(text, reply_markup=nick_menu_kb(), parse_mode="HTML")
     await callback.answer()
@@ -2883,7 +3063,7 @@ async def process_roulette_menu(callback: CallbackQuery):
     if can_spin:
         builder.button(text="🎲 Крутить барабан (Бесплатно)", callback_data="spin_roulette")
     else:
-        builder.button(text="⏳ Доступно завтра (Уже прокручено)", callback_data="spin_cooldown")
+        builder.button(text="⏳ Доступно завтра", callback_data="spin_cooldown")
     builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -2989,7 +3169,7 @@ async def process_set_club(callback: CallbackQuery, state: FSMContext):
         await callback.answer(f"⭐ Любимый клуб: {club}! (+10% к выплатам)", show_alert=True)
     await process_profile(callback, state)
 
-# ================= ЕЖЕНЕДЕЛЬНЫЙ ФИКСИРОВАННЫЙ СУПЕРЭКСПРЕСС (1 РАЗ В НЕДЕЛЮ) =================
+# ================= ЕЖЕНЕДЕЛЬНЫЙ ФИКСИРОВАННЫЙ СУПЕРЭКСПРЕСС =================
 @dp.callback_query(F.data == "superexpress_menu")
 async def process_superexpress_menu(callback: CallbackQuery):
     db = await get_real_matches()
@@ -2997,7 +3177,7 @@ async def process_superexpress_menu(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     if len(weekly_matches) < 6:
-        builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+        builder.button(text="🏠 Главное меню", callback_data="back_to_main")
         await callback.message.edit_text("🎯 <b>СУПЕРЭКСПРЕСС НЕДЕЛИ</b>\n\nФормируется новый еженедельный тираж.", reply_markup=builder.as_markup(), parse_mode="HTML")
         return
 
@@ -3011,7 +3191,7 @@ async def process_superexpress_menu(callback: CallbackQuery):
             lines.append(f"<b>{i}. {p['teams']}</b>\n   🎯 Выбор: <code>{p['pick_label']}</code>{sc_info}")
 
         if existing["status"] == "pending":
-            status_txt = "⏳ В игре (прогноз зафиксирован на эту неделю, следующий тираж — в пятницу)"
+            status_txt = "⏳ В игре (прогноз зафиксирован на эту неделю, новый тираж — в пятницу)"
         else:
             status_txt = f"🏁 Рассчитан (Угадано: {existing['guessed']}/6 • Выплата: +{existing['payout']} FC). Следующий тираж — в пятницу!"
 
@@ -3021,7 +3201,7 @@ async def process_superexpress_menu(callback: CallbackQuery):
             f"📡 <b>Статус:</b> {status_txt}\n\n"
             f"🏆 <b>Призовой фонд:</b> 4/6 — <code>+500 FC</code> | 5/6 — <code>+2 500 FC</code> | 6/6 — <b><code>+10 000 FC</code></b>"
         )
-        builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+        builder.button(text="🏠 Главное меню", callback_data="back_to_main")
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer()
         return
@@ -3038,13 +3218,13 @@ async def process_superexpress_menu(callback: CallbackQuery):
             builder.button(text=f"{mark}#{idx+1} {btn_txt}", callback_data=f"se_pick:{idx}:{code}")
 
     if len(draft) == 6:
-        builder.button(text="🔥 Зафиксировать прогноз на неделю (Бесплатно)", callback_data="se_submit")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+        builder.button(text="🔥 Зафиксировать купон недели (Бесплатно)", callback_data="se_submit")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
     builder.adjust(*([3, 3, 3, 3, 3, 3, 1, 1] if len(draft) == 6 else [3, 3, 3, 3, 3, 3, 1]))
 
     text = (
-        f"🎯 <b>СУПЕРЭКСПРЕСС НЕДЕЛИ (1 ТИРАЖ В НЕДЕЛЮ)</b>\n\n"
-        f"<blockquote>Угадай исходы 6 фиксированных матчей недели!\n"
+        f"🎯 <b>СУПЕРЭКСПРЕСС НЕДЕЛИ (1 РАЗ В НЕДЕЛЮ)</b>\n\n"
+        f"<blockquote>Угадай исходы 6 главных матчей недели!\n"
         f"4/6: <b>+500 FC</b> • 5/6: <b>+2 500 FC</b> • 6/6: <b>+10 000 FC</b></blockquote>\n" +
         "\n".join(lines) + f"\n\n👇 <i>Выбери исходы кнопками ниже ({len(draft)}/6):</i>"
     )
@@ -3088,7 +3268,7 @@ async def process_se_submit(callback: CallbackQuery):
     ]
     await db_manager.create_superexpress_entry(uid, round_key, picks_list)
     SUPEREXPRESS_DRAFTS.pop(uid, None)
-    await callback.answer("🎉 Твой еженедельный Суперэкспресс зафиксирован!", show_alert=True)
+    await callback.answer("🎉 Еженедельный Суперэкспресс принят!", show_alert=True)
     await process_superexpress_menu(callback)
 
 # ================= РЕФЕРАЛЫ, АКТИВНЫЕ СТАВКИ, АРХИВ И ТОП-10 =================
@@ -3110,10 +3290,10 @@ async def process_referral_menu(callback: CallbackQuery):
         f"💰 Заработано: <b><code>{user.get('referrals_count', 0) * 500} FC</code></b></blockquote>\n"
         f"• Тебе мгновенно начисляется <b><code>+500 FC</code></b> за каждого друга\n"
         f"• Друг получает повышенный стартовый банк <b><code>1 500 FC</code></b>\n\n"
-        f"🔗 <b>Твоя ссылка:</b>\n<code>{ref_link}</code>"
+        f"🔗 <b>Твоя ссылка (нажми для копирования):</b>\n<code>{ref_link}</code>"
     )
     builder = InlineKeyboardBuilder()
-    builder.button(text="📤 Отправить приглашение другу", url=share_url)
+    builder.button(text="📤 Отправить другу", url=share_url)
     builder.button(text="⬅️ Назад в кабинет", callback_data="profile")
     builder.adjust(1)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
@@ -3138,12 +3318,12 @@ async def process_active_bets(callback: CallbackQuery):
                 f"<blockquote>🎫 <b>Купон #{b['bet_id']}</b> ({btype}) • Кэф: <b><code>{b['odds']}</code></b>\n"
                 f"{events_multiline}{b_tag}\n"
                 f"💵 Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{pot_win} FC</code></b>\n"
-                f"⏱ Расчет: <i>в Live при пробитии тотала или ~{end_dt}</i></blockquote>"
+                f"⏱ Расчет: <i>досрочно при пробитии в Live или ~{end_dt}</i></blockquote>"
             )
             builder.button(text=f"💸 CashOut купона #{b['bet_id']}", callback_data=f"cashout_ask:{b['bet_id']}")
 
         text = "⏳ <b>МОИ АКТИВНЫЕ КУПОНЫ В ИГРЕ:</b>\n\n" + "\n".join(lines)
-        builder.button(text="📡 Проверить Live-счет и досрочный заход", callback_data="check_live_status")
+        builder.button(text="📡 Обновить Live-счет и расчет", callback_data="check_live_status")
 
     builder.button(text="🗄 Архив ставок", callback_data="archive_bets")
     builder.button(text="⬅️ В кабинет", callback_data="profile")
@@ -3289,14 +3469,14 @@ async def process_express(callback: CallbackQuery):
     exp_data = build_daily_express_data(db)
     builder = InlineKeyboardBuilder()
     if not exp_data:
-        builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+        builder.button(text="🏠 Главное меню", callback_data="back_to_main")
         await callback.message.edit_text("На ближайшие дни матчей не найдено.", reply_markup=builder.as_markup())
         return
     builder.button(text=f"🔥 Поставить на Экспресс (Кэф {exp_data['total_odd']})", callback_data="pick:express_day:all:exp")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
     builder.adjust(1)
     await callback.message.edit_text(
-        f"⚡ <b>ЭКСПРЕСС ДНЯ (ТОП-6 СОБЫТИЙ)</b>\n\n{exp_data['text']}\n\n👇 <i>Нажми кнопку ниже, чтобы поставить на весь экспресс одним купоном:</i>",
+        f"⚡ <b>ЭКСПРЕСС ДНЯ (ТОП-6 СОБЫТИЙ)</b>\n\n{exp_data['text']}\n\n👇 <i>Нажми кнопку ниже, чтобы поставить на весь экспресс:</i>",
         reply_markup=builder.as_markup(), parse_mode="HTML"
     )
     await callback.answer()
@@ -3306,8 +3486,8 @@ async def process_slip_add(callback: CallbackQuery):
     _, league_key, match_id, pick_code = callback.data.split(":")
     db = await get_real_matches()
     match = db.get(league_key, {}).get("matches", {}).get(match_id)
-    if not match:
-        await callback.answer("⛔ Матч уже начался!", show_alert=True)
+    if not match or match.get("is_live"):
+        await callback.answer("⛔ Матч уже идет в LIVE или начался!", show_alert=True)
         return
     mkt = evaluate_custom_market(match, pick_code)
     if not mkt:
@@ -3341,8 +3521,8 @@ async def process_view_slip(callback: CallbackQuery):
     text = f"🧺 <b>ТВОЙ КУПОН ЭКСПРЕССА ({len(slip)} МАТЧЕЙ)</b>\n\n" + "\n\n".join(lines) + f"\n\n<blockquote>📈 <b>Общий коэффициент:</b> <code>{total_odd}</code></blockquote>"
     builder = InlineKeyboardBuilder()
     builder.button(text=f"✅ Оформить ставку (Кэф {total_odd})", callback_data="pick:custom_slip:all:exp")
-    builder.button(text="🗑 Очистить купон", callback_data="clear_slip")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+    builder.button(text="🗑 Очистить", callback_data="clear_slip")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
     builder.adjust(1, 2)
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
@@ -3353,15 +3533,15 @@ async def process_clear_slip(callback: CallbackQuery, state: FSMContext):
     await callback.answer("🗑 Купон экспресса очищен!", show_alert=True)
     await process_back_main(callback, state)
 
-# ================= КАРТОЧКА МАТЧА, СВОДКА И КОНСТРУКТОР ТОТАЛОВ =================
+# ================= КАРТОЧКА МАТЧА (ПРЕДСТОЯЩИЕ + 🔴 LIVE) =================
 @dp.callback_query(F.data.startswith("refresh_league:"))
 async def process_refresh_league(callback: CallbackQuery):
     league_key = callback.data.split(":")[1]
-    await callback.answer("📡 Обновляю расписание...")
+    await callback.answer("📡 Синхронизация LIVE и расписания...")
     db = await get_real_matches(force_refresh=True)
     league_data = db.get(league_key, {})
     matches = league_data.get("matches", {})
-    text = f"<b>{league_data.get('title', 'Лига')}</b>\n📅 <i>Актуальное расписание (МСК):</i>" if matches else f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие дни матчей не найдено.</blockquote>"
+    text = f"<b>{league_data.get('title', 'Лига')}</b>\n📅 <i>Матчи в прямом эфире (🔴 LIVE) и расписание (МСК):</i>" if matches else f"<b>{league_data.get('title', 'Лига')}</b>\n\n<blockquote>📅 На ближайшие дни матчей не найдено.</blockquote>"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("league:"))
@@ -3371,7 +3551,7 @@ async def process_league_select(callback: CallbackQuery, state: FSMContext):
     db = await get_real_matches()
     league_data = db.get(league_key, {})
     matches = league_data.get("matches", {})
-    text = f"<b>{league_data.get('title', 'Турнир')}</b>\n📅 <i>Реальные матчи (время МСК):</i>" if matches else f"<b>{league_data.get('title', 'Турнир')}</b>\n\n<blockquote>📅 На ближайшие дни матчей не найдено. Нажми «🔄 Обновить».</blockquote>"
+    text = f"<b>{league_data.get('title', 'Турнир')}</b>\n📅 <i>Матчи в прямом эфире (🔴 LIVE) и расписание (МСК):</i>" if matches else f"<b>{league_data.get('title', 'Турнир')}</b>\n\n<blockquote>📅 На ближайшие дни матчей не найдено. Нажми «🔄 Обновить».</blockquote>"
     await callback.message.edit_text(text, reply_markup=matches_kb(league_key, matches), parse_mode="HTML")
     await callback.answer()
 
@@ -3381,32 +3561,55 @@ async def render_match_card(message_obj: Message, league_key: str, match_id: str
     if not match:
         return False
 
+    is_live = bool(match.get("is_live"))
+    # Если матч в LIVE — подтягиваем свежий счет напрямую из summary API
+    if is_live:
+        async with aiohttp.ClientSession() as session:
+            fresh = await fetch_real_match_result(session, match["league_slug"], str(match["event_id"]))
+            if fresh.get("ok"):
+                match["live_score"] = fresh["score_str"]
+                match["live_detail"] = fresh["detail"] or "LIVE"
+
     user = await db_manager.get_user(user_id)
     fav_club = user.get("favorite_club") or ""
     fav_banner = f"\n⭐ <b>Матч любимого клуба ({fav_club}) • +10% к выплате!</b>" if (fav_club and fav_club in match["teams"]) else ""
     league_title, odds = db[league_key]["title"], match["odds"]
     probs = calculate_ai_probabilities(odds)
 
-    if match["event_id"] not in AI_CACHE:
+    cache_k = f"live_{match['event_id']}_{match.get('live_score', '')}" if is_live else match["event_id"]
+    if cache_k not in AI_CACHE:
         await message_obj.edit_text(f"🧠 <i>ИИ анализирует матч {match['teams']}...</i>", parse_mode="HTML")
 
-    prompt = (
-        f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
-        f"Хозяева: {match['home_team']}. Гости: {match['away_team']}. Статистика: {match['records_info']}.\n"
-        f"Ожидаемые голы xG: {match['exp_goals']}. Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 1.5={odds['tb15']}, ТБ 2.5={odds['tb25']}, ОЗ(Да)={odds['btts']}.\n"
-        f"Дай краткий разбор (до 50 слов) в 2 пункта:\n1. ⚔️ Тактика и атака.\n2. 🎯 Лучшая ставка из линии с кэфом."
-    )
-    ai_verdict = await ask_ai_cached(match["event_id"], prompt) or smart_local_match_analysis(match, probs)
+    if is_live:
+        prompt = (
+            f"Матч идет ПРЯМО СЕЙЧАС (LIVE). Турнир: {league_title}.\n"
+            f"Матч: {match['home_team']} — {match['away_team']}. Текущий счет: {match['live_score']} ({match['live_detail']}).\n"
+            f"Предматчевый потенциал xG: {match['exp_goals']}. Статистика сезона: {match['records_info']}.\n"
+            f"Дай краткий живой комментарий эксперта (до 45 слов) в 2 пункта:\n"
+            f"1. 🔴 Оценка текущего счета и хода встречи.\n"
+            f"2. 📊 Чего ждать в оставшееся время матча по модели xG."
+        )
+        ai_verdict = await ask_ai_cached(cache_k, prompt, ttl=300) or smart_local_match_analysis(match, probs)
+        header_status = f"🔴 <b>ПРЯМОЙ ЭФИР (LIVE • {match['live_detail']})</b>\n🔢 Текущий счет: <b><code>{match['live_score']}</code></b>"
+    else:
+        prompt = (
+            f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
+            f"Хозяева: {match['home_team']}. Гости: {match['away_team']}. Статистика: {match['records_info']}.\n"
+            f"Ожидаемые голы xG: {match['exp_goals']}. Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 1.5={odds['tb15']}, ТБ 2.5={odds['tb25']}, ОЗ(Да)={odds['btts']}.\n"
+            f"Дай краткий разбор (до 50 слов) в 2 пункта:\n1. ⚔️ Тактика и атака.\n2. 🎯 Лучшая ставка из линии с кэфом."
+        )
+        ai_verdict = await ask_ai_cached(cache_k, prompt) or smart_local_match_analysis(match, probs)
+        header_status = f"🕒 Начало: <code>{match['date']}</code>"
 
     text = (
         f"🏟 <b>{league_title}</b>\n"
         f"🏠 <b>{match['home_team']}</b>  vs  ✈️ <b>{match['away_team']}</b>\n"
-        f"🕒 <code>{match['date']}</code>{fav_banner}\n\n"
-        f"<blockquote>📊 <b>1Х2:</b> П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%) | Х: <b><code>{odds['x']}</code></b> ({probs['x']}%) | П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
-        f"⚽ <b>xG матча:</b> <b><code>{match['exp_goals']}</code></b>  •  Точный счет ИИ: <b><code>{match['best_score']}</code></b></blockquote>\n"
-        f"🤖 <b>Вердикт ИИ:</b>\n{ai_verdict}"
+        f"{header_status}{fav_banner}\n\n"
+        f"<blockquote>📊 <b>Котировки 1Х2:</b> П1: <b><code>{odds['p1']}</code></b> ({probs['p1']}%) | Х: <b><code>{odds['x']}</code></b> ({probs['x']}%) | П2: <b><code>{odds['p2']}</code></b> ({probs['p2']}%)\n"
+        f"⚽ <b>Потенциал xG:</b> <b><code>{match['exp_goals']}</code></b>  •  Прогноз счета ИИ: <b><code>{match['best_score']}</code></b></blockquote>\n"
+        f"🤖 <b>Аналитика ИИ:</b>\n{ai_verdict}"
     )
-    await message_obj.edit_text(text, reply_markup=match_outcomes_kb(league_key, match_id, odds, user_id), parse_mode="HTML")
+    await message_obj.edit_text(text, reply_markup=match_outcomes_kb(league_key, match_id, odds, user_id, is_live=is_live), parse_mode="HTML")
     return True
 
 @dp.callback_query(F.data.startswith("match:"))
@@ -3414,7 +3617,7 @@ async def process_match_select(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     _, league_key, match_id = callback.data.split(":")
     if not await render_match_card(callback.message, league_key, match_id, callback.from_user.id):
-        await callback.answer("⛔ Этот матч уже начался или завершен!", show_alert=True)
+        await callback.answer("⛔ Этот матч уже завершен!", show_alert=True)
         return
     await callback.answer()
 
@@ -3425,14 +3628,14 @@ async def process_stats_menu(callback: CallbackQuery, state: FSMContext):
     db = await get_real_matches()
     match = db.get(league_key, {}).get("matches", {}).get(match_id)
     if not match:
-        await callback.answer("⛔ Матч уже начался!", show_alert=True)
+        await callback.answer("⛔ Матч уже завершен!", show_alert=True)
         return
     hs, as_ = match["h_stats"], match["a_stats"]
+    live_line = f"\n🔴 <b>Текущий счет в LIVE:</b> <b><code>{match['live_score']}</code></b> ({match['live_detail']})" if match.get("is_live") else ""
     text = (
-        f"📊 <b>ДЕТАЛЬНАЯ СВОДКА И ИТБ</b>\n\n🏟 <b>Арена:</b> {match['venue']}\n\n"
+        f"📊 <b>СВОДКА КОМАНД И ИТБ</b>\n\n🏟 <b>Арена:</b> {match['venue']}{live_line}\n\n"
         f"<blockquote>🏠 <b>{match['home_team']}</b>\n• Сезон: <code>{hs['record_str']}</code> ({hs['points']} очк.)\n• Форма: {hs['form_visual']} | xG: <b><code>{match['lam_h']}</code></b></blockquote>\n"
-        f"<blockquote>✈️ <b>{match['away_team']}</b>\n• Сезон: <code>{as_['record_str']}</code> ({as_['points']} очк.)\n• Форма: {as_['form_visual']} | xG: <b><code>{match['lam_a']}</code></b></blockquote>\n"
-        f"👇 <b>Индивидуальный Тотал Больше (ИТБ1 — Хозяева, ИТБ2 — Гости):</b>"
+        f"<blockquote>✈️ <b>{match['away_team']}</b>\n• Сезон: <code>{as_['record_str']}</code> ({as_['points']} очк.)\n• Форма: {as_['form_visual']} | xG: <b><code>{match['lam_a']}</code></b></blockquote>"
     )
     await callback.message.edit_text(text, reply_markup=stats_and_itb_kb(match), parse_mode="HTML")
     await callback.answer()
@@ -3442,8 +3645,8 @@ async def process_totals_menu(callback: CallbackQuery, state: FSMContext):
     _, league_key, match_id, direction = callback.data.split(":")
     db = await get_real_matches()
     match = db.get(league_key, {}).get("matches", {}).get(match_id)
-    if not match:
-        await callback.answer("⛔ Матч уже начался!", show_alert=True)
+    if not match or match.get("is_live"):
+        await callback.answer("⛔ Матч уже идет в LIVE!", show_alert=True)
         return
     await state.set_state(BetStates.waiting_for_custom_total)
     await state.update_data(league_key=league_key, match_id=match_id, direction=direction)
@@ -3495,7 +3698,7 @@ async def process_extras_menu(callback: CallbackQuery, state: FSMContext):
     _, league_key, match_id = callback.data.split(":")
     db = await get_real_matches()
     match = db.get(league_key, {}).get("matches", {}).get(match_id)
-    if not match:
+    if not match or match.get("is_live"):
         await callback.answer("⛔ Матч уже начался!", show_alert=True)
         return
     text = (
@@ -3543,7 +3746,7 @@ async def resolve_bet_target(target_code: str, user_id: int) -> dict | None:
     else:
         l_key, m_id, p_code = target_code.split("-", 2)
         match = db.get(l_key, {}).get("matches", {}).get(m_id)
-        if not match or match["start_ts"] <= now_ts:
+        if not match or match.get("is_live") or match["start_ts"] <= now_ts:
             return None
         mkt = evaluate_custom_market(match, p_code)
         if not mkt:
@@ -3605,9 +3808,9 @@ async def build_bet_accepted_response(user_id: int, bet_id: int, info: dict, amo
     share_url = f"https://t.me/share/url?url={quote(ref_link)}&text={share_txt}"
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="📤 Поделиться купоном с другом", url=share_url)
+    builder.button(text="📤 Поделиться купоном", url=share_url)
     builder.button(text="⏳ Мои активные ставки", callback_data="active_bets")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
     builder.adjust(1)
     return text, builder
 
@@ -3679,7 +3882,7 @@ async def process_custom_amount_input(message: Message, state: FSMContext):
     text, builder = await build_bet_accepted_response(message.from_user.id, res["bet_id"], info, amount, res)
     await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-# ================= ЗАКРЫТАЯ АДМИН-ПАНЕЛЬ (/admin) =================
+# ================= РАСШИРЕННАЯ АДМИН-ПАНЕЛЬ (/admin) =================
 def is_admin(user_id: int) -> bool:
     global ADMIN_ID
     if ADMIN_ID == 0:
@@ -3688,12 +3891,41 @@ def is_admin(user_id: int) -> bool:
 
 def admin_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="📢 Сделать рассылку всем", callback_data="admin_broadcast")
-    builder.button(text="🎁 Выдать FC игроку по ID", callback_data="admin_gift")
-    builder.button(text="🔄 Обновить статистику", callback_data="admin_panel")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(1)
+    builder.button(text="🔍 Найти игрока / Узнать ID", callback_data="admin_lookup")
+    builder.button(text="📋 Список игроков и их ID", callback_data="admin_users_list")
+    builder.button(text="🎁 Выдать / Списать FC", callback_data="admin_gift")
+    builder.button(text="⚡ Принудительный Live-расчет", callback_data="admin_force_settle")
+    builder.button(text="📢 Рассылка всем", callback_data="admin_broadcast")
+    builder.button(text="🔄 Обновить сводку", callback_data="admin_panel")
+    builder.button(text="🏠 Главное меню", callback_data="back_to_main")
+    builder.adjust(1, 2, 1, 2, 1)
     return builder.as_markup()
+
+def build_admin_user_dossier(u: dict) -> tuple[str, InlineKeyboardMarkup]:
+    st_lvl = int(u.get("stadium_level") or 1)
+    st_name = STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1])["name"]
+    vip_str = "👑 Да" if int(u.get("is_vip") or 0) == 1 else "Нет"
+    uid = u["user_id"]
+
+    text = (
+        f"🕵️‍♂️ <b>ДОСЬЕ ИГРОКА (АДМИН-ПРОСМОТР)</b>\n\n"
+        f"<blockquote>👤 Никнейм: <b>{u['username']}</b>\n"
+        f"🆔 ID (нажми для копирования): <code>{uid}</code>\n"
+        f"💰 Баланс: <b><code>{round(u['balance'], 1)} FC</code></b>\n"
+        f"👑 Статус VIP: <b>{vip_str}</b>\n"
+        f"🏟 Арена: <b>Ур. {st_lvl} ({st_name})</b> | ИИ: <b>Ур. {u.get('lab_level', 1)}</b>\n"
+        f"📊 Статистика: ✅ <code>{u['wins']}</code> | ❌ <code>{u['losses']}</code> | Профит: <code>{round(u['profit'], 1)} FC</code>\n"
+        f"🤝 Рефералов: <code>{u.get('referrals_count', 0)}</code> | Побед PvP: <code>{u.get('pvp_wins', 0)}</code></blockquote>\n"
+        f"👇 <b>Быстрые действия с игроком:</b>"
+    )
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ +1 000 FC", callback_data=f"adm_act:add1k:{uid}")
+    builder.button(text="➕ +5 000 FC", callback_data=f"adm_act:add5k:{uid}")
+    builder.button(text="👑 Переключить VIP", callback_data=f"adm_act:vip:{uid}")
+    builder.button(text="🔄 Сбросить таймеры", callback_data=f"adm_act:reset:{uid}")
+    builder.button(text="⬅️ Назад в Админ-панель", callback_data="admin_panel")
+    builder.adjust(2, 2, 1)
+    return text, builder.as_markup()
 
 @dp.message(Command("admin"))
 async def cmd_admin(message: Message, state: FSMContext):
@@ -3704,9 +3936,9 @@ async def cmd_admin(message: Message, state: FSMContext):
     text = (
         f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
         f"<blockquote>👥 Игроков в базе: <b><code>{st['users']}</code></b>\n"
-        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b>\n"
-        f"⏳ Активных купонов: <b><code>{st['active_bets']}</code></b>\n"
-        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n👇 Выбери действие:"
+        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b> (в игре: <b><code>{st['active_bets']}</code></b>)\n"
+        f"⚔️ Открытых дуэлей PvP: <b><code>{st['open_pvp']}</code></b>\n"
+        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n👇 Выбери инструмент:"
     )
     await message.answer(text, reply_markup=admin_kb(), parse_mode="HTML")
 
@@ -3719,12 +3951,137 @@ async def process_admin_panel(callback: CallbackQuery, state: FSMContext):
     text = (
         f"⚙️ <b>ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ (ADMIN)</b>\n\n"
         f"<blockquote>👥 Игроков в базе: <b><code>{st['users']}</code></b>\n"
-        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b>\n"
-        f"⏳ Активных купонов: <b><code>{st['active_bets']}</code></b>\n"
-        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n👇 Выбери действие:"
+        f"🎫 Всего купонов: <b><code>{st['bets']}</code></b> (в игре: <b><code>{st['active_bets']}</code></b>)\n"
+        f"⚔️ Открытых дуэлей PvP: <b><code>{st['open_pvp']}</code></b>\n"
+        f"🏦 Суммарный банк: <b><code>{st['total_fc']} FC</code></b></blockquote>\n👇 Выбери инструмент:"
     )
     await callback.message.edit_text(text, reply_markup=admin_kb(), parse_mode="HTML")
-    await callback.answer("Статистика обновлена")
+    await callback.answer("Сводка обновлена")
+
+@dp.callback_query(F.data == "admin_users_list")
+async def process_admin_users_list(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    users = await db_manager.get_users_list_admin(15)
+    lines = []
+    builder = InlineKeyboardBuilder()
+    for i, u in enumerate(users, 1):
+        lines.append(
+            f"<b>{i}. {u['username']}</b> — ID: <code>{u['user_id']}</code> • <b><code>{round(u['balance'], 1)} FC</code></b>"
+        )
+        builder.button(text=f"🕵️‍♂️ {u['username']}", callback_data=f"adm_view:{u['user_id']}")
+
+    builder.button(text="⬅️ Назад в Админку", callback_data="admin_panel")
+    rows = [2] * (len(users) // 2)
+    if len(users) % 2 == 1:
+        rows.append(1)
+    rows.append(1)
+    builder.adjust(*rows)
+
+    text = (
+        "📋 <b>СПИСОК ИГРОКОВ И ИХ ID</b>\n"
+        "<i>Нажми на любой ID в тексте, чтобы скопировать его, или открой досье кнопкой ниже:</i>\n\n"
+        "<blockquote>" + ("\n".join(lines) if lines else "Нет игроков") + "</blockquote>"
+    )
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("adm_view:"))
+async def process_adm_view_user(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    target_uid = int(callback.data.split(":")[1])
+    u = await db_manager.fetchrow("SELECT * FROM users WHERE user_id = $1", target_uid)
+    if not u:
+        await callback.answer("Игрок не найден", show_alert=True)
+        return
+    text, kb = build_admin_user_dossier(u)
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("adm_act:"))
+async def process_adm_quick_action(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    _, action, uid_str = callback.data.split(":")
+    target_uid = int(uid_str)
+
+    if action == "add1k":
+        await db_manager.add_balance_to_user(target_uid, 1000.0)
+        await callback.answer("✅ Начислено +1 000 FC!", show_alert=True)
+    elif action == "add5k":
+        await db_manager.add_balance_to_user(target_uid, 5000.0)
+        await callback.answer("✅ Начислено +5 000 FC!", show_alert=True)
+    elif action == "vip":
+        new_v = await db_manager.toggle_user_vip_admin(target_uid)
+        await callback.answer(f"👑 VIP статус: {'ВКЛЮЧЕН' if new_v == 1 else 'ВЫКЛЮЧЕН'}!", show_alert=True)
+    elif action == "reset":
+        await db_manager.reset_user_cooldowns_admin(target_uid)
+        await callback.answer("🔄 Таймеры бонуса, рулетки и арены сброшены!", show_alert=True)
+
+    u = await db_manager.fetchrow("SELECT * FROM users WHERE user_id = $1", target_uid)
+    if u:
+        text, kb = build_admin_user_dossier(u)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+
+@dp.callback_query(F.data == "admin_lookup")
+async def process_admin_lookup_ask(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AdminStates.waiting_for_user_lookup)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Отмена", callback_data="admin_panel")
+    await callback.message.edit_text(
+        "🔍 <b>ОПРЕДЕЛЕНИЕ ID И ПОИСК ДОСЬЕ ИГРОКА</b>\n\n"
+        "Напиши в чат <b>Никнейм</b> (можно часть ника) или <b>ID игрока</b>:",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_for_user_lookup)
+async def process_admin_lookup_input(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    found = await db_manager.search_users_admin(message.text or "")
+    if not found:
+        await message.answer("⚠️ Игроки по такому запросу не найдены. Попробуй ввести другой ник или ID:")
+        return
+
+    await state.clear()
+    if len(found) == 1:
+        text, kb = build_admin_user_dossier(found[0])
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        return
+
+    lines = []
+    builder = InlineKeyboardBuilder()
+    for u in found:
+        lines.append(f"• <b>{u['username']}</b> — ID: <code>{u['user_id']}</code> ({round(u['balance'], 1)} FC)")
+        builder.button(text=f"🕵️‍♂️ {u['username']}", callback_data=f"adm_view:{u['user_id']}")
+    builder.button(text="⬅️ В Админку", callback_data="admin_panel")
+    builder.adjust(2)
+    await message.answer(
+        "🔍 <b>Найдено несколько игроков:</b>\n\n<blockquote>" + "\n".join(lines) + "</blockquote>",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(F.data == "admin_force_settle")
+async def process_admin_force_settle(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await callback.answer("⚡ Запущена проверка всех активных купонов и LIVE-матчей...")
+    pending_bets = await db_manager.get_all_pending_bets()
+    settled_cnt = 0
+    if pending_bets:
+        async with aiohttp.ClientSession() as session:
+            for b in pending_bets:
+                r = await check_and_settle_real_bet(session, b)
+                if r.get("settled"):
+                    settled_cnt += 1
+    await callback.answer(f"✅ Проверено купонов: {len(pending_bets)}. Рассчитано сейчас: {settled_cnt}!", show_alert=True)
+    await process_admin_panel(callback, state)
 
 @dp.callback_query(F.data == "admin_broadcast")
 async def process_admin_broadcast_ask(callback: CallbackQuery, state: FSMContext):
@@ -3759,30 +4116,45 @@ async def process_admin_gift_ask(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_gift_data)
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Отмена", callback_data="admin_panel")
-    await callback.message.edit_text("🎁 <b>НАЧИСЛЕНИЕ ВАЛЮТЫ</b>\n\nОтправь через пробел <code>ID_игрока Сумму</code>:", reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.message.edit_text(
+        "🎁 <b>ИЗМЕНЕНИЕ БАЛАНСА ИГРОКА</b>\n\n"
+        "Отправь через пробел <code>ID_или_Ник Сумму</code> (для списания укажи минус, например: <code>123456789 -500</code>):",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
     await callback.answer()
 
 @dp.message(AdminStates.waiting_for_gift_data)
 async def process_admin_gift_exec(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
-    parts = (message.text or "").strip().split()
-    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].lstrip("-").isdigit():
-        await message.answer("⚠️ Введи два числа через пробел: <code>ID Сумма</code>", parse_mode="HTML")
+    parts = (message.text or "").strip().rsplit(maxsplit=1)
+    if len(parts) != 2 or not parts[1].lstrip("-").isdigit():
+        await message.answer("⚠️ Введи корректно через пробел: <code>ID_или_Ник Сумма</code>", parse_mode="HTML")
         return
-    target_uid, add_amt = int(parts[0]), float(parts[1])
+
+    target_user = await db_manager.find_user_by_query(parts[0])
+    if not target_user:
+        await message.answer("⚠️ Игрок с таким ID или Ником не найден.", reply_markup=admin_kb(), parse_mode="HTML")
+        return
+
+    add_amt = float(parts[1])
+    target_uid = target_user["user_id"]
     ok = await db_manager.add_balance_to_user(target_uid, add_amt)
     await state.clear()
     if ok:
-        try:
-            await bot.send_message(target_uid, f"🎁 Администратор начислил тебе <b><code>+{add_amt} FC</code></b> на баланс!", parse_mode="HTML")
-        except Exception:
-            pass
-        await message.answer(f"✅ Игроку <code>{target_uid}</code> начислено <b>{add_amt} FC</b>!", reply_markup=admin_kb(), parse_mode="HTML")
-    else:
-        await message.answer("⚠️ Игрок с таким ID не найден.", reply_markup=admin_kb(), parse_mode="HTML")
+        if add_amt > 0:
+            try:
+                await bot.send_message(target_uid, f"🎁 Администратор начислил тебе <b><code>+{add_amt} FC</code></b> на баланс!", parse_mode="HTML")
+            except Exception:
+                pass
+        await message.answer(
+            f"✅ Баланс игрока <b>{target_user['username']}</b> (ID: <code>{target_uid}</code>) изменен на <b>{add_amt} FC</b>!",
+            reply_markup=admin_kb(),
+            parse_mode="HTML"
+        )
 
-# ================= ВЕБ-СЕРВЕР + ГОТОВЫЙ REST API ШЛЮЗ ПОД БУДУЩИЙ WEBAPP =================
+# ================= ВЕБ-СЕРВЕР + REST API ШЛЮЗ ПОД WEBAPP (TELEGRAM MINI APP) =================
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -3793,7 +4165,7 @@ async def handle_ping(request):
     return web.Response(text="AI_BET_BOT Live Sports & WebApp Engine is running 24/7!", headers=CORS_HEADERS)
 
 async def api_get_user(request):
-    """REST-эндпоинт для будущего Telegram Mini App (возвращает профиль, стадион, карточки и баланс)"""
+    """Полный JSON-профиль игрока для синхронизации с Telegram WebApp"""
     uid_str = request.match_info.get("user_id", "0")
     if not uid_str.isdigit():
         return web.json_response({"ok": False, "error": "Invalid user_id"}, status=400, headers=CORS_HEADERS)
@@ -3801,6 +4173,7 @@ async def api_get_user(request):
     user = await db_manager.get_user(uid)
     buffs = get_user_fut_buffs(user)
     st_lvl = int(user.get("stadium_level") or 1)
+    active_bets = await db_manager.get_user_bets(uid, active_only=True)
     return web.json_response({
         "ok": True,
         "user": {
@@ -3809,17 +4182,20 @@ async def api_get_user(request):
             "balance": round(user["balance"], 1),
             "wins": user["wins"],
             "losses": user["losses"],
+            "profit": round(user["profit"], 1),
             "streak": user.get("streak", 0),
             "favorite_club": user.get("favorite_club", ""),
             "stadium_level": st_lvl,
             "stadium_info": STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1]),
+            "stadiums_catalog": STADIUM_LEVELS,
             "lab_level": user.get("lab_level", 1),
-            "fut_buffs": buffs
+            "fut_buffs": buffs,
+            "active_bets_count": len(active_bets)
         }
     }, headers=CORS_HEADERS)
 
 async def api_get_matches(request):
-    """REST-эндпоинт расписания и коэффициентов для будущего WebApp"""
+    """Возвращает LIVE и предстоящие матчи всех лиг для WebApp"""
     db = await get_real_matches()
     return web.json_response({"ok": True, "leagues": db}, headers=CORS_HEADERS)
 
@@ -3834,11 +4210,24 @@ async def start_web_server():
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
+async def setup_bot_commands():
+    """Автоматически добавляет кнопку Меню с командами /start и /profile в Telegram"""
+    commands = [
+        BotCommand(command="start", description="⚽ Главное меню"),
+        BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
+        BotCommand(command="admin", description="⚙️ Панель управления (Админ)")
+    ]
+    try:
+        await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
+    except Exception as e:
+        logging.warning(f"Не удалось установить меню команд: {e}")
+
 async def main():
     logging.basicConfig(level=logging.INFO)
     await db_manager.init()
     await get_real_matches(force_refresh=True)
     await start_web_server()
+    await setup_bot_commands()
     asyncio.create_task(match_settlement_worker())
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
