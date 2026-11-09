@@ -4169,34 +4169,153 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + ПОЛНЫЙ REST API ШЛЮЗ ДЛЯ WEBAPP (MINI APP) =================
+# ================= ВЕБ-СЕРВЕР + ПОЛНЫЙ REST API ШЛЮЗ ДЛЯ WEBAPP (TELEGRAM MINI APP) =================
+from aiogram.types import MenuButtonWebApp, WebAppInfo
+
+WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type"
 }
 
+LEAGUE_PRIORITY = {
+    "ucl": 60, "epl": 45, "laliga": 45, "seriea": 42,
+    "bundesliga": 40, "ligue1": 38, "rpl": 40, "unl": 36,
+    "uel": 35, "uecl": 28, "por": 22, "ned": 22, "tur": 20, "eng2": 18, "bra": 20
+}
+
+def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
+    """Формирует полную роспись исходов, статистику и рейтинг популярности матча для Web-App"""
+    odds = m["odds"]
+    probs = calculate_ai_probabilities(odds)
+
+    # Расширенная сетка тоталов и ИТБ для внутреннего экрана матча
+    totals_list = []
+    for line_val in ["1.5", "2.0", "2.5", "3.0", "3.5"]:
+        tb_m = evaluate_custom_market(m, f"tb_{line_val}")
+        tm_m = evaluate_custom_market(m, f"tm_{line_val}")
+        if tb_m and tm_m:
+            totals_list.append({
+                "line": line_val,
+                "tb_code": tb_m["pick_code"], "tb_odd": tb_m["odds"], "tb_label": tb_m["label"],
+                "tm_code": tm_m["pick_code"], "tm_odd": tm_m["odds"], "tm_label": tm_m["label"]
+            })
+
+    itb_list = []
+    for line_val in ["0.5", "1.5", "2.5"]:
+        i1 = evaluate_custom_market(m, f"itb1_{line_val}")
+        i2 = evaluate_custom_market(m, f"itb2_{line_val}")
+        if i1 and i2:
+            itb_list.append({
+                "line": line_val,
+                "itb1_code": i1["pick_code"], "itb1_odd": i1["odds"], "itb1_label": i1["label"],
+                "itb2_code": i2["pick_code"], "itb2_odd": i2["odds"], "itb2_label": i2["label"]
+            })
+
+    # Вычисляем индекс топовости для главной афиши (LIVE + статус лиги + гранды)
+    elite_score = (get_elite_bonus(m["home_team"]) + get_elite_bonus(m["away_team"])) * 120
+    league_score = LEAGUE_PRIORITY.get(l_key, 15)
+    live_boost = 500 if m.get("is_live") else 0
+    is_top_banner = (elite_score >= 35 or l_key == "ucl" or bool(m.get("is_live")))
+    priority_score = live_boost + elite_score + league_score
+
+    return {
+        "event_id": m["event_id"],
+        "league_key": l_key,
+        "league_title": l_title,
+        "teams": m["teams"],
+        "home_team": m["home_team"],
+        "away_team": m["away_team"],
+        "venue": m.get("venue", "Центральная арена"),
+        "is_live": bool(m.get("is_live")),
+        "live_score": m.get("live_score", "0:0"),
+        "live_detail": m.get("live_detail", ""),
+        "date": m["date"],
+        "short_date": m["short_date"],
+        "start_ts": m["start_ts"],
+        "exp_goals": m["exp_goals"],
+        "lam_h": m.get("lam_h", 1.4),
+        "lam_a": m.get("lam_a", 1.2),
+        "best_score": m["best_score"],
+        "h_stats": m.get("h_stats", {}),
+        "a_stats": m.get("a_stats", {}),
+        "odds": odds,
+        "probs": probs,
+        "totals_markets": totals_list,
+        "itb_markets": itb_list,
+        "is_top": is_top_banner,
+        "priority_score": round(priority_score, 1)
+    }
+
 async def handle_options(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 async def handle_ping(request):
-    return web.Response(text="AI_BET_BOT Live Sports & WebApp Engine is running 24/7!", headers=CORS_HEADERS)
+    return web.Response(text="AI_BET_BOT Live Sports & Full WebApp Engine is running 24/7!", headers=CORS_HEADERS)
 
 async def serve_webapp_html(request):
-    """Отдает интерфейс Telegram Mini App из файла webapp.html"""
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
     if not os.path.exists(html_path):
         return web.Response(
-            text="<h2>Файл webapp.html еще не загружен на сервер.</h2>",
+            text="<h2>Файл webapp.html еще не загружен в репозиторий.</h2>",
             content_type="text/html",
             headers=CORS_HEADERS
         )
     with open(html_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return web.Response(text=content, content_type="text/html", headers=CORS_HEADERS)
+        return web.Response(text=f.read(), content_type="text/html", headers=CORS_HEADERS)
+
+async def api_get_match_ai(request):
+    """Загружает краткий ИИ-анализ конкретного матча при открытии его карточки в Web-App"""
+    l_key = request.match_info.get("league_key", "")
+    m_id = request.match_info.get("event_id", "")
+    db = await get_real_matches()
+    l_data = db.get(l_key, {})
+    match = l_data.get("matches", {}).get(m_id)
+    if not match:
+        return web.json_response({"ok": False, "error": "Матч не найден"}, headers=CORS_HEADERS)
+
+    is_live = bool(match.get("is_live"))
+    if is_live:
+        async with aiohttp.ClientSession() as session:
+            fresh = await fetch_real_match_result(session, match["league_slug"], str(match["event_id"]))
+            if fresh.get("ok"):
+                match["live_score"] = fresh["score_str"]
+                match["live_detail"] = fresh["detail"] or "LIVE"
+
+    odds = match["odds"]
+    probs = calculate_ai_probabilities(odds)
+    league_title = l_data.get("title", "Турнир")
+    cache_k = f"live_{match['event_id']}_{match.get('live_score', '')}" if is_live else match["event_id"]
+
+    if is_live:
+        prompt = (
+            f"Матч идет в ПРЯМОМ ЭФИРЕ (LIVE). Турнир: {league_title}.\n"
+            f"Матч: {match['home_team']} — {match['away_team']}. Текущий счет: {match['live_score']} ({match['live_detail']}).\n"
+            f"Потенциал xG: {match['exp_goals']}. Сезон: {match['records_info']}.\n"
+            f"Дай краткий живой комментарий (до 45 слов) в 2 пункта:\n"
+            f"1. 🔴 Оценка хода игры по текущему счету.\n2. 📊 Ожидания на остаток матча."
+        )
+        ai_text = await ask_ai_cached(cache_k, prompt, ttl=300) or smart_local_match_analysis(match, probs)
+    else:
+        prompt = (
+            f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
+            f"Хозяева: {match['home_team']}. Гости: {match['away_team']}. Статистика: {match['records_info']}.\n"
+            f"Ожидаемые голы xG: {match['exp_goals']}. Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 1.5={odds['tb15']}, ТБ 2.5={odds['tb25']}, ОЗ(Да)={odds['btts']}.\n"
+            f"Дай краткий разбор (до 50 слов) в 2 пункта:\n1. ⚔️ Тактика и форма команд.\n2. 🎯 Лучший выбор по линии с кэфом."
+        )
+        ai_text = await ask_ai_cached(cache_k, prompt) or smart_local_match_analysis(match, probs)
+
+    return web.json_response({
+        "ok": True,
+        "ai_analysis": ai_text,
+        "live_score": match.get("live_score", "0:0"),
+        "live_detail": match.get("live_detail", "")
+    }, headers=CORS_HEADERS)
 
 async def api_get_state(request):
-    """Комплексный эндпоинт: отдает в WebApp профиль, FUT-состав, стадион, матчи, аукцион и Топ-10"""
+    """Отдает полное состояние всех разделов бота для единого приложения Web-App"""
     uid_str = request.match_info.get("user_id", "0")
     if not uid_str.isdigit():
         return web.json_response({"ok": False, "error": "Некорректный ID"}, status=400, headers=CORS_HEADERS)
@@ -4209,9 +4328,16 @@ async def api_get_state(request):
     rank_name, daily_bonus_amt = get_user_rank_info(user["balance"], user["is_vip"])
     today_str = now_msk().strftime("%Y-%m-%d")
 
-    active_bets = await db_manager.get_user_bets(uid, active_only=True)
+    active_bets_raw = await db_manager.get_user_bets(uid, active_only=True)
+    archive_bets_raw = await db_manager.get_user_bets(uid, active_only=False)
     lot = await db_manager.get_or_rotate_black_market()
     lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 20})
+    open_duels = await db_manager.get_open_pvp_duels(uid)
+
+    try:
+        achievements_unlocked = json.loads(user.get("achievements") or "[]")
+    except Exception:
+        achievements_unlocked = []
 
     top_raw = await db_manager.get_leaderboard()
     leaderboard = []
@@ -4226,30 +4352,73 @@ async def api_get_state(request):
             "is_me": u["user_id"] == uid
         })
 
+    # Собираем все активные лиги и формируем афишу матчей
     db_matches = await get_real_matches()
-    flat_matches = []
-    for l_key, l_data in db_matches.items():
-        for m_id, m in list(l_data.get("matches", {}).items())[:6]:
-            flat_matches.append({
-                "event_id": m["event_id"],
-                "league_key": l_key,
-                "league_title": l_data["title"],
-                "teams": m["teams"],
-                "home_team": m["home_team"],
-                "away_team": m["away_team"],
-                "is_live": bool(m.get("is_live")),
-                "live_score": m.get("live_score", "0:0"),
-                "live_detail": m.get("live_detail", ""),
-                "short_date": m["short_date"],
-                "start_ts": m["start_ts"],
-                "exp_goals": m["exp_goals"],
-                "best_score": m["best_score"],
-                "odds": m["odds"]
-            })
-    flat_matches.sort(key=lambda x: (0 if x["is_live"] else 1, x["start_ts"]))
+    leagues_nav = []
+    all_matches = []
+
+    for l_key, cfg in LEAGUES_CONFIG.items():
+        l_data = db_matches.get(l_key, {})
+        m_dict = l_data.get("matches", {})
+        if l_key in OTHER_LEAGUES and not l_data.get("has_2w_matches", False):
+            continue
+        if not m_dict:
+            continue
+
+        live_cnt = sum(1 for m in m_dict.values() if m.get("is_live"))
+        leagues_nav.append({
+            "key": l_key,
+            "title": cfg["title"],
+            "count": len(m_dict),
+            "live_count": live_cnt,
+            "is_main": l_key in MAIN_LEAGUES
+        })
+
+        for m_id, m in list(m_dict.items())[:15]:
+            all_matches.append(build_full_match_payload(m, l_key, cfg["title"]))
+
+    # На стартовой афише сначала идут LIVE и топовые вывески, затем по времени старта
+    top_poster_matches = sorted(
+        all_matches,
+        key=lambda x: (-1 if x["is_live"] else 0, -x["priority_score"], x["start_ts"])
+    )
+
+    # Экспресс дня и Еженедельный Суперэкспресс
+    daily_exp = build_daily_express_data(db_matches)
+    se_round_key, se_matches = await db_manager.get_or_create_weekly_superexpress(db_matches)
+    se_entry = await db_manager.get_superexpress_entry(uid, se_round_key)
+    se_user_picks = json.loads(se_entry["picks_json"]) if se_entry else None
+
+    # Секретный Валуй дня от ИИ (если ИИ-Отдел >= 2 ур.)
+    ai_value_offer = None
+    top_6_up = get_top_6_upcoming_matches(db_matches)
+    if lab_lvl >= 2 and top_6_up:
+        best_v = max(top_6_up, key=lambda x: x["exp_goals"])
+        v_mkt = evaluate_custom_market(best_v, "tb_2.0")
+        if v_mkt:
+            ai_value_offer = {
+                "league_key": best_v["league_key"],
+                "event_id": best_v["event_id"],
+                "teams": best_v["teams"],
+                "date": best_v["short_date"],
+                "exp_goals": best_v["exp_goals"],
+                "pick_code": "tb_2.0",
+                "pick_label": v_mkt["label"],
+                "odds": v_mkt["odds"],
+                "prob": v_mkt["prob"]
+            }
+
+    global BOT_USERNAME
+    if not BOT_USERNAME:
+        try:
+            me = await bot.get_me()
+            BOT_USERNAME = me.username
+        except Exception:
+            pass
 
     return web.json_response({
         "ok": True,
+        "bot_username": BOT_USERNAME,
         "user": {
             "user_id": user["user_id"],
             "username": user["username"],
@@ -4262,21 +4431,52 @@ async def api_get_state(request):
             "profit": round(user["profit"], 1),
             "streak": int(user.get("streak") or 0),
             "favorite_club": user.get("favorite_club", ""),
+            "is_incognito": int(user.get("is_incognito") or 0),
+            "referrals_count": int(user.get("referrals_count") or 0),
+            "pvp_wins": int(user.get("pvp_wins") or 0),
+            "achievements_unlocked": achievements_unlocked,
             "stadium_level": st_lvl,
             "stadium_info": STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1]),
-            "next_stadium": STADIUM_LEVELS.get(st_lvl + 1) if st_lvl < 10 else None,
             "can_claim_stadium": user.get("last_stadium_claim") != today_str,
             "lab_level": lab_lvl,
             "lab_info": LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1]),
             "next_lab": LAB_LEVELS.get(lab_lvl + 1) if lab_lvl < 5 else None,
             "can_spin_roulette": user.get("last_spin") != today_str,
             "active_booster": user.get("active_booster", ""),
+            "active_booster_name": BOOSTER_NAMES.get(user.get("active_booster", ""), ""),
             "fut_buffs": buffs
         },
+        "popular_clubs": POPULAR_CLUBS,
+        "all_achievements": ACHIEVEMENTS_CONFIG,
         "stadiums_catalog": STADIUM_LEVELS,
+        "ai_value_offer": ai_value_offer,
+        "daily_express": {
+            "total_odd": daily_exp["total_odd"],
+            "legs": daily_exp["legs"]
+        } if daily_exp else None,
+        "superexpress": {
+            "round_key": se_round_key,
+            "matches": se_matches,
+            "entry": {
+                "status": se_entry["status"],
+                "guessed": se_entry["guessed"],
+                "payout": se_entry["payout"],
+                "picks": se_user_picks
+            } if se_entry else None
+        },
+        "pvp_duels": [
+            {
+                "duel_id": d["duel_id"],
+                "creator_id": d["creator_id"],
+                "creator_name": d["creator_name"],
+                "target_id": int(d.get("target_id") or 0),
+                "stake": d["stake"],
+                "is_mine": d["creator_id"] == uid,
+                "is_for_me": int(d.get("target_id") or 0) == uid
+            }
+            for d in open_duels
+        ],
         "black_market": {
-            "day_key": lot["day_key"],
-            "lot_id": lot["lot_id"],
             "card": lot_card,
             "highest_bid": lot["highest_bid"],
             "leader_name": lot["leader_name"],
@@ -4290,16 +4490,31 @@ async def api_get_state(request):
                 "amount": b["amount"],
                 "odds": b["odds"],
                 "potential_win": round(b["amount"] * b["odds"], 1),
-                "bet_type": b.get("bet_type", "single")
+                "bet_type": b.get("bet_type", "single"),
+                "legs": json.loads(b.get("legs_json") or "[]")
             }
-            for b in active_bets[:10]
+            for b in active_bets_raw
+        ],
+        "archive_bets": [
+            {
+                "bet_id": b["bet_id"],
+                "match_title": b["match_title"],
+                "pick": b["pick"],
+                "amount": b["amount"],
+                "odds": b["odds"],
+                "status": b["status"],
+                "score_result": b.get("score_result", ""),
+                "payout": round(b["amount"] * b["odds"], 1) if b["status"] == "win" else (b["amount"] if b["status"] == "push" else 0)
+            }
+            for b in archive_bets_raw
         ],
         "leaderboard": leaderboard,
-        "matches": flat_matches[:24]
+        "leagues": leagues_nav,
+        "matches": top_poster_matches
     }, headers=CORS_HEADERS)
 
 async def api_handle_action(request):
-    """Обрабатывает интерактивные действия игрока прямо из интерфейса WebApp"""
+    """Единый обработчик всех игровых действий из интерфейса Web-App"""
     try:
         body = await request.json()
     except Exception:
@@ -4308,29 +4523,33 @@ async def api_handle_action(request):
     uid = int(body.get("user_id") or 0)
     action = str(body.get("action") or "")
     if not uid:
-        return web.json_response({"ok": False, "error": "Не указан user_id"}, status=400, headers=CORS_HEADERS)
+        return web.json_response({"ok": False, "error": "Не указан ID игрока"}, status=400, headers=CORS_HEADERS)
 
     user = await db_manager.get_user(uid)
 
+    # 1. Ежедневный бонус ранга
     if action == "claim_bonus":
         ok, amt, r_name = await db_manager.claim_daily_bonus(uid)
         if not ok:
-            return web.json_response({"ok": False, "error": "Ежедневный бонус уже получен сегодня!"}, headers=CORS_HEADERS)
+            return web.json_response({"ok": False, "error": "Бонус уже получен сегодня! Заходи завтра."}, headers=CORS_HEADERS)
         return web.json_response({"ok": True, "message": f"🎁 Бонус ранга «{r_name}»: +{amt} FC зачислено!"}, headers=CORS_HEADERS)
 
+    # 2. Сбор кассы стадиона
     elif action == "claim_stadium":
         ok, inc, st_name = await db_manager.claim_stadium_income(uid)
         if not ok:
-            return web.json_response({"ok": False, "error": "Касса арены сегодня уже собрана! Заходи завтра."}, headers=CORS_HEADERS)
+            return web.json_response({"ok": False, "error": "Касса арены сегодня уже собрана!"}, headers=CORS_HEADERS)
         return web.json_response({"ok": True, "message": f"🏟 Выручка «{st_name}» собрана: +{inc} FC!"}, headers=CORS_HEADERS)
 
+    # 3. Покупка стадиона или улучшение ИИ-отдела
     elif action == "upgrade_building":
         b_type = str(body.get("b_type") or "stadium")
         res = await db_manager.upgrade_empire_building(uid, b_type)
         if not res["ok"]:
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
-        return web.json_response({"ok": True, "message": f"🎉 Построено: {res['name']} (Ур. {res['new_lvl']})!"}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": f"✅ Приобретено: {res['name']} (Ур. {res['new_lvl']})!"}, headers=CORS_HEADERS)
 
+    # 4. Открытие FUT-паков
     elif action == "buy_pack":
         p_type = str(body.get("pack_type") or "basic")
         if p_type == "basic":
@@ -4352,19 +4571,20 @@ async def api_handle_action(request):
             "new_balance": res["new_balance"]
         }, headers=CORS_HEADERS)
 
+    # 5. Вращение рулетки удачи
     elif action == "spin_roulette":
         today_str = now_msk().strftime("%Y-%m-%d")
         if user.get("last_spin") == today_str:
             return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
 
         sectors = [
-            {"idx": 0, "name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
-            {"idx": 1, "name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
-            {"idx": 2, "name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
-            {"idx": 3, "name": "⚡ Кэф-буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
-            {"idx": 4, "name": "🎟 Золотой билет (+100 FC + Спин)", "coins": 100, "booster": "", "respin": True, "weight": 10},
-            {"idx": 5, "name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
-            {"idx": 6, "name": "🔥 ДЖЕКПОТ +2 000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
+            {"name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
+            {"name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
+            {"name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
+            {"name": "⚡ Кэф-буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
+            {"name": "🎟 Золотой билет (+100 FC + Спин!)", "coins": 100, "booster": "", "respin": True, "weight": 10},
+            {"name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
+            {"name": "🔥 ДЖЕКПОТ +2 000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
         ]
         chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
         res = await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
@@ -4374,6 +4594,7 @@ async def api_handle_action(request):
             "new_balance": res["new_balance"]
         }, headers=CORS_HEADERS)
 
+    # 6. Ставка на аукционе Черного рынка
     elif action == "bm_bid":
         amount = int(body.get("amount") or 0)
         res = await db_manager.place_black_market_bid(uid, amount)
@@ -4381,27 +4602,255 @@ async def api_handle_action(request):
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
         return web.json_response({"ok": True, "message": f"🔨 Ставка {amount} FC принята! Ты лидер аукциона!"}, headers=CORS_HEADERS)
 
-    elif action == "place_bet":
-        l_key = str(body.get("league_key") or "")
-        m_id = str(body.get("event_id") or "")
-        p_code = str(body.get("pick_code") or "")
-        amount = int(body.get("amount") or 0)
+    # 7. Оформление купона ставок (Ординар или Экспресс)
+    elif action == "submit_slip":
+        items = body.get("items") or []
+        stake_amount = int(body.get("stake") or 0)
 
-        target_code = f"{l_key}-{m_id}-{p_code}"
-        info = await resolve_bet_target(target_code, uid)
-        if not info:
-            return web.json_response({"ok": False, "error": "Прием ставок на этот матч уже закрыт!"}, headers=CORS_HEADERS)
+        if not items:
+            return web.json_response({"ok": False, "error": "Купон пуст! Выбери хотя бы один исход."}, headers=CORS_HEADERS)
+        if len(items) > 6:
+            return web.json_response({"ok": False, "error": "Максимум 6 событий в одном экспрессе!"}, headers=CORS_HEADERS)
+        if stake_amount < 10:
+            return web.json_response({"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}, headers=CORS_HEADERS)
 
+        db_schedule = await get_real_matches()
+        now_ts = int(now_msk().timestamp())
+
+        if len(items) == 1:
+            it = items[0]
+            m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(it["event_id"])
+            if not m or m.get("is_live") or m["start_ts"] <= now_ts:
+                return web.json_response({"ok": False, "error": f"Прием ставок на матч {it.get('teamsTitle', '')} уже закрыт!"}, headers=CORS_HEADERS)
+            mkt = evaluate_custom_market(m, it["pick_code"])
+            if not mkt:
+                return web.json_response({"ok": False, "error": "Некорректный исход!"}, headers=CORS_HEADERS)
+
+            legs = [{
+                "league_slug": m["league_slug"],
+                "event_id": m["event_id"],
+                "teams": m["teams"],
+                "pick_code": mkt["pick_code"],
+                "pick_label": mkt["label"],
+                "odds": mkt["odds"]
+            }]
+            res = await db_manager.create_pending_bet(
+                uid, user["username"], f"{m['teams']} ({m['short_date']})", mkt["label"],
+                stake_amount, mkt["odds"], mkt["prob"], m["end_ts"],
+                bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False)
+            )
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            return web.json_response({
+                "ok": True,
+                "message": f"✅ Ординар #{res['bet_id']} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC"
+            }, headers=CORS_HEADERS)
+
+        total_odd, comb_prob, max_end = 1.0, 1.0, 0
+        legs, titles = [], []
+        for idx, it in enumerate(items, 1):
+            m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(it["event_id"])
+            if not m or m.get("is_live") or m["start_ts"] <= now_ts:
+                return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} уже начался!"}, headers=CORS_HEADERS)
+            mkt = evaluate_custom_market(m, it["pick_code"])
+            if not mkt:
+                return web.json_response({"ok": False, "error": "Ошибка расчета котировки"}, headers=CORS_HEADERS)
+            total_odd *= mkt["odds"]
+            comb_prob *= (mkt["prob"] / 100.0)
+            if m["end_ts"] > max_end:
+                max_end = m["end_ts"]
+            titles.append(f"{idx}. {m['teams']} — {mkt['label']} ({mkt['odds']})")
+            legs.append({
+                "league_slug": m["league_slug"],
+                "event_id": m["event_id"],
+                "teams": m["teams"],
+                "pick_code": mkt["pick_code"],
+                "pick_label": mkt["label"],
+                "odds": mkt["odds"]
+            })
+
+        final_exp_odd = round(total_odd, 2)
         res = await db_manager.create_pending_bet(
-            uid, user["username"], info["match_title"], info["pick"],
-            amount, info["odds"], info["prob"], info["end_ts"], info["bet_type"], info["legs_json"]
+            uid, user["username"], f"Экспресс ({len(legs)} матчей)", "\n".join(titles),
+            stake_amount, final_exp_odd, round(comb_prob * 100, 1), max_end,
+            bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False)
         )
         if not res["ok"]:
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
         return web.json_response({
             "ok": True,
-            "message": f"🎫 Купон #{res['bet_id']} принят! Возможная выплата: {res['potential_win']} FC"
+            "message": f"⚡ Экспресс #{res['bet_id']} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC"
         }, headers=CORS_HEADERS)
+
+    # 8. Досрочный выкуп ставки CashOut прямо из Web-App
+    elif action == "cashout_bet":
+        bet_id = int(body.get("bet_id") or 0)
+        bet = await db_manager.get_bet_by_id(bet_id, uid)
+        if not bet or bet["status"] != "pending":
+            return web.json_response({"ok": False, "error": "Купон уже рассчитан!"}, headers=CORS_HEADERS)
+        async with aiohttp.ClientSession() as session:
+            offer = await calculate_cashout_offer(session, bet)
+        if offer <= 0:
+            return web.json_response({"ok": False, "error": "CashOut недоступен: одно из событий уже проиграло."}, headers=CORS_HEADERS)
+        res = await db_manager.settle_bet_in_db(bet, "cashout", offer, f"CashOut ({offer} FC)")
+        return web.json_response({
+            "ok": True,
+            "message": f"💸 Купон #{bet_id} выкуплен! На баланс зачислено +{res['payout']} FC!"
+        }, headers=CORS_HEADERS)
+
+    # 9. Участие в еженедельном Суперэкспрессе (6 матчей)
+    elif action == "se_submit":
+        picks_map = body.get("picks") or {}
+        db_schedule = await get_real_matches()
+        round_key, weekly_matches = await db_manager.get_or_create_weekly_superexpress(db_schedule)
+        if len(weekly_matches) < 6:
+            return web.json_response({"ok": False, "error": "Тираж недели еще формируется."}, headers=CORS_HEADERS)
+        if await db_manager.get_superexpress_entry(uid, round_key):
+            return web.json_response({"ok": False, "error": "Ты уже участвуешь в тираже этой недели!"}, headers=CORS_HEADERS)
+
+        lbl_map = {"p1": "П1", "x": "Х", "p2": "П2"}
+        picks_list = []
+        for idx, m in enumerate(weekly_matches):
+            c = str(picks_map.get(str(idx)) or "")
+            if c not in ("p1", "x", "p2"):
+                return web.json_response({"ok": False, "error": f"Выбери исход для матча #{idx+1}!"}, headers=CORS_HEADERS)
+            picks_list.append({
+                "event_id": m["event_id"],
+                "league_slug": m["league_slug"],
+                "teams": m["teams"],
+                "pick_code": c,
+                "pick_label": lbl_map[c]
+            })
+        await db_manager.create_superexpress_entry(uid, round_key, picks_list)
+        return web.json_response({"ok": True, "message": "🎯 Прогноз на Суперэкспресс недели зафиксирован!"}, headers=CORS_HEADERS)
+
+    # 10. PvP-Пенальти (С ботом, в Лобби, Личный вызов по Нику/ID, Принятие и Отмена)
+    elif action == "pvp_create":
+        mode = str(body.get("mode") or "bot")
+        stake = int(body.get("stake") or 0)
+        kick_dir = str(body.get("kick") or "C")
+        save_dir = str(body.get("save") or "C")
+        target_query = str(body.get("target") or "").strip()
+
+        if stake < 50:
+            return web.json_response({"ok": False, "error": "Минимальная ставка в PvP — 50 FC!"}, headers=CORS_HEADERS)
+        if user["balance"] < stake:
+            return web.json_response({"ok": False, "error": "Недостаточно FC на балансе!"}, headers=CORS_HEADERS)
+
+        if mode == "bot":
+            bot_kick, bot_save = random.choice(["L", "C", "R"]), random.choice(["L", "C", "R"])
+            g1, g2, log_txt = resolve_penalty_shootout(kick_dir, save_dir, bot_kick, bot_save)
+            clean_log = re.sub(r"<.*?>", "", log_txt)
+            if g1 > g2:
+                win_profit = round(stake * 0.90, 1)
+                await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $1 WHERE user_id = $2", win_profit, uid)
+                res_msg = f"🎉 ПОБЕДА ({g1}:{g2})! Выигрыш: +{win_profit} FC!"
+            elif g2 > g1:
+                await db_manager.exec("UPDATE users SET balance = balance - $1, profit = profit - $1 WHERE user_id = $2", float(stake), uid)
+                res_msg = f"❌ ПОРАЖЕНИЕ ({g1}:{g2})! Потеряно: -{stake} FC."
+            else:
+                res_msg = f"🤝 НИЧЬЯ ({g1}:{g2})! Ставка {stake} FC возвращена."
+            return web.json_response({"ok": True, "message": res_msg, "detail": clean_log}, headers=CORS_HEADERS)
+
+        elif mode == "lobby":
+            res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=0)
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            return web.json_response({"ok": True, "message": f"🌐 Вызов #{res['duel_id']} ({stake} FC) опубликован в лобби!"}, headers=CORS_HEADERS)
+
+        elif mode == "direct":
+            target_user = await db_manager.find_user_by_query(target_query)
+            if not target_user:
+                return web.json_response({"ok": False, "error": "Игрок с таким Ником или ID не найден!"}, headers=CORS_HEADERS)
+            if target_user["user_id"] == uid:
+                return web.json_response({"ok": False, "error": "Нельзя вызвать самого себя!"}, headers=CORS_HEADERS)
+            res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=target_user["user_id"])
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            duel_id = res["duel_id"]
+            try:
+                t_kb = InlineKeyboardBuilder()
+                t_kb.button(text=f"⚔️ Принять вызов ({stake} FC)", callback_data=f"pvp_accept_start:{duel_id}")
+                t_kb.button(text="❌ Отклонить", callback_data=f"pvp_cancel:{duel_id}")
+                t_kb.adjust(1)
+                await bot.send_message(
+                    target_user["user_id"],
+                    f"🔥 <b>ЛИЧНЫЙ ВЫЗОВ В ПЕНАЛЬТИ!</b>\n\n<blockquote>👤 Соперник: <b>{user['username']}</b>\n💵 Ставка: <b><code>{stake} FC</code></b></blockquote>",
+                    reply_markup=t_kb.as_markup(), parse_mode="HTML"
+                )
+            except Exception:
+                pass
+            return web.json_response({"ok": True, "message": f"🎯 Вызов #{duel_id} отправлен игроку {target_user['username']}!"}, headers=CORS_HEADERS)
+
+    elif action == "pvp_accept":
+        duel_id = int(body.get("duel_id") or 0)
+        kick_dir = str(body.get("kick") or "C")
+        save_dir = str(body.get("save") or "C")
+        d = await db_manager.get_pvp_duel(duel_id)
+        if not d or d["status"] != "open":
+            return web.json_response({"ok": False, "error": "Этот вызов уже закрыт!"}, headers=CORS_HEADERS)
+        stake = int(d["stake"])
+        if user["balance"] < stake:
+            return web.json_response({"ok": False, "error": f"Недостаточно средств ({stake} FC)!"}, headers=CORS_HEADERS)
+
+        await db_manager.exec("UPDATE pvp_duels SET status = 'closed' WHERE duel_id = $1", duel_id)
+        await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(stake), uid)
+
+        g1, g2, log_txt = resolve_penalty_shootout(d["kick_dir"], d["save_dir"], kick_dir, save_dir)
+        bank = round(stake * 2 * 0.95, 1)
+
+        if g1 > g2:
+            await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, d["creator_id"])
+            res_headline = f"🏆 Победил {d['creator_name']} (+{bank} FC)!"
+        elif g2 > g1:
+            await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, uid)
+            res_headline = f"🏆 Ты победил (+{bank} FC)!"
+        else:
+            await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), d["creator_id"])
+            await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), uid)
+            res_headline = f"🤝 Ничья ({g1}:{g2})! Ставки возвращены."
+
+        try:
+            await bot.send_message(
+                d["creator_id"],
+                f"⚔️ <b>ИТОГ PVP-ДУЭЛИ #{duel_id}</b>\n<b>{d['creator_name']}</b> vs <b>{user['username']}</b>\n\n<blockquote>{log_txt}</blockquote>\n{res_headline}",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+        return web.json_response({"ok": True, "message": res_headline, "detail": re.sub(r"<.*?>", "", log_txt)}, headers=CORS_HEADERS)
+
+    elif action == "pvp_cancel":
+        duel_id = int(body.get("duel_id") or 0)
+        cancelled = await db_manager.cancel_pvp_duel(duel_id, uid)
+        if not cancelled:
+            return web.json_response({"ok": False, "error": "Не удалось отменить вызов"}, headers=CORS_HEADERS)
+        return web.json_response({"ok": True, "message": "✅ Вызов отменен, средства возвращены!"}, headers=CORS_HEADERS)
+
+    # 11. Настройки профиля (Любимый клуб, Никнейм, Инкогнито)
+    elif action == "set_club":
+        club = str(body.get("club") or "")
+        if club in POPULAR_CLUBS:
+            await db_manager.set_favorite_club(uid, club)
+            return web.json_response({"ok": True, "message": f"⭐ Любимый клуб: {club} (+10% к прибыли)!"}, headers=CORS_HEADERS)
+        return web.json_response({"ok": False, "error": "Клуб не найден"}, headers=CORS_HEADERS)
+
+    elif action == "set_nickname":
+        mode = str(body.get("mode") or "custom")
+        if mode == "random":
+            new_nick = generate_football_nickname()
+        else:
+            ok, val = validate_custom_nickname(str(body.get("nickname") or ""))
+            if not ok:
+                return web.json_response({"ok": False, "error": val}, headers=CORS_HEADERS)
+            new_nick = val
+        await db_manager.update_nickname(uid, new_nick)
+        return web.json_response({"ok": True, "message": f"✏️ Твой новый никнейм: {new_nick}"}, headers=CORS_HEADERS)
+
+    elif action == "toggle_incognito":
+        st = await db_manager.toggle_user_incognito(uid)
+        msg = "🕶 Инкогнито ВКЛЮЧЕН (ник скрыт в Топ-10)" if st == 1 else "👀 Инкогнито ВЫКЛЮЧЕН"
+        return web.json_response({"ok": True, "message": msg}, headers=CORS_HEADERS)
 
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
@@ -4411,6 +4860,7 @@ async def start_web_server():
     app.router.add_get("/", handle_ping)
     app.router.add_get("/app", serve_webapp_html)
     app.router.add_get("/api/state/{user_id}", api_get_state)
+    app.router.add_get("/api/match_ai/{league_key}/{event_id}", api_get_match_ai)
     app.router.add_post("/api/action", api_handle_action)
     runner = web.AppRunner(app)
     await runner.setup()
@@ -4419,12 +4869,20 @@ async def start_web_server():
     await site.start()
 
 async def setup_bot_commands():
-    commands = [
-        BotCommand(command="start", description="⚽ Главное меню"),
-        BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
-        BotCommand(command="admin", description="⚙️ Панель управления (Админ)")
-    ]
+    """Устанавливает кнопку запуска Web-App слева от поля ввода чата (MenuButtonWebApp)"""
     try:
+        if WEBAPP_BASE_URL.startswith("https://"):
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="⚽ Играть",
+                    web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app")
+                )
+            )
+        commands = [
+            BotCommand(command="start", description="⚽ Главное меню"),
+            BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
+            BotCommand(command="admin", description="⚙️ Панель управления (Админ)")
+        ]
         await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
     except Exception as e:
         logging.warning(f"Не удалось установить меню команд: {e}")
