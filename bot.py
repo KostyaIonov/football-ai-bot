@@ -4170,7 +4170,7 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
         )
 
 # ================= ВЕБ-СЕРВЕР + НОВОГОДНЕЕ ЯДРО WEBAPP И ВИДЖЕТЫ BOT API 10.4 =================
-from aiogram.types import MenuButtonWebApp, WebAppInfo
+from aiogram.types import MenuButtonWebApp, WebAppInfo, URLInputFile, InputMediaPhoto
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
@@ -4180,28 +4180,350 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type"
 }
 
-# Расширяем коллекцию карточек FUT мета-параметрами (Рейтинг OVR и новогодние иконки для Альбома)
-FUT_META = {
-    "fw_1": {"ovr": 83, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "club": "Лестер", "pack": "Базовый / Золотой"},
-    "gk_1": {"ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "club": "Эвертон", "pack": "Базовый / Золотой"},
-    "co_1": {"ovr": 85, "nation": "🇪🇸", "club": "Арсенал", "pack": "Базовый"},
-    "fw_2": {"ovr": 90, "nation": "🇪🇬", "club": "Ливерпуль", "pack": "Базовый / Золотой / ЛЧ"},
-    "fw_3": {"ovr": 91, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "club": "Бавария", "pack": "Золотой"},
-    "gk_2": {"ovr": 90, "nation": "🇧🇷", "club": "Ливерпуль", "pack": "Базовый / Золотой / ЛЧ"},
-    "co_2": {"ovr": 92, "nation": "🇩🇪", "club": "Легенда", "pack": "Золотой / ЛЧ"},
-    "fw_4": {"ovr": 95, "nation": "🇫🇷", "club": "Реал Мадрид", "pack": "Золотой / Элитный ЛЧ"},
-    "fw_5": {"ovr": 95, "nation": "🇳🇴", "club": "Ман Сити", "pack": "Элитный ЛЧ"},
-    "gk_3": {"ovr": 94, "nation": "🇧🇪", "club": "Реал Мадрид", "pack": "Элитный ЛЧ"},
-    "co_3": {"ovr": 96, "nation": "🇮🇹", "club": "Реал Мадрид", "pack": "Элитный ЛЧ"},
-    "goat_messi": {"ovr": 99, "nation": "🇦🇷", "club": "GOAT Эксклюзив", "pack": "Черный рынок"},
-    "goat_ronaldo": {"ovr": 99, "nation": "🇵🇹", "club": "GOAT Эксклюзив", "pack": "Черный рынок"},
-    "goat_yashin": {"ovr": 99, "nation": "🇷🇺", "club": "GOAT Эксклюзив", "pack": "Черный рынок"},
-    "goat_pep": {"ovr": 99, "nation": "🇪🇸", "club": "GOAT Эксклюзив", "pack": "Черный рынок"}
+# 1. ПОЛНАЯ РУСИФИКАЦИЯ ВСЕХ КОМАНД + АВТО-ТРАНСЛИТЕРАТОР ДЛЯ РЕДКИХ КЛУБОВ
+TEAM_TRANSLATIONS.update({
+    "Athletic Bilbao": "Атлетик Б", "Real Betis": "Бетис", "Rayo Vallecano": "Райо Вальекано",
+    "Celta Vigo": "Сельта", "Real Sociedad": "Реал Сосьедад", "Las Palmas": "Лас-Пальмас",
+    "Leganes": "Леганес", "Valladolid": "Вальядолид", "Getafe": "Хетафе", "Osasuna": "Осасуна",
+    "Alaves": "Алавес", "Mallorca": "Мальорка", "Girona": "Жирона", "Villarreal": "Вильярреал",
+    "Espanyol": "Эспаньол", "Sevilla": "Севилья", "Valencia": "Валенсия",
+    "Nottingham Forest": "Ноттингем Форест", "Bournemouth": "Борнмут", "Brentford": "Брентфорд",
+    "Brighton and Hove Albion": "Брайтон", "Crystal Palace": "Кристал Пэлас", "Fulham": "Фулхэм",
+    "Ipswich Town": "Ипсвич Таун", "Leicester City": "Лестер Сити", "Southampton": "Саутгемптон",
+    "West Ham United": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон", "Everton": "Эвертон",
+    "Aston Villa": "Астон Вилла", "Newcastle United": "Ньюкасл", "Tottenham Hotspur": "Тоттенхэм",
+    "Borussia Monchengladbach": "Боруссия М", "Eintracht Frankfurt": "Айнтрахт Ф",
+    "SC Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Werder Bremen": "Вердер",
+    "VfL Wolfsburg": "Вольфсбург", "FC Augsburg": "Аугсбург", "1. FC Heidenheim": "Хайденхайм",
+    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
+    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль", "VfB Stuttgart": "Штутгарт",
+    "Hellas Verona": "Верона", "Udinese": "Удинезе", "Torino": "Торино", "Empoli": "Эмполи",
+    "Cagliari": "Кальяри", "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
+    "Como": "Комо", "Parma": "Парма", "Genoa": "Дженоа", "Bologna": "Болонья",
+    "Fiorentina": "Фиорентина", "Atalanta": "Аталанта", "Lazio": "Лацио",
+    "Stade Brestois": "Брест", "RC Lens": "Ланс", "Stade Rennais": "Ренн", "Stade de Reims": "Реймс",
+    "RC Strasbourg": "Страсбур", "Toulouse": "Тулуза", "Montpellier": "Монпелье", "FC Nantes": "Нант",
+    "AJ Auxerre": "Осер", "Angers": "Анже", "AS Saint-Etienne": "Сент-Этьен", "Le Havre": "Гавр",
+    "Sporting Lisbon": "Спортинг", "SL Benfica": "Бенфика", "FC Porto": "Порту", "SC Braga": "Брага",
+    "Vitoria Guimaraes": "Витория Гим", "Moreirense": "Морейренсе", "Santa Clara": "Санта-Клара",
+    "Gil Vicente": "Жил Висенте", "Casa Pia": "Каза Пия", "Estoril": "Эшторил", "Arouca": "Арока",
+    "Famalicao": "Фамаликан", "Boavista": "Боавишта", "Nacional": "Насьонал", "Farense": "Фаренсе",
+    "AVS": "АВС", "Estrela da Amadora": "Эштрела", "Rio Ave": "Риу Аве",
+    "PSV": "ПСВ Эйндховен", "Ajax Amsterdam": "Аякс", "Feyenoord Rotterdam": "Фейеноорд",
+    "FC Twente": "Твенте", "AZ": "АЗ Алкмар", "FC Utrecht": "Утрехт", "Go Ahead Eagles": "Гоу Эхед Иглс",
+    "Fortuna Sittard": "Фортуна Ситтард", "NEC Nijmegen": "НЕК Неймеген", "SC Heerenveen": "Херенвен",
+    "PEC Zwolle": "Зволле", "NAC Breda": "НАК Бреда", "Willem II": "Виллем II", "FC Groningen": "Гронинген",
+    "Heracles Almelo": "Хераклес", "Sparta Rotterdam": "Спарта Роттердам", "Almere City": "Алмере Сити", "RKC Waalwijk": "РКК Валвейк",
+    "Fenerbahce": "Фенербахче", "Galatasaray": "Галатасарай", "Besiktas": "Бешикташ",
+    "Trabzonspor": "Трабзонспор", "Basaksehir": "Башакшехир", "Eyupspor": "Эюпспор",
+    "Goztepe": "Гёзтепе", "Samsunspor": "Самсунспор", "Sivasspor": "Сивасспор", "Kasimpasa": "Касымпаша",
+    "Konyaspor": "Коньяспор", "Alanyaspor": "Аланьяспор", "Rizespor": "Ризеспор", "Gaziantep": "Газиантеп",
+    "Antalyaspor": "Антальяспор", "Kayserispor": "Кайсериспор", "Bodrumspor": "Бодрумспор", "Hatayspor": "Хатайспор",
+    "Adana Demirspor": "Адана Демирспор", "Botafogo": "Ботафого", "Palmeiras": "Палмейрас",
+    "Fortaleza": "Форталеза", "Flamengo": "Фламенго", "Sao Paulo": "Сан-Паулу", "Bahia": "Баия",
+    "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко да Гама", "Atletico Mineiro": "Атлетико Минейро",
+    "Internacional": "Интернасьонал", "Gremio": "Гремио", "Corinthians": "Коринтианс",
+    "Fluminense": "Флуминенсе", "Vitoria": "Витория", "Juventude": "Жувентуде", "Bragantino": "Брагантино",
+    "Red Bull Bragantino": "РБ Брагантино", "Athletico Paranaense": "Атлетико Паранаэнсе", "Criciuma": "Крисиума",
+    "Cuiaba": "Куяба", "Atletico Goianiense": "Атлетико Гоияниенсе",
+    "Dinamo Zagreb": "Динамо Загреб", "Young Boys": "Янг Бойз", "Crvena Zvezda": "Црвена Звезда",
+    "Red Star Belgrade": "Црвена Звезда", "Slovan Bratislava": "Слован Братислава",
+    "Bodo/Glimt": "Будё-Глимт", "Midtjylland": "Мидтьюлланд", "FCSB": "ФКСБ Стяуа",
+    "Elfsborg": "Эльфсборг", "Malmo FF": "Мальмё", "Qarabag": "Карабах", "Ludogorets": "Лудогорец",
+    "Ferencvaros": "Ференцварош", "Maccabi Tel Aviv": "Маккаби Т-А", "Viktoria Plzen": "Виктория Пльзень",
+    "Dynamo Kyiv": "Динамо Киев", "Rigas FS": "РФШ Рига", "Union SG": "Юнион СЖ", "Twente": "Твенте",
+    "Legia Warsaw": "Легия", "Jagiellonia": "Ягеллония", "Panathinaikos": "Панатинаикос",
+    "Hearts": "Хартс", "Astana": "Астана", "Rapid Wien": "Рапид Вена", "LASK": "ЛАСК",
+    "Gent": "Гент", "Cercle Brugge": "Серкль Брюгге", "Molde": "Мольде", "Djurgarden": "Юргорден",
+    "Copenhagen": "Копенгаген", "FC Copenhagen": "Копенгаген", "Lugano": "Лугано", "St. Gallen": "Санкт-Галлен",
+    "Omonia Nicosia": "Омония", "APOEL": "АПОЭЛ", "Pafos": "Пафос", "Celje": "Целе", "Olimpija": "Олимпия",
+    "Noah": "Ноа", "Petrocub": "Петрокуб", "TSC": "ТСЦ Бачка-Топола", "Borac Banja Luka": "Борац",
+    "Shamrock Rovers": "Шемрок Роверс", "The New Saints": "ТНС", "Larne": "Ларн", "Vikingur": "Викингур",
+    "Sheffield Wednesday": "Шеффилд Уэнсдей", "Derby County": "Дерби Каунти", "Portsmouth": "Портсмут",
+    "Oxford United": "Оксфорд Юнайтед", "Plymouth Argyle": "Плимут", "Luton Town": "Лутон Таун"
+})
+
+WORD_REPLACEMENTS = {
+    "United": "Юнайтед", "City": "Сити", "Town": "Таун", "Rovers": "Роверс", "Wanderers": "Уондерерс",
+    "Athletic": "Атлетик", "Sporting": "Спортинг", "Real": "Реал", "Dynamo": "Динамо", "Dinamo": "Динамо",
+    "Lokomotiv": "Локомотив", "Spartak": "Спартак", "Torpedo": "Торпедо", "Shakhtar": "Шахтёр",
+    "Victoria": "Виктория", "Viktoria": "Виктория", "Racing": "Расинг", "Union": "Юнион",
+    "Stade": "Стад", "Olympique": "Олимпик", "Borussia": "Боруссия", "Eintracht": "Айнтрахт"
 }
 
-for _cid, _meta in FUT_META.items():
-    if _cid in FUT_CARDS:
-        FUT_CARDS[_cid].update(_meta)
+TRANSLIT_MAP = [
+    ("sch", "ш"), ("sh", "ш"), ("ch", "ч"), ("zh", "ж"), ("kh", "х"), ("ts", "ц"),
+    ("yu", "ю"), ("ya", "я"), ("yo", "ё"), ("ck", "к"), ("qu", "кв"), ("ph", "ф"), ("th", "т"),
+    ("a", "а"), ("b", "б"), ("c", "к"), ("d", "д"), ("e", "е"), ("f", "ф"), ("g", "г"),
+    ("h", "х"), ("i", "и"), ("j", "дж"), ("k", "к"), ("l", "л"), ("m", "м"), ("n", "н"),
+    ("o", "о"), ("p", "п"), ("q", "к"), ("r", "р"), ("s", "с"), ("t", "т"), ("u", "у"),
+    ("v", "в"), ("w", "в"), ("x", "кс"), ("y", "й"), ("z", "з")
+]
+
+def translate_team_ru(name: str) -> str:
+    """Гарантирует 100% перевод любого названия команды на русский язык"""
+    raw = str(name or "").strip()
+    if raw in TEAM_TRANSLATIONS:
+        return TEAM_TRANSLATIONS[raw]
+
+    cleaned = re.sub(r"\b(FC|AFC|CF|SC|AC|AS|SV|VfL|VfB|1\.|RC|CD|UD|SD|FK|SK|NK|BK|IF)\b", "", raw, flags=re.IGNORECASE).strip()
+    if cleaned in TEAM_TRANSLATIONS:
+        return TEAM_TRANSLATIONS[cleaned]
+
+    for k, v in TEAM_TRANSLATIONS.items():
+        if k.lower() == cleaned.lower():
+            return v
+
+    # Если уже на кириллице — возвращаем как есть
+    if re.search(r"[а-яА-ЯёЁ]", cleaned):
+        return cleaned
+
+    # Авто-транслитерация редких зарубежных команд
+    for eng_w, ru_w in WORD_REPLACEMENTS.items():
+        cleaned = re.sub(rf"\b{eng_w}\b", ru_w, cleaned, flags=re.IGNORECASE)
+
+    words = []
+    for w in cleaned.split():
+        if re.search(r"[а-яА-ЯёЁ]", w) or w.isdigit():
+            words.append(w)
+            continue
+        low = w.lower()
+        for lat, cyr in TRANSLIT_MAP:
+            low = low.replace(lat, cyr)
+        words.append(low.capitalize())
+    return " ".join(words) if words else raw
+
+# Подменяем глобальный переводчик команд
+globals()["translate_team"] = translate_team_ru
+
+# 2. АВТО-ПЕРЕПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ И БЫСТРЫЙ ПРИЕМ СТАВОК БЕЗ ОШИБОК СЕТИ
+_orig_db_exec = db_manager.exec
+_orig_db_fetchrow = db_manager.fetchrow
+_orig_db_fetch = db_manager.fetch
+_orig_db_fetchval = db_manager.fetchval
+
+async def _safe_db_call(func, *args):
+    for attempt in range(2):
+        try:
+            return await func(*args)
+        except Exception as e:
+            if attempt == 0 and db_manager.use_pg:
+                try:
+                    import asyncpg
+                    db_manager.pg_pool = await asyncpg.create_pool(DATABASE_URL, statement_cache_size=0)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.08)
+            else:
+                raise e
+
+db_manager.exec = lambda q, *a: _safe_db_call(_orig_db_exec, q, *a)
+db_manager.fetchrow = lambda q, *a: _safe_db_call(_orig_db_fetchrow, q, *a)
+db_manager.fetch = lambda q, *a: _safe_db_call(_orig_db_fetch, q, *a)
+db_manager.fetchval = lambda q, *a: _safe_db_call(_orig_db_fetchval, q, *a)
+
+# 3. 5-СЛОТОВАЯ СИСТЕМА FUT (FW, MID, DEF, GK, COACH) + СЫГРАННОСТЬ + КАПИТАН + ИНВЕНТАРЬ
+FUT_CARDS.clear()
+FUT_CARDS.update({
+    # Форварды (FW) — Бонус к прибыли на Тоталах (ТБ/ТМ/ИТБ)
+    "fw_1": {"id": "fw_1", "role": "FW", "tier": 1, "ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Джейми Варди", "val": 6, "desc": "+6% к прибыли на Тоталах", "pack": "Базовый"},
+    "fw_2": {"id": "fw_2", "role": "FW", "tier": 2, "ovr": 90, "nation": "🇪🇬", "name": "🥇 Мохамед Салах", "val": 11, "desc": "+11% к прибыли на Тоталах", "pack": "Золотой"},
+    "fw_3": {"id": "fw_3", "role": "FW", "tier": 2, "ovr": 91, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥇 Харри Кейн", "val": 12, "desc": "+12% к прибыли на Тоталах", "pack": "Золотой"},
+    "fw_4": {"id": "fw_4", "role": "FW", "tier": 3, "ovr": 95, "nation": "🇫🇷", "name": "💎 Килиан Мбаппе (TOTY)", "val": 17, "desc": "+17% к прибыли на Тоталах", "pack": "Элитный ЛЧ"},
+    "fw_5": {"id": "fw_5", "role": "FW", "tier": 3, "ovr": 95, "nation": "🇳🇴", "name": "💎 Эрлинг Холанд (ICON)", "val": 18, "desc": "+18% к прибыли на Тоталах", "pack": "Элитный ЛЧ"},
+    # Плеймейкеры (MID) — Бонус к прибыли на Исходах 1Х2 и Таймах
+    "mid_1": {"id": "mid_1", "role": "MID", "tier": 1, "ovr": 85, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Коул Палмер", "val": 6, "desc": "+6% к прибыли на 1Х2 и Таймах", "pack": "Базовый"},
+    "mid_2": {"id": "mid_2", "role": "MID", "tier": 2, "ovr": 91, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥇 Джуд Беллингем", "val": 12, "desc": "+12% к прибыли на 1Х2 и Таймах", "pack": "Золотой"},
+    "mid_3": {"id": "mid_3", "role": "MID", "tier": 3, "ovr": 95, "nation": "🇧🇪", "name": "💎 Кевин Де Брёйне (TOTY)", "val": 18, "desc": "+18% к прибыли на 1Х2 и Таймах", "pack": "Элитный ЛЧ"},
+    # Защитники (DEF) — Бонус к прибыли на Форах, 1Х/Х2 и ОЗ
+    "def_1": {"id": "def_1", "role": "DEF", "tier": 1, "ovr": 84, "nation": "🇫🇷", "name": "🥉 Вильям Салиба", "val": 6, "desc": "+6% к прибыли на Форах и ОЗ", "pack": "Базовый"},
+    "def_2": {"id": "def_2", "role": "DEF", "tier": 2, "ovr": 90, "nation": "🇳🇱", "name": "🥇 Вирджил ван Дейк", "val": 12, "desc": "+12% к прибыли на Форах и ОЗ", "pack": "Золотой"},
+    "def_3": {"id": "def_3", "role": "DEF", "tier": 3, "ovr": 94, "nation": "🇮🇹", "name": "💎 Паоло Мальдини (ICON)", "val": 18, "desc": "+18% к прибыли на Форах и ОЗ", "pack": "Элитный ЛЧ"},
+    # Вратари (GK) — Кэшбэк при проигрыше купона
+    "gk_1": {"id": "gk_1", "role": "GK", "tier": 1, "ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Джордан Пикфорд", "val": 8, "desc": "8% кэшбэк при проигрыше", "pack": "Базовый"},
+    "gk_2": {"id": "gk_2", "role": "GK", "tier": 2, "ovr": 90, "nation": "🇧🇷", "name": "🥇 Алиссон Бекер", "val": 14, "desc": "14% кэшбэк при проигрыше", "pack": "Золотой"},
+    "gk_3": {"id": "gk_3", "role": "GK", "tier": 3, "ovr": 95, "nation": "🇧🇪", "name": "💎 Тибо Куртуа (TOTY)", "val": 20, "desc": "20% кэшбэк при проигрыше", "pack": "Элитный ЛЧ"},
+    # Главные тренеры (COACH) — Прибавка к коэффициенту Экспресса
+    "co_1": {"id": "co_1", "role": "COACH", "tier": 1, "ovr": 85, "nation": "🇪🇸", "name": "🥉 Микель Артета", "val": 0.10, "desc": "+0.10 к кэфу Экспресса", "pack": "Базовый"},
+    "co_2": {"id": "co_2", "role": "COACH", "tier": 2, "ovr": 92, "nation": "🇩🇪", "name": "🥇 Юрген Клопп", "val": 0.20, "desc": "+0.20 к кэфу Экспресса", "pack": "Золотой"},
+    "co_3": {"id": "co_3", "role": "COACH", "tier": 3, "ovr": 96, "nation": "🇮🇹", "name": "💎 Карло Анчелотти (ICON)", "val": 0.30, "desc": "+0.30 к кэфу Экспресса", "pack": "Элитный ЛЧ"},
+    # Эксклюзивные карты Черного рынка (GOAT 99 OVR)
+    "goat_messi": {"id": "goat_messi", "role": "FW", "tier": 4, "ovr": 99, "nation": "🇦🇷", "name": "🐐 Лионель Месси (GOAT)", "val": 24, "desc": "+24% к прибыли на Тоталах", "pack": "Черный рынок"},
+    "goat_ronaldo": {"id": "goat_ronaldo", "role": "FW", "tier": 4, "ovr": 99, "nation": "🇵🇹", "name": "🐐 Криштиану Роналду (GOAT)", "val": 24, "desc": "+24% к прибыли на Тоталах", "pack": "Черный рынок"},
+    "goat_yashin": {"id": "goat_yashin", "role": "GK", "tier": 4, "ovr": 99, "nation": "🇷🇺", "name": "🐐 Лев Яшин (GOAT)", "val": 25, "desc": "25% кэшбэк при проигрыше", "pack": "Черный рынок"},
+    "goat_pep": {"id": "goat_pep", "role": "COACH", "tier": 4, "ovr": 99, "nation": "🇪🇸", "name": "🐐 Пеп Гвардиола (GOAT)", "val": 0.45, "desc": "+0.45 к кэфу Экспресса", "pack": "Черный рынок"}
+})
+
+FUT_ROLES = ["FW", "MID", "DEF", "GK", "COACH"]
+
+def parse_user_fut_state(user: dict) -> dict:
+    """Извлекает инвентарь всех открытых карт (_owned), активный состав из 5 позиций и Капитана"""
+    try:
+        raw = json.loads(user.get("fut_cards") or "{}")
+        if not isinstance(raw, dict):
+            raw = {}
+    except Exception:
+        raw = {}
+
+    owned = list(raw.get("_owned") or [])
+    squad = {}
+    for role in FUT_ROLES:
+        cid = raw.get(role, "")
+        if cid in FUT_CARDS:
+            squad[role] = cid
+            if cid not in owned:
+                owned.append(cid)
+        else:
+            squad[role] = ""
+
+    owned = [c for c in owned if c in FUT_CARDS]
+    captain = str(raw.get("_captain") or "FW")
+    if captain not in FUT_ROLES:
+        captain = "FW"
+
+    return {"squad": squad, "owned": owned, "captain": captain}
+
+def save_user_fut_json(squad: dict, owned: list, captain: str) -> str:
+    payload = {**squad, "_owned": owned, "_captain": captain}
+    return json.dumps(payload, ensure_ascii=False)
+
+def get_user_fut_buffs_v2(user: dict) -> dict:
+    st = parse_user_fut_state(user)
+    squad = st["squad"]
+    cap_role = st["captain"]
+
+    filled_slots = sum(1 for r in FUT_ROLES if squad.get(r))
+    chemistry_pct = filled_slots * 20  # 5 заполненных слотов = 100% сыгранности
+    chem_mult = 1.15 if chemistry_pct == 100 else (1.0 + filled_slots * 0.02)
+
+    def _slot_val(role_key: str) -> float:
+        cid = squad.get(role_key, "")
+        if cid not in FUT_CARDS:
+            return 0.0
+        base_v = float(FUT_CARDS[cid]["val"])
+        cap_mult = 1.25 if cap_role == role_key else 1.0
+        return round(base_v * cap_mult * chem_mult, 2)
+
+    lab_lvl = int(user.get("lab_level") or 1)
+    lab_bonus = LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["odd_bonus"]
+
+    return {
+        "fw_card": FUT_CARDS.get(squad.get("FW", "")),
+        "mid_card": FUT_CARDS.get(squad.get("MID", "")),
+        "def_card": FUT_CARDS.get(squad.get("DEF", "")),
+        "gk_card": FUT_CARDS.get(squad.get("GK", "")),
+        "co_card": FUT_CARDS.get(squad.get("COACH", "")),
+        "totals_profit_pct": round(_slot_val("FW"), 1),
+        "outcomes_profit_pct": round(_slot_val("MID"), 1),
+        "handicap_profit_pct": round(_slot_val("DEF"), 1),
+        "loss_cashback_pct": min(35.0, round(_slot_val("GK"), 1)),
+        "express_odd_boost": round(_slot_val("COACH"), 2),
+        "lab_odd_boost": round(lab_bonus + (0.04 if chemistry_pct == 100 else 0.0), 2),
+        "chemistry": chemistry_pct,
+        "captain": cap_role,
+        "owned_ids": st["owned"],
+        "squad_ids": squad
+    }
+
+globals()["get_user_fut_buffs"] = get_user_fut_buffs_v2
+
+async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
+    user = await db_manager.get_user(user_id)
+    if user["balance"] < cost:
+        return {"ok": False, "error": f"Недостаточно средств! Нужно {cost} FC."}
+
+    card = FUT_CARDS[card_id]
+    role = card["role"]
+    st = parse_user_fut_state(user)
+    squad, owned, captain = st["squad"], st["owned"], st["captain"]
+
+    cashback = 0
+    if card_id in owned:
+        cashback = int(cost * 0.45)
+        status_note = f"♻️ Дубликат! Эта карточка уже есть в твоей коллекции — начислен кэшбэк +{cashback} FC!"
+    else:
+        owned.append(card_id)
+        cur_id = squad.get(role, "")
+        cur_card = FUT_CARDS.get(cur_id)
+        if not cur_card or card["val"] > cur_card["val"]:
+            squad[role] = card_id
+            status_note = "✅ Новая карточка добавлена в коллекцию и сразу вышла в стартовый состав!"
+        else:
+            status_note = "📚 Новая карточка добавлена в твою коллекцию! Ты можешь поставить её в состав в любой момент."
+
+    new_bal = round(user["balance"] - cost + cashback, 1)
+    await db_manager.exec(
+        "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
+        new_bal, save_user_fut_json(squad, owned, captain), user_id
+    )
+    return {"ok": True, "card": card, "new_balance": new_bal, "status_note": status_note}
+
+db_manager.open_fut_pack_db = open_fut_pack_v2
+
+async def fast_create_pending_bet(
+    user_id: int, username: str, match_title: str, pick: str,
+    amount: int, odds: float, win_prob: float, settle_ts: int,
+    bet_type: str = "single", legs_json: str = "[]"
+) -> dict:
+    """Мгновенное создание ставки без блокировок на отправке уведомлений в Telegram"""
+    user = await db_manager.get_user(user_id, username)
+    if amount < 10:
+        return {"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}
+    if user["balance"] < amount:
+        return {"ok": False, "error": f"Недостаточно средств! Твой баланс: {round(user['balance'], 1)} FC."}
+
+    is_all_in = 1 if (user["balance"] - amount < 10.0) else 0
+    fav_club = user.get("favorite_club") or ""
+    is_fav_club = 1 if (fav_club and (fav_club in match_title or fav_club in pick)) else 0
+
+    buffs = get_user_fut_buffs_v2(user)
+    final_odds = round(odds + buffs["lab_odd_boost"], 2)
+    if bet_type == "express" and buffs["express_odd_boost"] > 0:
+        final_odds = round(final_odds + buffs["express_odd_boost"], 2)
+
+    active_booster = user.get("active_booster") or ""
+    booster_used = ""
+    if active_booster == "boost035":
+        final_odds = round(final_odds + 0.35, 2)
+        booster_used = "boost035"
+    elif active_booster == "insure50":
+        booster_used = "insure50"
+
+    new_balance = round(user["balance"] - amount, 1)
+    created_str = now_msk().strftime("%d.%m %H:%M")
+
+    await db_manager.exec("UPDATE users SET balance = $1, active_booster = '' WHERE user_id = $2", new_balance, user_id)
+
+    if db_manager.use_pg:
+        bet_id = await db_manager.fetchval("""
+            INSERT INTO bets (
+                user_id, match_title, pick, amount, odds, status, bet_type,
+                win_prob, settle_ts, created_at, legs_json, booster_used, is_all_in, is_fav_club
+            ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13) RETURNING bet_id
+        """, user_id, match_title, pick, amount, final_odds, bet_type, win_prob, settle_ts, created_str, legs_json, booster_used, is_all_in, is_fav_club)
+    else:
+        async with aiosqlite.connect(db_manager.sqlite_path) as db:
+            cur = await db.execute("""
+                INSERT INTO bets (
+                    user_id, match_title, pick, amount, odds, status, bet_type,
+                    win_prob, settle_ts, created_at, legs_json, booster_used, is_all_in, is_fav_club
+                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, match_title, pick, amount, final_odds, bet_type, win_prob, settle_ts, created_str, legs_json, booster_used, is_all_in, is_fav_club))
+            bet_id = cur.lastrowid
+            await db.commit()
+
+    # Разблокируем трофеи строго в фоновом потоке, чтобы ответ WebApp вернулся за 0.01 сек!
+    asyncio.create_task(db_manager.unlock_achievement(user_id, "first_bet"))
+    if bet_type == "express":
+        asyncio.create_task(db_manager.unlock_achievement(user_id, "first_express"))
+
+    return {
+        "ok": True, "bet_id": bet_id, "final_odds": final_odds,
+        "booster_used": booster_used, "is_fav_club": is_fav_club,
+        "new_balance": new_balance, "potential_win": round(amount * final_odds, 1)
+    }
+
+db_manager.create_pending_bet = fast_create_pending_bet
 
 # Расширяем список трофеев до 25 достижений
 ACHIEVEMENTS_CONFIG.update({
@@ -4209,7 +4531,7 @@ ACHIEVEMENTS_CONFIG.update({
     "exact_score": {"title": "🎯 Снайпер точного счета", "desc": "Угадать точный счет футбольного матча", "reward": 3500},
     "first_half_win": {"title": "⏱ Доминатор 1-го тайма", "desc": "Выиграть ставку на исход или тотал 1-го тайма", "reward": 600},
     "secret_agent": {"title": "🕵️‍♂️ Секретный агент ИИ", "desc": "Заключить пари по Секретной ставке дня", "reward": 450},
-    "fut_full_squad": {"title": "👕 Полный боекомплект", "desc": "Экипировать Форварда, Вратаря и Тренера в FUT", "reward": 1500},
+    "fut_full_squad": {"title": "👕 Полная сыгранность (100%)", "desc": "Заполнить все 5 позиций в составе FUT", "reward": 1500},
     "stadium_lvl_5": {"title": "🏟 Архитектор Колизея", "desc": "Построить стадион 5-го уровня", "reward": 2500},
     "stadium_lvl_10": {"title": "👑 Император Арен", "desc": "Возвести Мега-Арену Легенд (10 уровень)", "reward": 15000},
     "pvp_gladiator": {"title": "⚔️ Гладиатор пенальти", "desc": "Одержать 5 побед в PvP-дуэлях", "reward": 1500},
@@ -4217,22 +4539,16 @@ ACHIEVEMENTS_CONFIG.update({
     "matchday_vip": {"title": "🎟 Аншлаг в VIP-ложе", "desc": "Провести домашний Матчдэй с VIP-тарифом билетов", "reward": 650}
 })
 
-# Ежедневные спонсорские контракты для Стадиона (Фича 4)
 STADIUM_SPONSORS = [
     {"id": "sp_bet", "name": "🎄 Winter Cup Energy", "task": "Активный купон в игре сегодня", "bonus": 350},
     {"id": "sp_exp", "name": "⚡ CyberBet Arena", "task": "Экспресс или серия от 1 победы", "bonus": 550},
     {"id": "sp_vip", "name": "👑 Emirates Gold", "task": "Собранный состав FUT + ставка дня", "bonus": 800}
 ]
 
-USER_STADIUM_PREFS = {}  # {user_id: {"ticket": "optimal", "sponsor": "sp_bet"}}
-ACTIVE_LIVE_WIDGETS = {}  # {chat_id: {"message_id": int, "user_id": int}}
+USER_STADIUM_PREFS = {}
+ACTIVE_LIVE_WIDGETS = {}
 
-# ================= МГНОВЕННЫЙ КЭШ БЕЗ ЗАВИСАНИЙ ПРИ ПРИЕМЕ СТАВКИ =================
 async def get_matches_instant() -> dict:
-    """
-    Возвращает расписание из оперативной памяти за 0.001 сек без ожидания внешних HTTP-запросов!
-    Если кэш старше 5 минут — запускает тихое обновление в фоне, не задерживая нажатие кнопки игрока.
-    """
     now_ts = int(now_msk().timestamp())
     if SCHEDULE_CACHE["data"]:
         if now_ts - SCHEDULE_CACHE["updated_at"] > CACHE_TTL:
@@ -4240,19 +4556,18 @@ async def get_matches_instant() -> dict:
         return SCHEDULE_CACHE["data"]
     return await get_real_matches()
 
-# ================= РАСШИРЕННЫЙ КАЛЬКУЛЯТОР КОТИРОВОК (ТОЧНЫЙ СЧЕТ, ТАЙМЫ, ТОТАЛЫ) =================
+# ================= КАЛЬКУЛЯТОР 45+ РЫНКОВ (ТОЧНЫЙ СЧЕТ, ТАЙМЫ, ТОТАЛЫ) =================
 _orig_evaluate_custom_market = evaluate_custom_market
 _orig_evaluate_leg_result = evaluate_leg_result
 
 def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
     code = pick_code.lower()
-    t1, t2 = match["home_team"], match["away_team"]
+    t1, t2 = translate_team_ru(match["home_team"]), translate_team_ru(match["away_team"])
     lam_h = match.get("lam_h", 1.45)
     lam_a = match.get("lam_a", 1.20)
     lam_total = match.get("exp_goals", 2.65)
     odds = match["odds"]
 
-    # 1. Точный счёт (cs_X_Y)
     if code.startswith("cs_"):
         parts = code.split("_")
         if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
@@ -4260,14 +4575,8 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             p_score = poisson_pmf(gh, lam_h) * poisson_pmf(ga, lam_a)
             p_clean = max(0.035, min(0.22, p_score))
             odd_cs = round(max(5.20, min(29.0, 1.0 / (p_clean * 1.08))), 2)
-            return {
-                "pick_code": code,
-                "label": f"Точный счёт {gh}:{ga}",
-                "odds": odd_cs,
-                "prob": round(p_clean * 100, 1)
-            }
+            return {"pick_code": code, "label": f"Точный счёт {gh}:{ga}", "odds": odd_cs, "prob": round(p_clean * 100, 1)}
 
-    # 2. Рынки 1-го тайма (h1_p1, h1_x, h1_p2, h1_tb_0.5, h1_tb_1.5, h1_tm_1.5)
     if code.startswith("h1_"):
         lam_h1 = lam_total * 0.44
         p_0 = math.exp(-lam_h1)
@@ -4292,9 +4601,8 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             return {"pick_code": code, "label": "1-й тайм: ТБ 1.5", "odds": odd_v, "prob": round(p_tb15 * 100, 1)}
         elif code == "h1_tm_1.5":
             odd_v = round(max(1.28, 1.0 / ((1.0 - p_tb15) * 1.05)), 2)
-            return {"pick_code": code, "label": "1-й тайм: ТМ 1.5", "odds": odd_v, "prob": round((1.0 - p_tb15) * 100, 1)}
+            return {"pick_code": code, "label": "1-й тайм: ТМ 1.5", "odds": odd_v, "prob": round((1.0 - p_tb15) * 1.00, 1)}
 
-    # 3. Голы в обоих таймах
     if code in ("bh_yes", "bh_no"):
         lam_h1 = lam_total * 0.44
         lam_h2 = lam_total * 0.56
@@ -4311,12 +4619,10 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
 def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str:
     code = pick_code.lower()
     total = home_score + away_score
-
     if code.startswith("cs_"):
         parts = code.split("_")
         if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
             return "win" if (home_score == int(parts[1]) and away_score == int(parts[2])) else "loss"
-
     if code == "h1_tb_0.5":
         return "win" if total >= 1 else "loss"
     elif code == "h1_tb_1.5":
@@ -4333,22 +4639,14 @@ def evaluate_leg_result(pick_code: str, home_score: int, away_score: int) -> str
         return "win" if total >= 2 else "loss"
     elif code == "bh_no":
         return "win" if total <= 1 else "loss"
-
     return _orig_evaluate_leg_result(pick_code, home_score, away_score)
 
-# ================= ФИЧА 2 (БИТВА ИИ) И ФИЧА 3 (РАДАР ТОЛПА VS ТОП-10) =================
 def build_ai_battle_and_radar(m: dict) -> tuple[dict, dict]:
-    """
-    Генерирует для каждого матча:
-    1) Битву двух ИИ-аналитиков: Прагматик (xG-математик) vs Романтик (Охотник за кэфами).
-    2) Радар ставок: выбор большинства vs ставка игроков из Топ-10 (Smart Money).
-    """
     o = m["odds"]
     probs = calculate_ai_probabilities(o)
-    t1, t2 = m["home_team"], m["away_team"]
+    t1, t2 = translate_team_ru(m["home_team"]), translate_team_ru(m["away_team"])
     exp_g = m["exp_goals"]
 
-    # Прагматик (надежный математический выбор)
     if probs["p1"] >= 56:
         prag_mkt = evaluate_custom_market(m, "f10") or {"pick_code": "1x", "label": f"1Х ({t1})", "odds": o["1x"]}
         prag_text = f"Домашний xG {t1} составляет {m.get('lam_h', 1.5)}. Подстраховка нулевой форой исключает риск ничьей."
@@ -4359,70 +4657,56 @@ def build_ai_battle_and_radar(m: dict) -> tuple[dict, dict]:
         prag_mkt = evaluate_custom_market(m, "tb_1.5") or {"pick_code": "tb_1.5", "label": "ТБ 1.5", "odds": o["tb15"]}
         prag_text = f"Суммарный потенциал атаки {exp_g} xG дает 82% вероятности минимум на 2 забитых мяча."
 
-    # Романтик (дерзкий выбор с высоким коэффициентом)
     cs_code = "cs_" + m.get("best_score", "2:1").replace(":", "_")
     if exp_g >= 2.75:
         rom_mkt = evaluate_custom_market(m, "bh_yes") or {"pick_code": "btts", "label": "Обе забьют: Да", "odds": o["btts"]}
-        rom_text = f"Оборона обеих команд оставляет свободные зоны! Жду открытый футбол и голы в обоих таймах."
+        rom_text = "Оборона обеих команд оставляет свободные зоны! Жду открытый футбол и голы в обоих таймах."
     elif abs(probs["p1"] - probs["p2"]) <= 12:
         rom_mkt = evaluate_custom_market(m, cs_code) or {"pick_code": "x", "label": "Ничья (Х)", "odds": o["x"]}
-        rom_text = f"Абсолютно равные соперники ({probs['p1']}% vs {probs['p2']}%). Идеальный сценарий для охоты за большим кэфом!"
+        rom_text = f"Равные соперники ({probs['p1']}% vs {probs['p2']}%). Идеальный сценарий для охоты за большим кэфом!"
     else:
         rom_mkt = evaluate_custom_market(m, "h1_tb_1.5") or {"pick_code": "tb_2.5", "label": "ТБ 2.5", "odds": o["tb25"]}
-        rom_text = f"Фаворит пойдет в агрессивный прессинг с первых минут — ждем быстрые голы уже до перерыва!"
+        rom_text = "Фаворит пойдет в агрессивный прессинг с первых минут — ждем быстрые голы уже до перерыва!"
 
     ai_battle = {
         "pragmatist": {
-            "name": "📊 Алгоритм xG (Прагматик)",
-            "text": prag_text,
-            "pick_code": prag_mkt["pick_code"],
-            "pick_label": prag_mkt["label"],
-            "odds": prag_mkt["odds"]
+            "name": "📊 Алгоритм xG (Прагматик)", "text": prag_text,
+            "pick_code": prag_mkt["pick_code"], "pick_label": prag_mkt["label"], "odds": prag_mkt["odds"]
         },
         "romantic": {
-            "name": "🔥 Кураж-Скаут (Романтик)",
-            "text": rom_text,
-            "pick_code": rom_mkt["pick_code"],
-            "pick_label": rom_mkt["label"],
-            "odds": rom_mkt["odds"]
+            "name": "🔥 Кураж-Скаут (Романтик)", "text": rom_text,
+            "pick_code": rom_mkt["pick_code"], "pick_label": rom_mkt["label"], "odds": rom_mkt["odds"]
         }
     }
 
-    # Радар «Толпа vs Топ-10 капперов»
     seed_val = sum(ord(c) for c in str(m["event_id"]))
     crowd_p1 = min(82, max(14, int(probs["p1"] + (seed_val % 9) - 4)))
     crowd_x = min(35, max(10, int(probs["x"])))
     crowd_p2 = max(8, 100 - crowd_p1 - crowd_x)
 
-    if exp_g >= 2.65:
-        smart_mkt = evaluate_custom_market(m, "tb_2.5")
-    elif probs["p1"] >= probs["p2"]:
-        smart_mkt = evaluate_custom_market(m, "itb1_1.5")
-    else:
-        smart_mkt = evaluate_custom_market(m, "itb2_1.5")
-
+    smart_mkt = evaluate_custom_market(m, "tb_2.5" if exp_g >= 2.65 else ("itb1_1.5" if probs["p1"] >= probs["p2"] else "itb2_1.5"))
     if not smart_mkt:
         smart_mkt = {"pick_code": "btts", "label": "Обе забьют: Да", "odds": o["btts"]}
 
     radar = {
-        "crowd_p1": crowd_p1,
-        "crowd_x": crowd_x,
-        "crowd_p2": crowd_p2,
+        "crowd_p1": crowd_p1, "crowd_x": crowd_x, "crowd_p2": crowd_p2,
         "smart_money": {
-            "title": "👑 Выбор Топ-10 капперов (Smart Money)",
-            "pick_code": smart_mkt["pick_code"],
-            "pick_label": smart_mkt["label"],
-            "odds": smart_mkt["odds"],
-            "share_pct": 68 + (seed_val % 19)
+            "title": "👑 Выбор Топ-10 капперов",
+            "pick_code": smart_mkt["pick_code"], "pick_label": smart_mkt["label"],
+            "odds": smart_mkt["odds"], "share_pct": 68 + (seed_val % 19)
         }
     }
     return ai_battle, radar
 
 def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
+    # Гарантируем перевод названий команд на русский язык даже для закэшированных матчей
+    m["home_team"] = translate_team_ru(m["home_team"])
+    m["away_team"] = translate_team_ru(m["away_team"])
+    m["teams"] = f"{m['home_team']} — {m['away_team']}"
+
     odds = m["odds"]
     probs = calculate_ai_probabilities(odds)
 
-    # 1. Тоталы (от 1.5 до 3.5)
     totals_list = []
     for line_val in ["1.5", "2.0", "2.5", "3.0", "3.5"]:
         tb_m = evaluate_custom_market(m, f"tb_{line_val}")
@@ -4434,7 +4718,6 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
                 "tm_code": tm_m["pick_code"], "tm_odd": tm_m["odds"], "tm_label": tm_m["label"]
             })
 
-    # 2. Индивидуальные тоталы ИТБ
     itb_list = []
     for line_val in ["0.5", "1.5", "2.5"]:
         i1 = evaluate_custom_market(m, f"itb1_{line_val}")
@@ -4446,14 +4729,12 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
                 "itb2_code": i2["pick_code"], "itb2_odd": i2["odds"], "itb2_label": i2["label"]
             })
 
-    # 3. 1-й Тайм и Голы в обоих таймах
     half_markets = []
     for h_code in ["h1_p1", "h1_x", "h1_p2", "h1_tb_0.5", "h1_tb_1.5", "h1_tm_1.5", "bh_yes", "bh_no"]:
         hm = evaluate_custom_market(m, h_code)
         if hm:
             half_markets.append(hm)
 
-    # 4. Точный счёт (12 популярных вариантов)
     exact_scores = []
     for sc_pair in ["1_0", "2_0", "2_1", "3_0", "3_1", "0_0", "1_1", "2_2", "0_1", "0_2", "1_2", "0_3"]:
         c_mkt = evaluate_custom_market(m, f"cs_{sc_pair}")
@@ -4470,42 +4751,54 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
     is_top_banner = (elite_score >= 30 or l_key in ("ucl", "epl", "laliga", "rpl") or bool(m.get("is_live")))
 
     return {
-        "event_id": m["event_id"],
-        "league_key": l_key,
-        "league_title": l_title,
-        "teams": m["teams"],
-        "home_team": m["home_team"],
-        "away_team": m["away_team"],
+        "event_id": m["event_id"], "league_key": l_key, "league_title": l_title,
+        "teams": m["teams"], "home_team": m["home_team"], "away_team": m["away_team"],
         "venue": m.get("venue", "Центральная арена"),
-        "is_live": bool(m.get("is_live")),
-        "live_score": m.get("live_score", "0:0"),
-        "live_detail": m.get("live_detail", ""),
-        "date": m["date"],
-        "short_date": m["short_date"],
-        "start_ts": m["start_ts"],
-        "exp_goals": m["exp_goals"],
-        "lam_h": m.get("lam_h", 1.4),
-        "lam_a": m.get("lam_a", 1.2),
-        "best_score": m["best_score"],
-        "h_stats": m.get("h_stats", {}),
-        "a_stats": m.get("a_stats", {}),
-        "odds": odds,
-        "probs": probs,
-        "totals_markets": totals_list,
-        "itb_markets": itb_list,
-        "half_markets": half_markets,
-        "exact_scores": exact_scores,
-        "ai_battle": ai_battle,
-        "radar": radar,
-        "is_top": is_top_banner
+        "is_live": bool(m.get("is_live")), "live_score": m.get("live_score", "0:0"), "live_detail": m.get("live_detail", ""),
+        "date": m["date"], "short_date": m["short_date"], "start_ts": m["start_ts"],
+        "exp_goals": m["exp_goals"], "lam_h": m.get("lam_h", 1.4), "lam_a": m.get("lam_a", 1.2),
+        "best_score": m["best_score"], "h_stats": m.get("h_stats", {}), "a_stats": m.get("a_stats", {}),
+        "odds": odds, "probs": probs, "totals_markets": totals_list, "itb_markets": itb_list,
+        "half_markets": half_markets, "exact_scores": exact_scores,
+        "ai_battle": ai_battle, "radar": radar, "is_top": is_top_banner
     }
 
-# ================= ИНТЕРАКТИВНЫЙ ВИДЖЕТ BOT API 10.4 В ЧАТЕ (ЖИВОЙ ЦЕНТР МАТЧА) =================
+# ================= ГРАФИЧЕСКИЙ ВИДЖЕТ LIVE-ЦЕНТРА В ЧАТЕ (BOT API 10.4 STYLE) =================
+def build_svg_scoreboard_card(l_title: str, t1: str, t2: str, score_Or_vs: str, status_txt: str, exp_g: float, best_sc: str, user_bal: float, coupon_txt: str) -> bytes:
+    """Генерирует стильное графическое окно-виджет в духе Web-App для отображения прямо в чате"""
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="440" viewBox="0 0 800 440">
+        <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#0b192c"/>
+                <stop offset="50%" stop-color="#060c17"/>
+                <stop offset="100%" stop-color="#040810"/>
+            </linearGradient>
+            <linearGradient id="pill" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#00e676"/>
+                <stop offset="100%" stop-color="#00b0ff"/>
+            </linearGradient>
+        </defs>
+        <rect width="800" height="440" rx="28" fill="url(#bg)" stroke="#1e3a5f" stroke-width="4"/>
+        <rect x="24" y="22" width="752" height="54" rx="16" fill="#112239" stroke="#23456e" stroke-width="1.5"/>
+        <circle cx="52" cy="49" r="9" fill="#ff5252"/>
+        <text x="72" y="55" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="bold">LIVE MATCH CENTER • {l_title}</text>
+        <text x="752" y="55" fill="#00e676" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="end">Банк: {user_bal} FC</text>
+
+        <rect x="24" y="92" width="752" height="190" rx="22" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="2"/>
+        <text x="190" y="185" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">{t1[:16]}</text>
+        <rect x="330" y="135" width="140" height="72" rx="18" fill="#162a45" stroke="#ffca28" stroke-width="2.5"/>
+        <text x="400" y="183" fill="#ffca28" font-family="Arial, sans-serif" font-size="34" font-weight="bold" text-anchor="middle">{score_Or_vs}</text>
+        <text x="610" y="185" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">{t2[:16]}</text>
+        <text x="400" y="118" fill="#80d8ff" font-family="Arial, sans-serif" font-size="17" font-weight="bold" text-anchor="middle">{status_txt}</text>
+        <text x="400" y="252" fill="#94a3b8" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">Потенциал модели: {exp_g} xG  •  Точный счет ИИ: {best_sc}</text>
+
+        <rect x="24" y="300" width="752" height="114" rx="18" fill="#102036" stroke="#00e676" stroke-width="1.8"/>
+        <text x="48" y="338" fill="#00e676" font-family="Arial, sans-serif" font-size="19" font-weight="bold">АКТИВНЫЙ ТРЕКЕР КУПОНА В РЕАЛЬНОМ ВРЕМЕНИ:</text>
+        <text x="48" y="376" fill="#f8fafc" font-family="Arial, sans-serif" font-size="20" font-weight="bold">{coupon_txt[:58]}</text>
+    </svg>"""
+    return svg.encode("utf-8")
+
 async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
-    """
-    Формирует автообновляемый интерактивный виджет «Живой Центр Матча и Трекер Купона» в чате бота.
-    Поддерживает скрытый ответ для Секретной ставки дня и прямой запуск WebApp.
-    """
     db = await get_matches_instant()
     user = await db_manager.get_user(user_id)
     active_bets = await db_manager.get_user_bets(user_id, active_only=True)
@@ -4516,50 +4809,67 @@ async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeybo
             all_m.append((l_k, l_v["title"], m))
     all_m.sort(key=lambda x: (0 if x[2].get("is_live") else 1, x[2]["start_ts"]))
 
-    now_str = now_msk().strftime("%H:%M:%S МСК")
+    now_str = now_msk().strftime("%H:%M:%S")
     if all_m:
-        l_k, l_title, center_m = all_m[0]
-        is_live = bool(center_m.get("is_live"))
-        st_badge = f"🔴 <b>LIVE ({center_m.get('live_detail', 'В игре')}) • Счет: <code>{center_m.get('live_score', '0:0')}</code></b>" if is_live else f"🕒 Старт: <code>{center_m['short_date']} МСК</code>"
-        o = center_m["odds"]
-        match_block = (
-            f"🏟 <b>{l_title}</b>\n"
-            f"⚽ <b>{center_m['teams']}</b>\n"
-            f"{st_badge}\n"
-            f"📊 Котировки: П1 <code>{o['p1']}</code> | Х <code>{o['x']}</code> | П2 <code>{o['p2']}</code> | ТБ 2.5 <code>{o['tb25']}</code>\n"
-            f"🤖 Ожидание ИИ: <b><code>{center_m['exp_goals']} xG</code></b> (Точный счет: <code>{center_m['best_score']}</code>)"
+        l_k, l_title, cm = all_m[0]
+        t1, t2 = translate_team_ru(cm["home_team"]), translate_team_ru(cm["away_team"])
+        is_live = bool(cm.get("is_live"))
+        o = cm["odds"]
+        probs = calculate_ai_probabilities(o)
+        bar_blocks = max(1, min(9, round(probs["p1"] / 10)))
+        visual_bar = "🟦" * bar_blocks + "⬜" * (10 - bar_blocks)
+
+        status_line = f"🔴 <b>LIVE • {cm.get('live_detail', 'В игре')}</b>" if is_live else f"🕒 Старт: <b>{cm['short_date']} МСК</b>"
+        score_box = f"<b><code>[ {cm.get('live_score', '0 : 0')} ]</code></b>" if is_live else "<b><code>[ VS ]</code></b>"
+
+        match_card = (
+            f"╭──────────────────────────╮\n"
+            f"  {l_title} • {status_line}\n"
+            f"  🏠 <b>{t1}</b>  {score_box}  <b>{t2}</b> ✈️\n"
+            f"  📊 Перевес: {visual_bar} ({probs['p1']}% / {probs['p2']}%)\n"
+            f"  🎯 <code>П1 {o['p1']}</code>  •  <code>Х {o['x']}</code>  •  <code>П2 {o['p2']}</code>  •  <code>ТБ2.5 {o['tb25']}</code>\n"
+            f"  🤖 Модель xG: <b>{cm['exp_goals']}</b> | Счёт ИИ: <b>{cm['best_score']}</b>\n"
+            f"╰──────────────────────────╯"
         )
     else:
-        match_block = "📡 <i>Синхронизация расписания матчей...</i>"
+        l_k, cm = "ucl", None
+        match_card = "📡 <i>Синхронизация матчей...</i>"
 
     if active_bets:
         b = active_bets[0]
-        coupon_block = (
-            f"🎫 <b>Твой активный купон #{b['bet_id']}:</b>\n"
-            f"• {b['match_title']} — <code>{b['pick']}</code> (Кэф <b>{b['odds']}</b>)\n"
-            f"• Потенциальная выплата: <b><code>{round(b['amount'] * b['odds'], 1)} FC</code></b>"
+        coupon_card = (
+            f"🎫 <b>Твой активный купон #{b['bet_id']} (Кэф {b['odds']}):</b>\n"
+            f"• {b['match_title']} — <code>{b['pick']}</code>\n"
+            f"• Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{round(b['amount'] * b['odds'], 1)} FC</code></b>"
         )
     else:
-        coupon_block = "🎫 <i>У тебя сейчас нет активных купонов в игре — открой приложение, чтобы собрать пресс!</i>"
+        coupon_card = "🎫 <i>Нет активных ставок — нажми на кнопку ниже, чтобы открыть интерактивный Live-Центр!</i>"
 
     text = (
-        f"🎄 <b>ЖИВОЙ ЦЕНТР МАТЧА • LIVE WIDGET</b>\n"
-        f"<i>🔄 Автообновление в реальном времени ({now_str})</i>\n\n"
-        f"<blockquote>{match_block}</blockquote>\n"
-        f"<blockquote>💰 Твой банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n"
-        f"{coupon_block}</blockquote>"
+        f"📱 <b>LIVE MATCH CENTER • MINI-APP WIDGET</b>\n"
+        f"<i>⚡ Автообновление табло в реальном времени ({now_str} МСК)</i>\n\n"
+        f"{match_card}\n\n"
+        f"<blockquote>💰 Банк: <b><code>{round(user['balance'], 1)} FC</code></b>\n{coupon_card}</blockquote>"
     )
 
     builder = InlineKeyboardBuilder()
     if WEBAPP_BASE_URL.startswith("https://"):
         builder.button(
-            text="📱 Открыть Матч-Центр в WebApp",
-            web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app?uid={user_id}")
+            text="🔴 Открыть интерактивное окно Live-Центра",
+            web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app?uid={user_id}&view=live")
         )
+    if cm and not cm.get("is_live"):
+        builder.button(text=f"⚡ П1 ({cm['odds']['p1']})", callback_data=f"pick:{l_k}:{cm['event_id']}:p1")
+        builder.button(text=f"⚡ Х ({cm['odds']['x']})", callback_data=f"pick:{l_k}:{cm['event_id']}:x")
+        builder.button(text=f"⚡ П2 ({cm['odds']['p2']})", callback_data=f"pick:{l_k}:{cm['event_id']}:p2")
     builder.button(text="🕵️‍♂️ Секретная ставка дня (Скрытый ответ)", callback_data="widget_secret_bet")
-    builder.button(text="🔄 Обновить табло сейчас", callback_data="widget_refresh_now")
-    builder.button(text="🏠 В главное меню", callback_data="back_to_main")
-    builder.adjust(1, 1, 2)
+    builder.button(text="🔄 Синхронизировать", callback_data="widget_refresh_now")
+    builder.button(text="🏠 Меню", callback_data="back_to_main")
+
+    if cm and not cm.get("is_live"):
+        builder.adjust(1, 3, 1, 2)
+    else:
+        builder.adjust(1, 1, 2)
     return text, builder.as_markup()
 
 @dp.message(Command("live"))
@@ -4573,7 +4883,7 @@ async def process_open_live_widget(callback: CallbackQuery):
     text, kb = await build_live_match_center_widget(callback.from_user.id)
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     ACTIVE_LIVE_WIDGETS[callback.message.chat.id] = {"message_id": callback.message.message_id, "user_id": callback.from_user.id}
-    await callback.answer("🔴 Живой виджет активирован!")
+    await callback.answer("🔴 Виджет Live-Центра запущен!")
 
 @dp.callback_query(F.data == "widget_refresh_now")
 async def process_widget_refresh_now(callback: CallbackQuery):
@@ -4582,11 +4892,10 @@ async def process_widget_refresh_now(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     except Exception:
         pass
-    await callback.answer("📡 Данные виджета синхронизированы!")
+    await callback.answer("📡 Табло обновлено!")
 
 @dp.callback_query(F.data == "widget_secret_bet")
 async def process_widget_secret_bet(callback: CallbackQuery):
-    """Скрытый ответ (Ephemeral Alert): видит только пользователь, нажавший кнопку в чате"""
     user = await db_manager.get_user(callback.from_user.id)
     db = await get_matches_instant()
     top_m = get_top_6_upcoming_matches(db)
@@ -4599,36 +4908,32 @@ async def process_widget_secret_bet(callback: CallbackQuery):
     if lab_lvl < 2:
         await callback.answer(
             f"🔒 Секретная ставка дня доступна со 2-го уровня ИИ-Лаборатории!\n\n"
-            f"Подсказка скаута: обрати внимание на матч {best_m['teams']} (ожидание {best_m['exp_goals']} xG).",
+            f"Подсказка скаута: обрати внимание на матч {translate_team_ru(best_m['home_team'])} — {translate_team_ru(best_m['away_team'])} ({best_m['exp_goals']} xG).",
             show_alert=True
         )
         return
     await callback.answer(
         f"🕵️‍♂️ СЕКРЕТНАЯ СТАВКА ДНЯ (ТОЛЬКО ДЛЯ ТЕБЯ):\n\n"
-        f"🏟 {best_m['teams']} ({best_m['short_date']})\n"
+        f"🏟 {translate_team_ru(best_m['home_team'])} — {translate_team_ru(best_m['away_team'])} ({best_m['short_date']})\n"
         f"🎯 Исход: {mkt['label']} • Кэф {mkt['odds']}\n"
         f"📊 Вероятность по модели ИИ: {mkt['prob']}% ({best_m['exp_goals']} xG)",
         show_alert=True
     )
 
 async def live_widget_updater_worker():
-    """Фоновый поток Bot API 10.4: обновляет открытые в чатах виджеты в реальном времени без действий игрока"""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(55)
         for chat_id, info in list(ACTIVE_LIVE_WIDGETS.items()):
             try:
                 text, kb = await build_live_match_center_widget(info["user_id"])
                 await bot.edit_message_text(
-                    text=text,
-                    chat_id=chat_id,
-                    message_id=info["message_id"],
-                    reply_markup=kb,
-                    parse_mode="HTML"
+                    text=text, chat_id=chat_id, message_id=info["message_id"],
+                    reply_markup=kb, parse_mode="HTML"
                 )
             except Exception:
                 ACTIVE_LIVE_WIDGETS.pop(chat_id, None)
 
-# ================= REST API HANDLERS ДЛЯ НОВОГОДНЕГО WEBAPP =================
+# ================= REST API HANDLERS ДЛЯ WEBAPP =================
 async def handle_options(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -4662,23 +4967,24 @@ async def api_get_match_ai(request):
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
     league_title = l_data.get("title", "Турнир")
+    t1, t2 = translate_team_ru(match["home_team"]), translate_team_ru(match["away_team"])
     cache_k = f"live_{match['event_id']}_{match.get('live_score', '')}" if is_live else match["event_id"]
 
     if is_live:
         prompt = (
             f"Матч идет в ПРЯМОМ ЭФИРЕ (LIVE). Турнир: {league_title}.\n"
-            f"Матч: {match['home_team']} — {match['away_team']}. Текущий счет: {match['live_score']} ({match['live_detail']}).\n"
-            f"Потенциал xG: {match['exp_goals']}. Сезон: {match['records_info']}.\n"
-            f"Дай краткий живой комментарий (до 45 слов) в 2 пункта:\n"
+            f"Матч: {t1} — {t2}. Текущий счет: {match['live_score']} ({match['live_detail']}).\n"
+            f"Потенциал xG: {match['exp_goals']}.\n"
+            f"Дай краткий живой комментарий на русском языке (до 45 слов) в 2 пункта:\n"
             f"1. 🔴 Оценка хода игры по текущему счету.\n2. 📊 Ожидания на остаток матча."
         )
         ai_text = await ask_ai_cached(cache_k, prompt, ttl=300) or smart_local_match_analysis(match, probs)
     else:
         prompt = (
             f"Предстоящий матч. Турнир: {league_title}. Дата: {match['date']}.\n"
-            f"Хозяева: {match['home_team']}. Гости: {match['away_team']}. Статистика: {match['records_info']}.\n"
+            f"Хозяева: {t1}. Гости: {t2}.\n"
             f"Ожидаемые голы xG: {match['exp_goals']}. Линия: П1={odds['p1']}, Х={odds['x']}, П2={odds['p2']}, ТБ 2.5={odds['tb25']}, ОЗ={odds['btts']}.\n"
-            f"Дай краткий разбор (до 50 слов) в 2 пункта:\n1. ⚔️ Тактика и форма команд.\n2. 🎯 Главный аргумент по тоталу или исходу."
+            f"Дай краткий разбор строго на русском языке (до 50 слов) в 2 пункта:\n1. ⚔️ Тактика и форма команд.\n2. 🎯 Главный аргумент по тоталу или исходу."
         )
         ai_text = await ask_ai_cached(cache_k, prompt) or smart_local_match_analysis(match, probs)
 
@@ -4689,6 +4995,55 @@ async def api_get_match_ai(request):
         "live_detail": match.get("live_detail", "")
     }, headers=CORS_HEADERS)
 
+def format_archive_bet_legs(b: dict) -> list[dict]:
+    """Форматирует каждый матч в архиве с явным статусом: ✅ Зашёл / ❌ Не зашёл / 🔄 Возврат"""
+    st_overall = b.get("status", "loss")
+    try:
+        legs = json.loads(b.get("legs_json") or "[]")
+    except Exception:
+        legs = []
+
+    result_legs = []
+    if legs:
+        for lg in legs:
+            raw_teams = str(lg.get("teams") or b.get("match_title") or "Матч")
+            if " — " in raw_teams:
+                p_a, p_b = raw_teams.split(" — ", 1)
+                ru_teams = f"{translate_team_ru(p_a)} — {translate_team_ru(p_b)}"
+            else:
+                ru_teams = raw_teams
+
+            leg_st = lg.get("final_status") or (st_overall if len(legs) == 1 else "loss")
+            f_sc = lg.get("final_score") or (b.get("score_result", "") if len(legs) == 1 else "")
+            if leg_st == "win":
+                badge_txt = "✅ Зашёл" + (" ⚡Досрочно" if lg.get("early_win") else "")
+            elif leg_st == "push":
+                badge_txt = "🔄 Возврат"
+            elif st_overall == "cashout":
+                badge_txt = "💸 Выкуплен"
+            else:
+                badge_txt = "❌ Не зашёл"
+
+            result_legs.append({
+                "teams": ru_teams,
+                "pick_label": lg.get("pick_label") or lg.get("pick_code") or b.get("pick", ""),
+                "odds": lg.get("odds") or b.get("odds", 1.0),
+                "score": f_sc,
+                "status": leg_st,
+                "badge": badge_txt
+            })
+    else:
+        badge_txt = "✅ Зашёл" if st_overall == "win" else ("🔄 Возврат" if st_overall == "push" else ("💸 Выкуплен" if st_overall == "cashout" else "❌ Не зашёл"))
+        result_legs.append({
+            "teams": b.get("match_title", "Матч"),
+            "pick_label": b.get("pick", ""),
+            "odds": b.get("odds", 1.0),
+            "score": b.get("score_result", ""),
+            "status": st_overall,
+            "badge": badge_txt
+        })
+    return result_legs
+
 async def api_get_state(request):
     uid_str = request.match_info.get("user_id", "0")
     if not uid_str.isdigit():
@@ -4696,7 +5051,7 @@ async def api_get_state(request):
 
     uid = int(uid_str)
     user = await db_manager.get_user(uid)
-    buffs = get_user_fut_buffs(user)
+    buffs = get_user_fut_buffs_v2(user)
     st_lvl = int(user.get("stadium_level") or 1)
     lab_lvl = int(user.get("lab_level") or 1)
     rank_name, daily_bonus_amt = get_user_rank_info(user["balance"], user["is_vip"])
@@ -4705,18 +5060,13 @@ async def api_get_state(request):
     active_bets_raw = await db_manager.get_user_bets(uid, active_only=True)
     archive_bets_raw = await db_manager.get_user_bets(uid, active_only=False)
     lot = await db_manager.get_or_rotate_black_market()
-    lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 22, "ovr": 99})
+    lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 24, "ovr": 99})
     open_duels = await db_manager.get_open_pvp_duels(uid)
 
     try:
         achievements_unlocked = json.loads(user.get("achievements") or "[]")
     except Exception:
         achievements_unlocked = []
-
-    try:
-        equipped_cards = json.loads(user.get("fut_cards") or "{}")
-    except Exception:
-        equipped_cards = {}
 
     top_raw = await db_manager.get_leaderboard()
     leaderboard = []
@@ -4731,7 +5081,6 @@ async def api_get_state(request):
             "is_me": u["user_id"] == uid
         })
 
-    # Мгновенная выборка матчей: в Топ-Афише сначала идут LIVE, затем ближайшие по времени старта!
     db_matches = await get_matches_instant()
     leagues_nav = []
     all_matches = []
@@ -4755,7 +5104,6 @@ async def api_get_state(request):
         for m_id, m in list(m_dict.items())[:15]:
             all_matches.append(build_full_match_payload(m, l_key, cfg["title"]))
 
-    # Сортировка Топ-Афиши: сначала LIVE, затем строго ближайшие по времени начала матчи!
     chronological_matches = sorted(
         all_matches,
         key=lambda x: (0 if x["is_live"] else 1, x["start_ts"])
@@ -4763,10 +5111,14 @@ async def api_get_state(request):
 
     daily_exp = build_daily_express_data(db_matches)
     se_round_key, se_matches = await db_manager.get_or_create_weekly_superexpress(db_matches)
+    for sm in se_matches:
+        if " — " in sm.get("teams", ""):
+            pa, pb = sm["teams"].split(" — ", 1)
+            sm["teams"] = f"{translate_team_ru(pa)} — {translate_team_ru(pb)}"
+
     se_entry = await db_manager.get_superexpress_entry(uid, se_round_key)
     se_user_picks = json.loads(se_entry["picks_json"]) if se_entry else None
 
-    # 🕵️‍♂️ Секретная ставка дня
     secret_bet_offer = None
     top_6_up = get_top_6_upcoming_matches(db_matches)
     if lab_lvl >= 2 and top_6_up:
@@ -4776,7 +5128,7 @@ async def api_get_state(request):
             secret_bet_offer = {
                 "league_key": best_v["league_key"],
                 "event_id": best_v["event_id"],
-                "teams": best_v["teams"],
+                "teams": f"{translate_team_ru(best_v['home_team'])} — {translate_team_ru(best_v['away_team'])}",
                 "date": best_v["short_date"],
                 "exp_goals": best_v["exp_goals"],
                 "pick_code": "tb_2.0",
@@ -4814,7 +5166,10 @@ async def api_get_state(request):
             "referrals_count": int(user.get("referrals_count") or 0),
             "pvp_wins": int(user.get("pvp_wins") or 0),
             "achievements_unlocked": achievements_unlocked,
-            "equipped_cards": equipped_cards,
+            "equipped_cards": buffs["squad_ids"],
+            "owned_cards": buffs["owned_ids"],
+            "captain_role": buffs["captain"],
+            "chemistry": buffs["chemistry"],
             "stadium_level": st_lvl,
             "stadium_info": STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1]),
             "can_claim_stadium": user.get("last_stadium_claim") != today_str,
@@ -4873,7 +5228,8 @@ async def api_get_state(request):
                 "amount": b["amount"],
                 "odds": b["odds"],
                 "potential_win": round(b["amount"] * b["odds"], 1),
-                "bet_type": b.get("bet_type", "single")
+                "bet_type": b.get("bet_type", "single"),
+                "legs_detailed": format_archive_bet_legs(b)
             }
             for b in active_bets_raw
         ],
@@ -4886,7 +5242,8 @@ async def api_get_state(request):
                 "odds": b["odds"],
                 "status": b["status"],
                 "score_result": b.get("score_result", ""),
-                "payout": round(b["amount"] * b["odds"], 1) if b["status"] == "win" else (b["amount"] if b["status"] == "push" else 0)
+                "payout": round(b["amount"] * b["odds"], 1) if b["status"] == "win" else (b["amount"] if b["status"] == "push" else 0),
+                "legs_detailed": format_archive_bet_legs(b)
             }
             for b in archive_bets_raw
         ],
@@ -4914,6 +5271,35 @@ async def api_handle_action(request):
             return web.json_response({"ok": False, "error": "Бонус уже получен сегодня! Заходи завтра."}, headers=CORS_HEADERS)
         return web.json_response({"ok": True, "message": f"🎁 Бонус ранга «{r_name}»: +{amt} FC зачислено!"}, headers=CORS_HEADERS)
 
+    # Смена игрока в активном составе FUT из собственной коллекции
+    elif action == "equip_fut_card":
+        card_id = str(body.get("card_id") or "")
+        if card_id not in FUT_CARDS:
+            return web.json_response({"ok": False, "error": "Карточка не найдена"}, headers=CORS_HEADERS)
+        st = parse_user_fut_state(user)
+        if card_id not in st["owned"]:
+            return web.json_response({"ok": False, "error": "Этой карточки еще нет в твоей коллекции! Выбей её в паках."}, headers=CORS_HEADERS)
+        c = FUT_CARDS[card_id]
+        st["squad"][c["role"]] = card_id
+        await db_manager.exec(
+            "UPDATE users SET fut_cards = $1 WHERE user_id = $2",
+            save_user_fut_json(st["squad"], st["owned"], st["captain"]), uid
+        )
+        return web.json_response({"ok": True, "message": f"👕 {c['name']} поставлен в основной состав на позицию {c['role']}!"}, headers=CORS_HEADERS)
+
+    # Назначение Капитана состава (+25% к бонусу карточки)
+    elif action == "set_fut_captain":
+        role = str(body.get("role") or "FW")
+        if role not in FUT_ROLES:
+            return web.json_response({"ok": False, "error": "Неверная позиция"}, headers=CORS_HEADERS)
+        st = parse_user_fut_state(user)
+        st["captain"] = role
+        await db_manager.exec(
+            "UPDATE users SET fut_cards = $1 WHERE user_id = $2",
+            save_user_fut_json(st["squad"], st["owned"], st["captain"]), uid
+        )
+        return web.json_response({"ok": True, "message": f"© Капитанская повязка передана позиции {role} (+25% к баффу)!"}, headers=CORS_HEADERS)
+
     elif action == "set_stadium_prefs":
         ticket = str(body.get("ticket") or "optimal")
         sponsor = str(body.get("sponsor") or "sp_bet")
@@ -4937,14 +5323,13 @@ async def api_handle_action(request):
         has_activity = len(active_bets) > 0 or int(user.get("streak") or 0) > 0
 
         if t_mode == "social":
-            mult = 1.0
-            t_note = "Социальный тариф (100% трибун)"
+            mult, t_note = 1.0, "Социальный тариф (100% трибун)"
         elif t_mode == "optimal":
             mult = 1.30 if has_activity else 1.0
-            t_note = "Оптимальный тариф (+30% за активность!)" if has_activity else "Оптимальный тариф (базовая выручка)"
+            t_note = "Оптимальный тариф (+30% за активность!)" if has_activity else "Оптимальный тариф (база)"
         else:
             mult = 1.65 if has_activity else 0.85
-            t_note = "VIP-Аншлаг (+65% к выручке!)" if has_activity else "VIP-тариф (85% без активных ставок)"
+            t_note = "VIP-Аншлаг (+65% к выручке!)" if has_activity else "VIP-тариф (85% без ставок)"
 
         sp_bonus = 0
         sp_id = prefs.get("sponsor", "sp_bet")
@@ -4978,24 +5363,21 @@ async def api_handle_action(request):
     elif action == "buy_pack":
         p_type = str(body.get("pack_type") or "basic")
         if p_type == "basic":
-            cost, pool, weights = 1500, ["fw_1", "gk_1", "co_1", "fw_2", "gk_2"], [30, 30, 25, 10, 5]
+            cost, pool, weights = 1500, ["fw_1", "mid_1", "def_1", "gk_1", "co_1", "fw_2", "gk_2"], [20, 20, 20, 15, 15, 5, 5]
         elif p_type == "gold":
-            cost, pool, weights = 5000, ["fw_1", "gk_1", "fw_2", "fw_3", "gk_2", "co_2", "fw_4"], [12, 12, 22, 20, 15, 14, 5]
+            cost, pool, weights = 5000, ["fw_2", "fw_3", "mid_2", "def_2", "gk_2", "co_2", "fw_4", "mid_3"], [18, 16, 18, 16, 14, 10, 4, 4]
         else:
-            cost, pool, weights = 15000, ["fw_2", "gk_2", "co_2", "fw_4", "fw_5", "gk_3", "co_3"], [10, 10, 10, 20, 18, 16, 16]
+            cost, pool, weights = 15000, ["fw_3", "mid_2", "def_2", "fw_4", "fw_5", "mid_3", "def_3", "gk_3", "co_3"], [8, 8, 8, 16, 15, 15, 10, 10, 10]
 
         card_id = random.choices(pool, weights=weights, k=1)[0]
-        res = await db_manager.open_fut_pack_db(uid, cost, card_id)
+        res = await open_fut_pack_v2(uid, cost, card_id)
         if not res["ok"]:
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
 
         u_after = await db_manager.get_user(uid)
-        try:
-            eq_now = json.loads(u_after.get("fut_cards") or "{}")
-            if eq_now.get("FW") and eq_now.get("GK") and eq_now.get("COACH"):
-                asyncio.create_task(db_manager.unlock_achievement(uid, "fut_full_squad"))
-        except Exception:
-            pass
+        st_after = parse_user_fut_state(u_after)
+        if all(st_after["squad"].get(r) for r in FUT_ROLES):
+            asyncio.create_task(db_manager.unlock_achievement(uid, "fut_full_squad"))
 
         clean_note = re.sub(r"<.*?>", "", res["status_note"])
         return web.json_response({
@@ -5035,7 +5417,6 @@ async def api_handle_action(request):
         asyncio.create_task(db_manager.unlock_achievement(uid, "bm_tycoon"))
         return web.json_response({"ok": True, "message": f"🔨 Ставка {amount} FC принята! Ты лидер торгов!"}, headers=CORS_HEADERS)
 
-    # МГНОВЕННЫЙ ПРИЕМ КУПОНА СТАВОК (БЕЗ БЛОКИРОВОК СЕРВЕРА!)
     elif action == "submit_slip":
         items = body.get("items") or []
         stake_amount = int(body.get("stake") or 0)
@@ -5048,7 +5429,6 @@ async def api_handle_action(request):
         if stake_amount < 10:
             return web.json_response({"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}, headers=CORS_HEADERS)
 
-        # Читаем расписание мгновенно из памяти (0.001 сек), не блокируя запрос!
         db_schedule = await get_matches_instant()
         now_ts = int(now_msk().timestamp())
 
@@ -5061,16 +5441,17 @@ async def api_handle_action(request):
             if not mkt:
                 return web.json_response({"ok": False, "error": "Некорректный исход!"}, headers=CORS_HEADERS)
 
+            ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
             legs = [{
                 "league_slug": m["league_slug"],
                 "event_id": m["event_id"],
-                "teams": m["teams"],
+                "teams": ru_teams,
                 "pick_code": mkt["pick_code"],
                 "pick_label": mkt["label"],
                 "odds": mkt["odds"]
             }]
-            res = await db_manager.create_pending_bet(
-                uid, user["username"], f"{m['teams']} ({m['short_date']})", mkt["label"],
+            res = await fast_create_pending_bet(
+                uid, user["username"], f"{ru_teams} ({m['short_date']})", mkt["label"],
                 stake_amount, mkt["odds"], mkt["prob"], m["end_ts"],
                 bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False)
             )
@@ -5099,18 +5480,19 @@ async def api_handle_action(request):
             comb_prob *= (mkt["prob"] / 100.0)
             if m["end_ts"] > max_end:
                 max_end = m["end_ts"]
-            titles.append(f"{idx}. {m['teams']} — {mkt['label']} ({mkt['odds']})")
+            ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
+            titles.append(f"{idx}. {ru_teams} — {mkt['label']} ({mkt['odds']})")
             legs.append({
                 "league_slug": m["league_slug"],
                 "event_id": m["event_id"],
-                "teams": m["teams"],
+                "teams": ru_teams,
                 "pick_code": mkt["pick_code"],
                 "pick_label": mkt["label"],
                 "odds": mkt["odds"]
             })
 
         final_exp_odd = round(total_odd, 2)
-        res = await db_manager.create_pending_bet(
+        res = await fast_create_pending_bet(
             uid, user["username"], f"Экспресс ({len(legs)} матчей)", "\n".join(titles),
             stake_amount, final_exp_odd, round(comb_prob * 100, 1), max_end,
             bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False)
