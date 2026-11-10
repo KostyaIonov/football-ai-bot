@@ -4170,7 +4170,7 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
         )
 
 # ================= ВЕБ-СЕРВЕР + НОВОГОДНЕЕ ЯДРО WEBAPP И ВИДЖЕТЫ BOT API 10.4 =================
-from aiogram.types import MenuButtonWebApp, WebAppInfo, URLInputFile, InputMediaPhoto
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
@@ -4180,123 +4180,179 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type"
 }
 
-# 1. ПОЛНАЯ РУСИФИКАЦИЯ ВСЕХ КОМАНД + АВТО-ТРАНСЛИТЕРАТОР ДЛЯ РЕДКИХ КЛУБОВ
-TEAM_TRANSLATIONS.update({
-    "Athletic Bilbao": "Атлетик Б", "Real Betis": "Бетис", "Rayo Vallecano": "Райо Вальекано",
-    "Celta Vigo": "Сельта", "Real Sociedad": "Реал Сосьедад", "Las Palmas": "Лас-Пальмас",
-    "Leganes": "Леганес", "Valladolid": "Вальядолид", "Getafe": "Хетафе", "Osasuna": "Осасуна",
-    "Alaves": "Алавес", "Mallorca": "Мальорка", "Girona": "Жирона", "Villarreal": "Вильярреал",
-    "Espanyol": "Эспаньол", "Sevilla": "Севилья", "Valencia": "Валенсия",
-    "Nottingham Forest": "Ноттингем Форест", "Bournemouth": "Борнмут", "Brentford": "Брентфорд",
-    "Brighton and Hove Albion": "Брайтон", "Crystal Palace": "Кристал Пэлас", "Fulham": "Фулхэм",
-    "Ipswich Town": "Ипсвич Таун", "Leicester City": "Лестер Сити", "Southampton": "Саутгемптон",
-    "West Ham United": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон", "Everton": "Эвертон",
-    "Aston Villa": "Астон Вилла", "Newcastle United": "Ньюкасл", "Tottenham Hotspur": "Тоттенхэм",
-    "Borussia Monchengladbach": "Боруссия М", "Eintracht Frankfurt": "Айнтрахт Ф",
-    "SC Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Werder Bremen": "Вердер",
-    "VfL Wolfsburg": "Вольфсбург", "FC Augsburg": "Аугсбург", "1. FC Heidenheim": "Хайденхайм",
-    "1. FSV Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "VfL Bochum": "Бохум",
-    "FC St. Pauli": "Санкт-Паули", "Holstein Kiel": "Хольштайн Киль", "VfB Stuttgart": "Штутгарт",
-    "Hellas Verona": "Верона", "Udinese": "Удинезе", "Torino": "Торино", "Empoli": "Эмполи",
-    "Cagliari": "Кальяри", "Lecce": "Лечче", "Monza": "Монца", "Venezia": "Венеция",
-    "Como": "Комо", "Parma": "Парма", "Genoa": "Дженоа", "Bologna": "Болонья",
-    "Fiorentina": "Фиорентина", "Atalanta": "Аталанта", "Lazio": "Лацио",
-    "Stade Brestois": "Брест", "RC Lens": "Ланс", "Stade Rennais": "Ренн", "Stade de Reims": "Реймс",
-    "RC Strasbourg": "Страсбур", "Toulouse": "Тулуза", "Montpellier": "Монпелье", "FC Nantes": "Нант",
-    "AJ Auxerre": "Осер", "Angers": "Анже", "AS Saint-Etienne": "Сент-Этьен", "Le Havre": "Гавр",
-    "Sporting Lisbon": "Спортинг", "SL Benfica": "Бенфика", "FC Porto": "Порту", "SC Braga": "Брага",
-    "Vitoria Guimaraes": "Витория Гим", "Moreirense": "Морейренсе", "Santa Clara": "Санта-Клара",
-    "Gil Vicente": "Жил Висенте", "Casa Pia": "Каза Пия", "Estoril": "Эшторил", "Arouca": "Арока",
-    "Famalicao": "Фамаликан", "Boavista": "Боавишта", "Nacional": "Насьонал", "Farense": "Фаренсе",
-    "AVS": "АВС", "Estrela da Amadora": "Эштрела", "Rio Ave": "Риу Аве",
-    "PSV": "ПСВ Эйндховен", "Ajax Amsterdam": "Аякс", "Feyenoord Rotterdam": "Фейеноорд",
-    "FC Twente": "Твенте", "AZ": "АЗ Алкмар", "FC Utrecht": "Утрехт", "Go Ahead Eagles": "Гоу Эхед Иглс",
-    "Fortuna Sittard": "Фортуна Ситтард", "NEC Nijmegen": "НЕК Неймеген", "SC Heerenveen": "Херенвен",
-    "PEC Zwolle": "Зволле", "NAC Breda": "НАК Бреда", "Willem II": "Виллем II", "FC Groningen": "Гронинген",
-    "Heracles Almelo": "Хераклес", "Sparta Rotterdam": "Спарта Роттердам", "Almere City": "Алмере Сити", "RKC Waalwijk": "РКК Валвейк",
-    "Fenerbahce": "Фенербахче", "Galatasaray": "Галатасарай", "Besiktas": "Бешикташ",
-    "Trabzonspor": "Трабзонспор", "Basaksehir": "Башакшехир", "Eyupspor": "Эюпспор",
-    "Goztepe": "Гёзтепе", "Samsunspor": "Самсунспор", "Sivasspor": "Сивасспор", "Kasimpasa": "Касымпаша",
-    "Konyaspor": "Коньяспор", "Alanyaspor": "Аланьяспор", "Rizespor": "Ризеспор", "Gaziantep": "Газиантеп",
-    "Antalyaspor": "Антальяспор", "Kayserispor": "Кайсериспор", "Bodrumspor": "Бодрумспор", "Hatayspor": "Хатайспор",
-    "Adana Demirspor": "Адана Демирспор", "Botafogo": "Ботафого", "Palmeiras": "Палмейрас",
-    "Fortaleza": "Форталеза", "Flamengo": "Фламенго", "Sao Paulo": "Сан-Паулу", "Bahia": "Баия",
-    "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко да Гама", "Atletico Mineiro": "Атлетико Минейро",
-    "Internacional": "Интернасьонал", "Gremio": "Гремио", "Corinthians": "Коринтианс",
-    "Fluminense": "Флуминенсе", "Vitoria": "Витория", "Juventude": "Жувентуде", "Bragantino": "Брагантино",
-    "Red Bull Bragantino": "РБ Брагантино", "Athletico Paranaense": "Атлетико Паранаэнсе", "Criciuma": "Крисиума",
-    "Cuiaba": "Куяба", "Atletico Goianiense": "Атлетико Гоияниенсе",
-    "Dinamo Zagreb": "Динамо Загреб", "Young Boys": "Янг Бойз", "Crvena Zvezda": "Црвена Звезда",
-    "Red Star Belgrade": "Црвена Звезда", "Slovan Bratislava": "Слован Братислава",
-    "Bodo/Glimt": "Будё-Глимт", "Midtjylland": "Мидтьюлланд", "FCSB": "ФКСБ Стяуа",
-    "Elfsborg": "Эльфсборг", "Malmo FF": "Мальмё", "Qarabag": "Карабах", "Ludogorets": "Лудогорец",
-    "Ferencvaros": "Ференцварош", "Maccabi Tel Aviv": "Маккаби Т-А", "Viktoria Plzen": "Виктория Пльзень",
-    "Dynamo Kyiv": "Динамо Киев", "Rigas FS": "РФШ Рига", "Union SG": "Юнион СЖ", "Twente": "Твенте",
-    "Legia Warsaw": "Легия", "Jagiellonia": "Ягеллония", "Panathinaikos": "Панатинаикос",
-    "Hearts": "Хартс", "Astana": "Астана", "Rapid Wien": "Рапид Вена", "LASK": "ЛАСК",
-    "Gent": "Гент", "Cercle Brugge": "Серкль Брюгге", "Molde": "Мольде", "Djurgarden": "Юргорден",
-    "Copenhagen": "Копенгаген", "FC Copenhagen": "Копенгаген", "Lugano": "Лугано", "St. Gallen": "Санкт-Галлен",
-    "Omonia Nicosia": "Омония", "APOEL": "АПОЭЛ", "Pafos": "Пафос", "Celje": "Целе", "Olimpija": "Олимпия",
-    "Noah": "Ноа", "Petrocub": "Петрокуб", "TSC": "ТСЦ Бачка-Топола", "Borac Banja Luka": "Борац",
-    "Shamrock Rovers": "Шемрок Роверс", "The New Saints": "ТНС", "Larne": "Ларн", "Vikingur": "Викингур",
-    "Sheffield Wednesday": "Шеффилд Уэнсдей", "Derby County": "Дерби Каунти", "Portsmouth": "Портсмут",
-    "Oxford United": "Оксфорд Юнайтед", "Plymouth Argyle": "Плимут", "Luton Town": "Лутон Таун"
-})
+# 1. ЭТАЛОННЫЙ СЛОВАРЬ КЛУБОВ И СБОРНЫХ (БЕЗ ФОНЕТИЧЕСКОГО ИСКАЖЕНИЯ)
+EXACT_CLUB_DICTIONARY = {
+    # РПЛ и Кубок России
+    "CSKA Moscow": "ЦСКА", "PFC CSKA Moscow": "ЦСКА", "Spartak Moscow": "Спартак", "FC Spartak Moscow": "Спартак",
+    "Zenit St Petersburg": "Зенит", "FC Zenit Saint Petersburg": "Зенит", "Zenit": "Зенит",
+    "Krasnodar": "Краснодар", "FC Krasnodar": "Краснодар", "Dynamo Moscow": "Динамо Москва", "FC Dynamo Moscow": "Динамо Москва",
+    "Lokomotiv Moscow": "Локомотив", "FC Lokomotiv Moscow": "Локомотив", "Rostov": "Ростов", "FC Rostov": "Ростов",
+    "Rubin Kazan": "Рубин", "FC Rubin Kazan": "Рубин", "Krylia Sovetov": "Крылья Советов", "PFC Krylia Sovetov Samara": "Крылья Советов",
+    "Akhmat Grozny": "Ахмат", "RFK Akhmat Grozny": "Ахмат", "Pari Nizhny Novgorod": "Пари НН", "FC Pari Nizhny Novgorod": "Пари НН",
+    "Fakel Voronezh": "Факел", "FC Fakel Voronezh": "Факел", "Orenburg": "Оренбург", "FC Orenburg": "Оренбург",
+    "Khimki": "Химки", "FC Khimki": "Химки", "Akron Togliatti": "Акрон", "FC Akron Togliatti": "Акрон",
+    "Dynamo Makhachkala": "Динамо Махачкала", "FC Dynamo Makhachkala": "Динамо Махачкала",
+    "Baltika Kaliningrad": "Балтика", "Torpedo Moscow": "Торпедо", "Ural Yekaterinburg": "Урал", "Sochi": "Сочи",
 
-WORD_REPLACEMENTS = {
-    "United": "Юнайтед", "City": "Сити", "Town": "Таун", "Rovers": "Роверс", "Wanderers": "Уондерерс",
-    "Athletic": "Атлетик", "Sporting": "Спортинг", "Real": "Реал", "Dynamo": "Динамо", "Dinamo": "Динамо",
-    "Lokomotiv": "Локомотив", "Spartak": "Спартак", "Torpedo": "Торпедо", "Shakhtar": "Шахтёр",
-    "Victoria": "Виктория", "Viktoria": "Виктория", "Racing": "Расинг", "Union": "Юнион",
-    "Stade": "Стад", "Olympique": "Олимпик", "Borussia": "Боруссия", "Eintracht": "Айнтрахт"
+    # АПЛ и Чемпионшип (Англия)
+    "Arsenal": "Арсенал", "Aston Villa": "Астон Вилла", "Bournemouth": "Борнмут", "AFC Bournemouth": "Борнмут",
+    "Brentford": "Брентфорд", "Brighton & Hove Albion": "Брайтон", "Brighton and Hove Albion": "Брайтон", "Brighton": "Брайтон",
+    "Chelsea": "Челси", "Crystal Palace": "Кристал Пэлас", "Everton": "Эвертон", "Fulham": "Фулхэм",
+    "Ipswich Town": "Ипсвич Таун", "Ipswich": "Ипсвич Таун", "Leicester City": "Лестер Сити", "Leicester": "Лестер Сити",
+    "Liverpool": "Ливерпуль", "Manchester City": "Манчестер Сити", "Man City": "Манчестер Сити",
+    "Manchester United": "Манчестер Юнайтед", "Man United": "Манчестер Юнайтед", "Newcastle United": "Ньюкасл", "Newcastle": "Ньюкасл",
+    "Nottingham Forest": "Ноттингем Форест", "Southampton": "Саутгемптон", "Tottenham Hotspur": "Тоттенхэм", "Tottenham": "Тоттенхэм",
+    "West Ham United": "Вест Хэм", "West Ham": "Вест Хэм", "Wolverhampton Wanderers": "Вулверхэмптон", "Wolves": "Вулверхэмптон",
+    "Leeds United": "Лидс Юнайтед", "Leeds": "Лидс Юнайтед", "Burnley": "Бёрнли", "Sunderland": "Сандерленд",
+    "Sheffield United": "Шеффилд Юнайтед", "Sheffield Wednesday": "Шеффилд Уэнсдей", "West Bromwich Albion": "Вест Бромвич",
+    "Middlesbrough": "Мидлсбро", "Norwich City": "Норвич Сити", "Coventry City": "Ковентри Сити", "Watford": "Уотфорд",
+    "Blackburn Rovers": "Блэкберн Роверс", "Bristol City": "Бристоль Сити", "Hull City": "Халл Сити", "Stoke City": "Сток Сити",
+    "Swansea City": "Суонси Сити", "Millwall": "Миллуолл", "Queens Park Rangers": "КПР", "QPR": "КПР",
+    "Preston North End": "Престон", "Cardiff City": "Кардифф Сити", "Derby County": "Дерби Каунти",
+    "Portsmouth": "Портсмут", "Oxford United": "Оксфорд Юнайтед", "Plymouth Argyle": "Плимут Аргайл", "Luton Town": "Лутон Таун",
+
+    # Ла Лига (Испания)
+    "Real Madrid": "Реал Мадрид", "Barcelona": "Барселона", "FC Barcelona": "Барселона",
+    "Atlético Madrid": "Атлетико Мадрид", "Atletico Madrid": "Атлетико Мадрид", "Club Atlético de Madrid": "Атлетико Мадрид",
+    "Athletic Club": "Атлетик Бильбао", "Athletic Bilbao": "Атлетик Бильбао", "Real Sociedad": "Реал Сосьедад",
+    "Real Betis": "Реал Бетис", "Villarreal": "Вильярреал", "Valencia": "Валенсия", "Sevilla": "Севилья",
+    "Girona": "Жирона", "Celta Vigo": "Сельта", "RC Celta": "Сельта", "Osasuna": "Осасуна", "CA Osasuna": "Осасуна",
+    "Getafe": "Хетафе", "Rayo Vallecano": "Райо Вальекано", "Mallorca": "Мальорка", "RCD Mallorca": "Мальорка",
+    "Las Palmas": "Лас-Пальмас", "UD Las Palmas": "Лас-Пальмас", "Alavés": "Алавес", "Deportivo Alavés": "Алавес", "Alaves": "Алавес",
+    "Espanyol": "Эспаньол", "RCD Espanyol": "Эспаньол", "Leganés": "Леганес", "CD Leganés": "Леганес", "Leganes": "Леганес",
+    "Real Valladolid": "Реал Вальядолид", "Valladolid": "Реал Вальядолид",
+
+    # Серия А (Италия)
+    "Internazionale": "Интер", "Inter Milan": "Интер", "FC Internazionale Milano": "Интер",
+    "AC Milan": "Милан", "Milan": "Милан", "Juventus": "Ювентус", "Napoli": "Наполи", "SSC Napoli": "Наполи",
+    "AS Roma": "Рома", "Roma": "Рома", "Lazio": "Лацио", "SS Lazio": "Лацио", "Atalanta": "Аталанта",
+    "Fiorentina": "Фиорентина", "ACF Fiorentina": "Фиорентина", "Bologna": "Болонья", "Torino": "Торино",
+    "Udinese": "Удинезе", "Genoa": "Дженоа", "Como": "Комо", "Como 1907": "Комо", "Parma": "Парма",
+    "Hellas Verona": "Верона", "Verona": "Верона", "Empoli": "Эмполи", "Cagliari": "Кальяри",
+    "Lecce": "Лечче", "US Lecce": "Лечче", "Monza": "Монца", "AC Monza": "Монца", "Venezia": "Венеция",
+
+    # Бундеслига (Германия)
+    "Bayern Munich": "Бавария", "FC Bayern Munich": "Бавария", "Borussia Dortmund": "Боруссия Дортмунд",
+    "Bayer Leverkusen": "Байер Леверкузен", "Bayer 04 Leverkusen": "Байер Леверкузен", "RB Leipzig": "РБ Лейпциг",
+    "VfB Stuttgart": "Штутгарт", "Stuttgart": "Штутгарт", "Eintracht Frankfurt": "Айнтрахт Франкфурт",
+    "SC Freiburg": "Фрайбург", "Freiburg": "Фрайбург", "TSG Hoffenheim": "Хоффенхайм", "Hoffenheim": "Хоффенхайм",
+    "Werder Bremen": "Вердер Бремен", "SV Werder Bremen": "Вердер Бремен", "Heidenheim": "Хайденхайм", "1. FC Heidenheim 1846": "Хайденхайм",
+    "FC Augsburg": "Аугсбург", "Augsburg": "Аугсбург", "VfL Wolfsburg": "Вольфсбург", "Wolfsburg": "Вольфсбург",
+    "Borussia Mönchengladbach": "Боруссия Мёнхенгладбах", "Borussia Monchengladbach": "Боруссия Мёнхенгладбах",
+    "Mainz": "Майнц", "1. FSV Mainz 05": "Майнц", "Mainz 05": "Майнц", "1. FC Union Berlin": "Унион Берлин", "Union Berlin": "Унион Берлин",
+    "VfL Bochum": "Бохум", "Bochum": "Бохум", "FC St. Pauli": "Санкт-Паули", "St. Pauli": "Санкт-Паули",
+    "Holstein Kiel": "Хольштайн Киль", "Hamburger SV": "Гамбург", "FC Cologne": "Кёльн", "1. FC Köln": "Кёльн",
+
+    # Лига 1 (Франция)
+    "Paris Saint-Germain": "ПСЖ", "PSG": "ПСЖ", "AS Monaco": "Монако", "Monaco": "Монако",
+    "Marseille": "Марсель", "Olympique de Marseille": "Марсель", "Lille": "Лилль", "LOSC Lille": "Лилль",
+    "Lyon": "Лион", "Olympique Lyonnais": "Лион", "Nice": "Ницца", "OGC Nice": "Ницца",
+    "Lens": "Ланс", "RC Lens": "Ланс", "Rennes": "Ренн", "Stade Rennais": "Ренн",
+    "Stade Brestois 29": "Брест", "Stade Brestois": "Брест", "Brest": "Брест",
+    "Reims": "Реймс", "Stade de Reims": "Реймс", "Strasbourg": "Страсбур", "RC Strasbourg Alsace": "Страсбур",
+    "Toulouse": "Тулуза", "Montpellier": "Монпелье", "Nantes": "Нант", "FC Nantes": "Нант",
+    "Auxerre": "Осер", "AJ Auxerre": "Осер", "Angers": "Анже", "Angers SCO": "Анже",
+    "Saint-Étienne": "Сент-Этьен", "AS Saint-Étienne": "Сент-Этьен", "AS Saint-Etienne": "Сент-Этьен", "Le Havre": "Гавр", "Le Havre AC": "Гавр",
+
+    # Португалия, Нидерланды, Турция, Бразилия и Еврокубки
+    "Sporting CP": "Спортинг", "Sporting Lisbon": "Спортинг", "Benfica": "Бенфика", "SL Benfica": "Бенфика",
+    "FC Porto": "Порту", "Porto": "Порту", "SC Braga": "Брага", "Braga": "Брага",
+    "Vitória de Guimarães": "Витория Гимарайнш", "Vitoria Guimaraes": "Витория Гимарайнш",
+    "Famalicão": "Фамаликан", "Famalicao": "Фамаликан", "Rio Ave": "Риу Аве", "Boavista": "Боавишта",
+    "Moreirense": "Морейренсе", "Santa Clara": "Санта-Клара", "Gil Vicente": "Жил Висенте",
+    "Casa Pia": "Каза Пия", "Estoril": "Эшторил", "Arouca": "Арока", "Nacional": "Насьонал", "Farense": "Фаренсе",
+    "PSV Eindhoven": "ПСВ Эйндховен", "PSV": "ПСВ Эйндховен", "Feyenoord": "Фейеноорд", "Ajax": "Аякс", "AFC Ajax": "Аякс",
+    "AZ Alkmaar": "АЗ Алкмар", "AZ": "АЗ Алкмар", "FC Twente": "Твенте", "Twente": "Твенте", "FC Utrecht": "Утрехт",
+    "Go Ahead Eagles": "Гоу Эхед Иглс", "Fortuna Sittard": "Фортуна Ситтард", "NEC Nijmegen": "НЕК Неймеген",
+    "SC Heerenveen": "Херенвен", "Heerenveen": "Херенвен", "PEC Zwolle": "Зволле", "NAC Breda": "НАК Бреда",
+    "Willem II": "Виллем II", "FC Groningen": "Гронинген", "Heracles Almelo": "Хераклес",
+    "Sparta Rotterdam": "Спарта Роттердам", "Almere City": "Алмере Сити", "RKC Waalwijk": "РКК Валвейк",
+    "Galatasaray": "Галатасарай", "Fenerbahce": "Фенербахче", "Fenerbahçe": "Фенербахче",
+    "Besiktas": "Бешикташ", "Beşiktaş": "Бешикташ", "Trabzonspor": "Трабзонспор",
+    "Istanbul Basaksehir": "Башакшехир", "Basaksehir": "Башакшехир", "Başakşehir": "Башакшехир",
+    "Samsunspor": "Самсунспор", "Antalyaspor": "Антальяспор", "Eyüpspor": "Эюпспор", "Eyupspor": "Эюпспор",
+    "Göztepe": "Гёзтепе", "Goztepe": "Гёзтепе", "Sivasspor": "Сивасспор", "Kasımpaşa": "Касымпаша", "Kasimpasa": "Касымпаша",
+    "Konyaspor": "Коньяспор", "Alanyaspor": "Аланьяспор", "Çaykur Rizespor": "Ризеспор", "Rizespor": "Ризеспор",
+    "Gaziantep FK": "Газиантеп", "Kayserispor": "Кайсериспор", "Bodrum FK": "Бодрумспор", "Hatayspor": "Хатайспор", "Adana Demirspor": "Адана Демирспор",
+    "Flamengo": "Фламенго", "Palmeiras": "Палмейрас", "Botafogo": "Ботафого", "São Paulo": "Сан-Паулу", "Sao Paulo": "Сан-Паулу",
+    "Corinthians": "Коринтианс", "Fluminense": "Флуминенсе", "Grêmio": "Гремио", "Gremio": "Гремио",
+    "Internacional": "Интернасьонал", "Atlético Mineiro": "Атлетико Минейро", "Atletico Mineiro": "Атлетико Минейро",
+    "Cruzeiro": "Крузейро", "Vasco da Gama": "Васко да Гама", "Santos": "Сантос", "Fortaleza": "Форталеза",
+    "Bahia": "Баия", "EC Vitória": "Витория Салвадор", "Juventude": "Жувентуде", "Red Bull Bragantino": "РБ Брагантино",
+    "Athletico Paranaense": "Атлетико Паранаэнсе", "Criciúma": "Крисиума", "Cuiabá": "Куяба", "Atlético Goianiense": "Атлетико Гоияниенсе",
+    "Celtic": "Селтик", "Rangers": "Рейнджерс", "Club Brugge": "Брюгге", "Anderlecht": "Андерлехт", "RSC Anderlecht": "Андерлехт",
+    "Shakhtar Donetsk": "Шахтёр Донецк", "Dynamo Kyiv": "Динамо Киев", "Red Bull Salzburg": "РБ Зальцбург", "FC Salzburg": "РБ Зальцбург",
+    "Sturm Graz": "Штурм Грац", "SK Sturm Graz": "Штурм Грац", "Sparta Prague": "Спарта Прага", "Slavia Prague": "Славия Прага",
+    "Olympiacos": "Олимпиакос", "PAOK": "ПАОК", "Panathinaikos": "Панатинаикос", "AEK Athens": "АЕК Афины",
+    "Dinamo Zagreb": "Динамо Загреб", "GNK Dinamo Zagreb": "Динамо Загреб", "Young Boys": "Янг Бойз", "BSC Young Boys": "Янг Бойз",
+    "Crvena Zvezda": "Црвена Звезда", "Red Star Belgrade": "Црвена Звезда", "Slovan Bratislava": "Слован Братислава",
+    "Bodø/Glimt": "Будё-Глимт", "Bodo/Glimt": "Будё-Глимт", "FC Midtjylland": "Мидтьюлланд", "Midtjylland": "Мидтьюлланд",
+    "FCSB": "ФКСБ Стяуа", "IF Elfsborg": "Эльфсборг", "Elfsborg": "Эльфсборг", "Malmö FF": "Мальмё", "Malmo FF": "Мальмё",
+    "Qarabağ": "Карабах", "Qarabag": "Карабах", "Ludogorets Razgrad": "Лудогорец", "Ludogorets": "Лудогорец",
+    "Ferencváros": "Ференцварош", "Ferencvaros": "Ференцварош", "Maccabi Tel Aviv": "Маккаби Тель-Авив",
+    "Viktoria Plzeň": "Виктория Пльзень", "Viktoria Plzen": "Виктория Пльзень", "RFS": "РФШ Рига", "Rigas FS": "РФШ Рига",
+    "Union Saint-Gilloise": "Юнион Сент-Жиллуа", "Union SG": "Юнион Сент-Жиллуа", "Legia Warsaw": "Легия Варшава",
+    "Jagiellonia Białystok": "Ягеллония", "Jagiellonia Bialystok": "Ягеллония", "Heart of Midlothian": "Хартс", "Hearts": "Хартс",
+    "FC Astana": "Астана", "Astana": "Астана", "Rapid Wien": "Рапид Вена", "SK Rapid": "Рапид Вена", "LASK": "ЛАСК",
+    "KAA Gent": "Гент", "Gent": "Гент", "Cercle Brugge": "Серкль Брюгге", "Molde": "Мольде", "Molde FK": "Мольде",
+    "Djurgårdens IF": "Юргорден", "Djurgarden": "Юргорден", "FC Copenhagen": "Копенгаген", "Copenhagen": "Копенгаген",
+    "FC Lugano": "Лугано", "Lugano": "Лугано", "FC St. Gallen": "Санкт-Галлен", "St. Gallen": "Санкт-Галлен",
+    "Omonia Nicosia": "Омония", "APOEL Nicosia": "АПОЭЛ", "APOEL": "АПОЭЛ", "Pafos FC": "Пафос", "Pafos": "Пафос",
+    "NK Celje": "Целе", "Celje": "Целе", "Olimpija Ljubljana": "Олимпия Любляна", "FC Noah": "Ноа", "Noah": "Ноа",
+    "Petrocub Hîncești": "Петрокуб", "TSC Bačka Topola": "ТСЦ Бачка-Топола", "Borac Banja Luka": "Борац Баня-Лука",
+    "Shamrock Rovers": "Шемрок Роверс", "The New Saints": "ТНС", "Larne": "Ларн", "Víkingur Reykjavík": "Викингур",
+
+    # Национальные сборные (Лига Наций / Отбор ЧМ и Евро)
+    "Russia": "Россия", "France": "Франция", "Spain": "Испания", "England": "Англия", "Germany": "Германия",
+    "Italy": "Италия", "Portugal": "Португалия", "Netherlands": "Нидерланды", "Belgium": "Бельгия", "Croatia": "Хорватия",
+    "Switzerland": "Швейцария", "Denmark": "Дания", "Austria": "Австрия", "Serbia": "Сербия", "Hungary": "Венгрия",
+    "Poland": "Польша", "Scotland": "Шотландия", "Ukraine": "Украина", "Turkey": "Турция", "Türkiye": "Турция",
+    "Czechia": "Чехия", "Czech Republic": "Чехия", "Wales": "Уэльс", "Norway": "Норвегия", "Sweden": "Швеция",
+    "Greece": "Греция", "Romania": "Румыния", "Slovakia": "Словакия", "Slovenia": "Словения", "Georgia": "Грузия",
+    "Finland": "Финляндия", "Republic of Ireland": "Ирландия", "Ireland": "Ирландия", "Northern Ireland": "Северная Ирландия",
+    "Kazakhstan": "Казахстан", "Armenia": "Армения", "Belarus": "Беларусь", "Azerbaijan": "Азербайджан", "Iceland": "Исландия",
+    "Bosnia and Herzegovina": "Босния и Герцеговина", "Israel": "Израиль", "Albania": "Албания", "North Macedonia": "Северная Македония",
+    "Montenegro": "Черногория", "Bulgaria": "Болгария", "Kosovo": "Косово", "Luxembourg": "Люксембург", "Cyprus": "Кипр",
+    "Estonia": "Эстония", "Latvia": "Латвия", "Lithuania": "Литва", "Moldova": "Молдова", "Malta": "Мальта",
+    "Andorra": "Андорра", "San Marino": "Сан-Марино", "Liechtenstein": "Лихтенштейн", "Gibraltar": "Гибралтар", "Faroe Islands": "Фарерские о-ва",
+    "Brazil": "Бразилия", "Argentina": "Аргентина", "Uruguay": "Уругвай", "Colombia": "Колумбия", "USA": "США", "Mexico": "Мексика"
 }
 
-TRANSLIT_MAP = [
-    ("sch", "ш"), ("sh", "ш"), ("ch", "ч"), ("zh", "ж"), ("kh", "х"), ("ts", "ц"),
-    ("yu", "ю"), ("ya", "я"), ("yo", "ё"), ("ck", "к"), ("qu", "кв"), ("ph", "ф"), ("th", "т"),
-    ("a", "а"), ("b", "б"), ("c", "к"), ("d", "д"), ("e", "е"), ("f", "ф"), ("g", "г"),
-    ("h", "х"), ("i", "и"), ("j", "дж"), ("k", "к"), ("l", "л"), ("m", "м"), ("n", "н"),
-    ("o", "о"), ("p", "п"), ("q", "к"), ("r", "р"), ("s", "с"), ("t", "т"), ("u", "у"),
-    ("v", "в"), ("w", "в"), ("x", "кс"), ("y", "й"), ("z", "з")
-]
+TEAM_TRANSLATIONS.update(EXACT_CLUB_DICTIONARY)
+_SORTED_DICT_KEYS = sorted(TEAM_TRANSLATIONS.keys(), key=len, reverse=True)
 
 def translate_team_ru(name: str) -> str:
-    """Гарантирует 100% перевод любого названия команды на русский язык"""
+    """Переводит название команды строго по проверенному футбольному словарю"""
     raw = str(name or "").strip()
+    if not raw:
+        return "Команда"
     if raw in TEAM_TRANSLATIONS:
         return TEAM_TRANSLATIONS[raw]
 
-    cleaned = re.sub(r"\b(FC|AFC|CF|SC|AC|AS|SV|VfL|VfB|1\.|RC|CD|UD|SD|FK|SK|NK|BK|IF)\b", "", raw, flags=re.IGNORECASE).strip()
+    raw_low = raw.lower()
+    for k in _SORTED_DICT_KEYS:
+        if k.lower() == raw_low:
+            return TEAM_TRANSLATIONS[k]
+
+    cleaned = re.sub(r"\b(FC|AFC|CF|SC|AC|AS|SV|VfL|VfB|TSG|1\.|RC|RCD|CD|UD|SD|FK|SK|NK|BK|IF|BSC|GNK|KAA|RSC)\b", "", raw, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b\d{2,4}\b", "", cleaned).strip(" .-")
     if cleaned in TEAM_TRANSLATIONS:
         return TEAM_TRANSLATIONS[cleaned]
 
-    for k, v in TEAM_TRANSLATIONS.items():
-        if k.lower() == cleaned.lower():
-            return v
+    cl_low = cleaned.lower()
+    for k in _SORTED_DICT_KEYS:
+        if k.lower() == cl_low:
+            return TEAM_TRANSLATIONS[k]
 
-    # Если уже на кириллице — возвращаем как есть
-    if re.search(r"[а-яА-ЯёЁ]", cleaned):
-        return cleaned
+    for k in _SORTED_DICT_KEYS:
+        if len(k) >= 4 and k.lower() in raw_low:
+            return TEAM_TRANSLATIONS[k]
 
-    # Авто-транслитерация редких зарубежных команд
-    for eng_w, ru_w in WORD_REPLACEMENTS.items():
-        cleaned = re.sub(rf"\b{eng_w}\b", ru_w, cleaned, flags=re.IGNORECASE)
+    return cleaned if cleaned else raw
 
-    words = []
-    for w in cleaned.split():
-        if re.search(r"[а-яА-ЯёЁ]", w) or w.isdigit():
-            words.append(w)
-            continue
-        low = w.lower()
-        for lat, cyr in TRANSLIT_MAP:
-            low = low.replace(lat, cyr)
-        words.append(low.capitalize())
-    return " ".join(words) if words else raw
-
-# Подменяем глобальный переводчик команд
 globals()["translate_team"] = translate_team_ru
 
-# 2. АВТО-ПЕРЕПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ И БЫСТРЫЙ ПРИЕМ СТАВОК БЕЗ ОШИБОК СЕТИ
+# 2. ЗАЩИТА СОЕДИНЕНИЯ С БАЗОЙ ДАННЫХ (АВТО-РЕКОННЕКТ)
 _orig_db_exec = db_manager.exec
 _orig_db_fetchrow = db_manager.fetchrow
 _orig_db_fetch = db_manager.fetch
@@ -4322,32 +4378,56 @@ db_manager.fetchrow = lambda q, *a: _safe_db_call(_orig_db_fetchrow, q, *a)
 db_manager.fetch = lambda q, *a: _safe_db_call(_orig_db_fetch, q, *a)
 db_manager.fetchval = lambda q, *a: _safe_db_call(_orig_db_fetchval, q, *a)
 
-# 3. 5-СЛОТОВАЯ СИСТЕМА FUT (FW, MID, DEF, GK, COACH) + СЫГРАННОСТЬ + КАПИТАН + ИНВЕНТАРЬ
+# 3. РАСШИРЕННАЯ БАЗА ИЗ 36 КАРТОЧЕК FUT (FW, MID, DEF, GK, COACH)
 FUT_CARDS.clear()
 FUT_CARDS.update({
-    # Форварды (FW) — Бонус к прибыли на Тоталах (ТБ/ТМ/ИТБ)
+    # ФОРВАРДЫ (FW) — Бонус к прибыли на Тоталах (ТБ/ТМ/ИТБ)
     "fw_1": {"id": "fw_1", "role": "FW", "tier": 1, "ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Джейми Варди", "val": 6, "desc": "+6% к прибыли на Тоталах", "pack": "Базовый"},
+    "fw_6": {"id": "fw_6", "role": "FW", "tier": 1, "ovr": 85, "nation": "🇪🇸", "name": "🥉 Альваро Мората", "val": 7, "desc": "+7% к прибыли на Тоталах", "pack": "Базовый"},
+    "fw_7": {"id": "fw_7", "role": "FW", "tier": 1, "ovr": 86, "nation": "🇷🇺", "name": "🥉 Константин Тюкавин", "val": 8, "desc": "+8% к прибыли на Тоталах", "pack": "Базовый"},
     "fw_2": {"id": "fw_2", "role": "FW", "tier": 2, "ovr": 90, "nation": "🇪🇬", "name": "🥇 Мохамед Салах", "val": 11, "desc": "+11% к прибыли на Тоталах", "pack": "Золотой"},
     "fw_3": {"id": "fw_3", "role": "FW", "tier": 2, "ovr": 91, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥇 Харри Кейн", "val": 12, "desc": "+12% к прибыли на Тоталах", "pack": "Золотой"},
+    "fw_8": {"id": "fw_8", "role": "FW", "tier": 2, "ovr": 91, "nation": "🇵🇱", "name": "🥇 Роберт Левандовски", "val": 12, "desc": "+12% к прибыли на Тоталах", "pack": "Золотой"},
+    "fw_9": {"id": "fw_9", "role": "FW", "tier": 2, "ovr": 90, "nation": "🇪🇸", "name": "🥇 Ламин Ямаль", "val": 13, "desc": "+13% к прибыли на Тоталах", "pack": "Золотой"},
     "fw_4": {"id": "fw_4", "role": "FW", "tier": 3, "ovr": 95, "nation": "🇫🇷", "name": "💎 Килиан Мбаппе (TOTY)", "val": 17, "desc": "+17% к прибыли на Тоталах", "pack": "Элитный ЛЧ"},
     "fw_5": {"id": "fw_5", "role": "FW", "tier": 3, "ovr": 95, "nation": "🇳🇴", "name": "💎 Эрлинг Холанд (ICON)", "val": 18, "desc": "+18% к прибыли на Тоталах", "pack": "Элитный ЛЧ"},
-    # Плеймейкеры (MID) — Бонус к прибыли на Исходах 1Х2 и Таймах
+    "fw_10": {"id": "fw_10", "role": "FW", "tier": 3, "ovr": 95, "nation": "🇧🇷", "name": "💎 Винисиус Жуниор (TOTY)", "val": 18, "desc": "+18% к прибыли на Тоталах", "pack": "Элитный ЛЧ"},
+
+    # ПЛЕЙМЕЙКЕРЫ (MID) — Бонус к прибыли на 1Х2 и Таймах
     "mid_1": {"id": "mid_1", "role": "MID", "tier": 1, "ovr": 85, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Коул Палмер", "val": 6, "desc": "+6% к прибыли на 1Х2 и Таймах", "pack": "Базовый"},
+    "mid_4": {"id": "mid_4", "role": "MID", "tier": 1, "ovr": 85, "nation": "🇷🇺", "name": "🥉 Александр Головин", "val": 7, "desc": "+7% к прибыли на 1Х2 и Таймах", "pack": "Базовый"},
     "mid_2": {"id": "mid_2", "role": "MID", "tier": 2, "ovr": 91, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥇 Джуд Беллингем", "val": 12, "desc": "+12% к прибыли на 1Х2 и Таймах", "pack": "Золотой"},
+    "mid_5": {"id": "mid_5", "role": "MID", "tier": 2, "ovr": 90, "nation": "🇩🇪", "name": "🥇 Джамал Мусиала", "val": 11, "desc": "+11% к прибыли на 1Х2 и Таймах", "pack": "Золотой"},
+    "mid_6": {"id": "mid_6", "role": "MID", "tier": 2, "ovr": 92, "nation": "🇪🇸", "name": "🥇 Родри", "val": 13, "desc": "+13% к прибыли на 1Х2 и Таймах", "pack": "Золотой"},
     "mid_3": {"id": "mid_3", "role": "MID", "tier": 3, "ovr": 95, "nation": "🇧🇪", "name": "💎 Кевин Де Брёйне (TOTY)", "val": 18, "desc": "+18% к прибыли на 1Х2 и Таймах", "pack": "Элитный ЛЧ"},
-    # Защитники (DEF) — Бонус к прибыли на Форах, 1Х/Х2 и ОЗ
+    "mid_7": {"id": "mid_7", "role": "MID", "tier": 3, "ovr": 96, "nation": "🇫🇷", "name": "💎 Зинедин Зидан (ICON)", "val": 19, "desc": "+19% к прибыли на 1Х2 и Таймах", "pack": "Элитный ЛЧ"},
+
+    # ЗАЩИТНИКИ (DEF) — Бонус к прибыли на Форах, 1Х/Х2 и ОЗ
     "def_1": {"id": "def_1", "role": "DEF", "tier": 1, "ovr": 84, "nation": "🇫🇷", "name": "🥉 Вильям Салиба", "val": 6, "desc": "+6% к прибыли на Форах и ОЗ", "pack": "Базовый"},
+    "def_4": {"id": "def_4", "role": "DEF", "tier": 1, "ovr": 85, "nation": "🇭🇷", "name": "🥉 Йошко Гвардиол", "val": 7, "desc": "+7% к прибыли на Форах и ОЗ", "pack": "Базовый"},
     "def_2": {"id": "def_2", "role": "DEF", "tier": 2, "ovr": 90, "nation": "🇳🇱", "name": "🥇 Вирджил ван Дейк", "val": 12, "desc": "+12% к прибыли на Форах и ОЗ", "pack": "Золотой"},
-    "def_3": {"id": "def_3", "role": "DEF", "tier": 3, "ovr": 94, "nation": "🇮🇹", "name": "💎 Паоло Мальдини (ICON)", "val": 18, "desc": "+18% к прибыли на Форах и ОЗ", "pack": "Элитный ЛЧ"},
-    # Вратари (GK) — Кэшбэк при проигрыше купона
+    "def_5": {"id": "def_5", "role": "DEF", "tier": 2, "ovr": 89, "nation": "🇩🇪", "name": "🥇 Антонио Рюдигер", "val": 11, "desc": "+11% к прибыли на Форах и ОЗ", "pack": "Золотой"},
+    "def_6": {"id": "def_6", "role": "DEF", "tier": 2, "ovr": 90, "nation": "🇪🇸", "name": "🥇 Дани Карвахаль", "val": 12, "desc": "+12% к прибыли на Форах и ОЗ", "pack": "Золотой"},
+    "def_3": {"id": "def_3", "role": "DEF", "tier": 3, "ovr": 95, "nation": "🇮🇹", "name": "💎 Паоло Мальдини (ICON)", "val": 18, "desc": "+18% к прибыли на Форах и ОЗ", "pack": "Элитный ЛЧ"},
+    "def_7": {"id": "def_7", "role": "DEF", "tier": 3, "ovr": 94, "nation": "🇧🇷", "name": "💎 Роберто Карлос (ICON)", "val": 17, "desc": "+17% к прибыли на Форах и ОЗ", "pack": "Элитный ЛЧ"},
+
+    # ВРАТАРИ (GK) — Кэшбэк при проигрыше купона
     "gk_1": {"id": "gk_1", "role": "GK", "tier": 1, "ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Джордан Пикфорд", "val": 8, "desc": "8% кэшбэк при проигрыше", "pack": "Базовый"},
+    "gk_4": {"id": "gk_4", "role": "GK", "tier": 1, "ovr": 86, "nation": "🇷🇺", "name": "🥉 Игорь Акинфеев", "val": 9, "desc": "9% кэшбэк при проигрыше", "pack": "Базовый"},
     "gk_2": {"id": "gk_2", "role": "GK", "tier": 2, "ovr": 90, "nation": "🇧🇷", "name": "🥇 Алиссон Бекер", "val": 14, "desc": "14% кэшбэк при проигрыше", "pack": "Золотой"},
+    "gk_5": {"id": "gk_5", "role": "GK", "tier": 2, "ovr": 90, "nation": "🇮🇹", "name": "🥇 Джанлуиджи Доннарумма", "val": 14, "desc": "14% кэшбэк при проигрыше", "pack": "Золотой"},
     "gk_3": {"id": "gk_3", "role": "GK", "tier": 3, "ovr": 95, "nation": "🇧🇪", "name": "💎 Тибо Куртуа (TOTY)", "val": 20, "desc": "20% кэшбэк при проигрыше", "pack": "Элитный ЛЧ"},
-    # Главные тренеры (COACH) — Прибавка к коэффициенту Экспресса
+    "gk_6": {"id": "gk_6", "role": "GK", "tier": 3, "ovr": 96, "nation": "🇮🇹", "name": "💎 Джанлуиджи Буффон (ICON)", "val": 21, "desc": "21% кэшбэк при проигрыше", "pack": "Элитный ЛЧ"},
+
+    # ГЛАВНЫЕ ТРЕНЕРЫ (COACH) — Прибавка к коэффициенту Экспресса
     "co_1": {"id": "co_1", "role": "COACH", "tier": 1, "ovr": 85, "nation": "🇪🇸", "name": "🥉 Микель Артета", "val": 0.10, "desc": "+0.10 к кэфу Экспресса", "pack": "Базовый"},
+    "co_4": {"id": "co_4", "role": "COACH", "tier": 1, "ovr": 86, "nation": "🇪🇸", "name": "🥉 Хаби Алонсо", "val": 0.12, "desc": "+0.12 к кэфу Экспресса", "pack": "Базовый"},
     "co_2": {"id": "co_2", "role": "COACH", "tier": 2, "ovr": 92, "nation": "🇩🇪", "name": "🥇 Юрген Клопп", "val": 0.20, "desc": "+0.20 к кэфу Экспресса", "pack": "Золотой"},
+    "co_5": {"id": "co_5", "role": "COACH", "tier": 2, "ovr": 91, "nation": "🇵🇹", "name": "🥇 Жозе Моуринью", "val": 0.18, "desc": "+0.18 к кэфу Экспресса", "pack": "Золотой"},
     "co_3": {"id": "co_3", "role": "COACH", "tier": 3, "ovr": 96, "nation": "🇮🇹", "name": "💎 Карло Анчелотти (ICON)", "val": 0.30, "desc": "+0.30 к кэфу Экспресса", "pack": "Элитный ЛЧ"},
-    # Эксклюзивные карты Черного рынка (GOAT 99 OVR)
+    "co_6": {"id": "co_6", "role": "COACH", "tier": 3, "ovr": 97, "nation": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "name": "💎 Сэр Алекс Фергюсон (ICON)", "val": 0.35, "desc": "+0.35 к кэфу Экспресса", "pack": "Элитный ЛЧ"},
+
+    # ЭКСКЛЮЗИВ ЧЕРНОГО РЫНКА (GOAT 99 OVR)
     "goat_messi": {"id": "goat_messi", "role": "FW", "tier": 4, "ovr": 99, "nation": "🇦🇷", "name": "🐐 Лионель Месси (GOAT)", "val": 24, "desc": "+24% к прибыли на Тоталах", "pack": "Черный рынок"},
     "goat_ronaldo": {"id": "goat_ronaldo", "role": "FW", "tier": 4, "ovr": 99, "nation": "🇵🇹", "name": "🐐 Криштиану Роналду (GOAT)", "val": 24, "desc": "+24% к прибыли на Тоталах", "pack": "Черный рынок"},
     "goat_yashin": {"id": "goat_yashin", "role": "GK", "tier": 4, "ovr": 99, "nation": "🇷🇺", "name": "🐐 Лев Яшин (GOAT)", "val": 25, "desc": "25% кэшбэк при проигрыше", "pack": "Черный рынок"},
@@ -4357,7 +4437,6 @@ FUT_CARDS.update({
 FUT_ROLES = ["FW", "MID", "DEF", "GK", "COACH"]
 
 def parse_user_fut_state(user: dict) -> dict:
-    """Извлекает инвентарь всех открытых карт (_owned), активный состав из 5 позиций и Капитана"""
     try:
         raw = json.loads(user.get("fut_cards") or "{}")
         if not isinstance(raw, dict):
@@ -4393,7 +4472,7 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
     cap_role = st["captain"]
 
     filled_slots = sum(1 for r in FUT_ROLES if squad.get(r))
-    chemistry_pct = filled_slots * 20  # 5 заполненных слотов = 100% сыгранности
+    chemistry_pct = filled_slots * 20
     chem_mult = 1.15 if chemistry_pct == 100 else (1.0 + filled_slots * 0.02)
 
     def _slot_val(role_key: str) -> float:
@@ -4406,6 +4485,10 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
 
     lab_lvl = int(user.get("lab_level") or 1)
     lab_bonus = LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["odd_bonus"]
+
+    # Считаем резервные карты (доступные для крафта СПК)
+    active_ids = set(v for v in squad.values() if v)
+    reserve_ids = [cid for cid in st["owned"] if cid not in active_ids]
 
     return {
         "fw_card": FUT_CARDS.get(squad.get("FW", "")),
@@ -4422,6 +4505,7 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
         "chemistry": chemistry_pct,
         "captain": cap_role,
         "owned_ids": st["owned"],
+        "reserve_ids": reserve_ids,
         "squad_ids": squad
     }
 
@@ -4439,8 +4523,8 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
 
     cashback = 0
     if card_id in owned:
-        cashback = int(cost * 0.45)
-        status_note = f"♻️ Дубликат! Эта карточка уже есть в твоей коллекции — начислен кэшбэк +{cashback} FC!"
+        cashback = int(cost * 0.45) if cost > 0 else 750
+        status_note = f"♻️ Дубликат! Эта карточка уже есть в твоей коллекции — начислен бонус +{cashback} FC!"
     else:
         owned.append(card_id)
         cur_id = squad.get(role, "")
@@ -4449,7 +4533,7 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
             squad[role] = card_id
             status_note = "✅ Новая карточка добавлена в коллекцию и сразу вышла в стартовый состав!"
         else:
-            status_note = "📚 Новая карточка добавлена в твою коллекцию! Ты можешь поставить её в состав в любой момент."
+            status_note = "📚 Новая карточка добавлена в твою коллекцию! (Резервные карты можно обменять в СПК)."
 
     new_bal = round(user["balance"] - cost + cashback, 1)
     await db_manager.exec(
@@ -4460,12 +4544,24 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
 
 db_manager.open_fut_pack_db = open_fut_pack_v2
 
+# Прогрессивный Экспресс-Буст от количества матчей в купоне
+def get_express_boost_multiplier(num_legs: int) -> tuple[float, int]:
+    """Возвращает множитель и процент бонуса за размер экспресса"""
+    if num_legs >= 6:
+        return 1.25, 25
+    elif num_legs == 5:
+        return 1.15, 15
+    elif num_legs == 4:
+        return 1.10, 10
+    elif num_legs == 3:
+        return 1.05, 5
+    return 1.0, 0
+
 async def fast_create_pending_bet(
     user_id: int, username: str, match_title: str, pick: str,
     amount: int, odds: float, win_prob: float, settle_ts: int,
     bet_type: str = "single", legs_json: str = "[]"
 ) -> dict:
-    """Мгновенное создание ставки без блокировок на отправке уведомлений в Telegram"""
     user = await db_manager.get_user(user_id, username)
     if amount < 10:
         return {"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}
@@ -4476,8 +4572,16 @@ async def fast_create_pending_bet(
     fav_club = user.get("favorite_club") or ""
     is_fav_club = 1 if (fav_club and (fav_club in match_title or fav_club in pick)) else 0
 
+    try:
+        parsed_legs = json.loads(legs_json or "[]")
+    except Exception:
+        parsed_legs = []
+
     buffs = get_user_fut_buffs_v2(user)
-    final_odds = round(odds + buffs["lab_odd_boost"], 2)
+    exp_mult, exp_pct = get_express_boost_multiplier(len(parsed_legs) if bet_type == "express" else 1)
+
+    boosted_base = round(odds * exp_mult, 2)
+    final_odds = round(boosted_base + buffs["lab_odd_boost"], 2)
     if bet_type == "express" and buffs["express_odd_boost"] > 0:
         final_odds = round(final_odds + buffs["express_odd_boost"], 2)
 
@@ -4512,26 +4616,26 @@ async def fast_create_pending_bet(
             bet_id = cur.lastrowid
             await db.commit()
 
-    # Разблокируем трофеи строго в фоновом потоке, чтобы ответ WebApp вернулся за 0.01 сек!
     asyncio.create_task(db_manager.unlock_achievement(user_id, "first_bet"))
     if bet_type == "express":
         asyncio.create_task(db_manager.unlock_achievement(user_id, "first_express"))
 
     return {
-        "ok": True, "bet_id": bet_id, "final_odds": final_odds,
+        "ok": True, "bet_id": bet_id, "final_odds": final_odds, "exp_boost_pct": exp_pct,
         "booster_used": booster_used, "is_fav_club": is_fav_club,
         "new_balance": new_balance, "potential_win": round(amount * final_odds, 1)
     }
 
 db_manager.create_pending_bet = fast_create_pending_bet
 
-# Расширяем список трофеев до 25 достижений
+# 26 достижений (включая Мастера СПК)
 ACHIEVEMENTS_CONFIG.update({
     "winter_2027": {"title": "🎄 Зимний Чемпион", "desc": "Сделать ставку в новогоднем обновлении бота", "reward": 400},
     "exact_score": {"title": "🎯 Снайпер точного счета", "desc": "Угадать точный счет футбольного матча", "reward": 3500},
     "first_half_win": {"title": "⏱ Доминатор 1-го тайма", "desc": "Выиграть ставку на исход или тотал 1-го тайма", "reward": 600},
     "secret_agent": {"title": "🕵️‍♂️ Секретный агент ИИ", "desc": "Заключить пари по Секретной ставке дня", "reward": 450},
     "fut_full_squad": {"title": "👕 Полная сыгранность (100%)", "desc": "Заполнить все 5 позиций в составе FUT", "reward": 1500},
+    "sbc_master": {"title": "🔄 Мастер СПК (Крафт)", "desc": "Обменять 3 резервные карточки на Золотой пак", "reward": 750},
     "stadium_lvl_5": {"title": "🏟 Архитектор Колизея", "desc": "Построить стадион 5-го уровня", "reward": 2500},
     "stadium_lvl_10": {"title": "👑 Император Арен", "desc": "Возвести Мега-Арену Легенд (10 уровень)", "reward": 15000},
     "pvp_gladiator": {"title": "⚔️ Гладиатор пенальти", "desc": "Одержать 5 побед в PvP-дуэлях", "reward": 1500},
@@ -4547,6 +4651,7 @@ STADIUM_SPONSORS = [
 
 USER_STADIUM_PREFS = {}
 ACTIVE_LIVE_WIDGETS = {}
+LAST_PVP_MATCH = {}  # {user_id: {"mode": "bot"|"direct", "target": str, "opponent_name": str, "stake": int}}
 
 async def get_matches_instant() -> dict:
     now_ts = int(now_msk().timestamp())
@@ -4601,7 +4706,7 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             return {"pick_code": code, "label": "1-й тайм: ТБ 1.5", "odds": odd_v, "prob": round(p_tb15 * 100, 1)}
         elif code == "h1_tm_1.5":
             odd_v = round(max(1.28, 1.0 / ((1.0 - p_tb15) * 1.05)), 2)
-            return {"pick_code": code, "label": "1-й тайм: ТМ 1.5", "odds": odd_v, "prob": round((1.0 - p_tb15) * 1.00, 1)}
+            return {"pick_code": code, "label": "1-й тайм: ТМ 1.5", "odds": odd_v, "prob": round((1.0 - p_tb15) * 100, 1)}
 
     if code in ("bh_yes", "bh_no"):
         lam_h1 = lam_total * 0.44
@@ -4699,7 +4804,6 @@ def build_ai_battle_and_radar(m: dict) -> tuple[dict, dict]:
     return ai_battle, radar
 
 def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
-    # Гарантируем перевод названий команд на русский язык даже для закэшированных матчей
     m["home_team"] = translate_team_ru(m["home_team"])
     m["away_team"] = translate_team_ru(m["away_team"])
     m["teams"] = f"{m['home_team']} — {m['away_team']}"
@@ -4749,12 +4853,15 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
     ai_battle, radar = build_ai_battle_and_radar(m)
     elite_score = (get_elite_bonus(m["home_team"]) + get_elite_bonus(m["away_team"])) * 100
     is_top_banner = (elite_score >= 30 or l_key in ("ucl", "epl", "laliga", "rpl") or bool(m.get("is_live")))
+    today_dm = now_msk().strftime("%d.%m")
+    is_today = bool(m.get("is_live")) or str(m.get("short_date", "")).startswith(today_dm)
 
     return {
         "event_id": m["event_id"], "league_key": l_key, "league_title": l_title,
         "teams": m["teams"], "home_team": m["home_team"], "away_team": m["away_team"],
         "venue": m.get("venue", "Центральная арена"),
-        "is_live": bool(m.get("is_live")), "live_score": m.get("live_score", "0:0"), "live_detail": m.get("live_detail", ""),
+        "is_live": bool(m.get("is_live")), "is_today": is_today,
+        "live_score": m.get("live_score", "0:0"), "live_detail": m.get("live_detail", ""),
         "date": m["date"], "short_date": m["short_date"], "start_ts": m["start_ts"],
         "exp_goals": m["exp_goals"], "lam_h": m.get("lam_h", 1.4), "lam_a": m.get("lam_a", 1.2),
         "best_score": m["best_score"], "h_stats": m.get("h_stats", {}), "a_stats": m.get("a_stats", {}),
@@ -4763,41 +4870,7 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
         "ai_battle": ai_battle, "radar": radar, "is_top": is_top_banner
     }
 
-# ================= ГРАФИЧЕСКИЙ ВИДЖЕТ LIVE-ЦЕНТРА В ЧАТЕ (BOT API 10.4 STYLE) =================
-def build_svg_scoreboard_card(l_title: str, t1: str, t2: str, score_Or_vs: str, status_txt: str, exp_g: float, best_sc: str, user_bal: float, coupon_txt: str) -> bytes:
-    """Генерирует стильное графическое окно-виджет в духе Web-App для отображения прямо в чате"""
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="440" viewBox="0 0 800 440">
-        <defs>
-            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#0b192c"/>
-                <stop offset="50%" stop-color="#060c17"/>
-                <stop offset="100%" stop-color="#040810"/>
-            </linearGradient>
-            <linearGradient id="pill" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#00e676"/>
-                <stop offset="100%" stop-color="#00b0ff"/>
-            </linearGradient>
-        </defs>
-        <rect width="800" height="440" rx="28" fill="url(#bg)" stroke="#1e3a5f" stroke-width="4"/>
-        <rect x="24" y="22" width="752" height="54" rx="16" fill="#112239" stroke="#23456e" stroke-width="1.5"/>
-        <circle cx="52" cy="49" r="9" fill="#ff5252"/>
-        <text x="72" y="55" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="bold">LIVE MATCH CENTER • {l_title}</text>
-        <text x="752" y="55" fill="#00e676" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="end">Банк: {user_bal} FC</text>
-
-        <rect x="24" y="92" width="752" height="190" rx="22" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="2"/>
-        <text x="190" y="185" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">{t1[:16]}</text>
-        <rect x="330" y="135" width="140" height="72" rx="18" fill="#162a45" stroke="#ffca28" stroke-width="2.5"/>
-        <text x="400" y="183" fill="#ffca28" font-family="Arial, sans-serif" font-size="34" font-weight="bold" text-anchor="middle">{score_Or_vs}</text>
-        <text x="610" y="185" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">{t2[:16]}</text>
-        <text x="400" y="118" fill="#80d8ff" font-family="Arial, sans-serif" font-size="17" font-weight="bold" text-anchor="middle">{status_txt}</text>
-        <text x="400" y="252" fill="#94a3b8" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">Потенциал модели: {exp_g} xG  •  Точный счет ИИ: {best_sc}</text>
-
-        <rect x="24" y="300" width="752" height="114" rx="18" fill="#102036" stroke="#00e676" stroke-width="1.8"/>
-        <text x="48" y="338" fill="#00e676" font-family="Arial, sans-serif" font-size="19" font-weight="bold">АКТИВНЫЙ ТРЕКЕР КУПОНА В РЕАЛЬНОМ ВРЕМЕНИ:</text>
-        <text x="48" y="376" fill="#f8fafc" font-family="Arial, sans-serif" font-size="20" font-weight="bold">{coupon_txt[:58]}</text>
-    </svg>"""
-    return svg.encode("utf-8")
-
+# ================= ВИДЖЕТ LIVE-ЦЕНТРА В ЧАТЕ (С ЧЕТКИМ РАЗДЕЛЕНИЕМ VS И РЕАЛЬНОГО СЧЕТА) =================
 async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
     db = await get_matches_instant()
     user = await db_manager.get_user(user_id)
@@ -4819,8 +4892,12 @@ async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeybo
         bar_blocks = max(1, min(9, round(probs["p1"] / 10)))
         visual_bar = "🟦" * bar_blocks + "⬜" * (10 - bar_blocks)
 
-        status_line = f"🔴 <b>LIVE • {cm.get('live_detail', 'В игре')}</b>" if is_live else f"🕒 Старт: <b>{cm['short_date']} МСК</b>"
-        score_box = f"<b><code>[ {cm.get('live_score', '0 : 0')} ]</code></b>" if is_live else "<b><code>[ VS ]</code></b>"
+        if is_live:
+            status_line = f"🔴 <b>LIVE • {cm.get('live_detail', 'В игре')}</b>"
+            score_box = f"<b><code>[ {cm.get('live_score', '0 : 0')} ]</code></b>"
+        else:
+            status_line = f"🕒 Начало: <b>{cm['short_date']} МСК (Не начался)</b>"
+            score_box = "<b><code>[ VS ]</code></b>"
 
         match_card = (
             f"╭──────────────────────────╮\n"
@@ -4828,7 +4905,7 @@ async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeybo
             f"  🏠 <b>{t1}</b>  {score_box}  <b>{t2}</b> ✈️\n"
             f"  📊 Перевес: {visual_bar} ({probs['p1']}% / {probs['p2']}%)\n"
             f"  🎯 <code>П1 {o['p1']}</code>  •  <code>Х {o['x']}</code>  •  <code>П2 {o['p2']}</code>  •  <code>ТБ2.5 {o['tb25']}</code>\n"
-            f"  🤖 Модель xG: <b>{cm['exp_goals']}</b> | Счёт ИИ: <b>{cm['best_score']}</b>\n"
+            f"  🤖 Ожидание ИИ: <b>{cm['exp_goals']} xG</b> (Прогноз счёта: <code>{cm['best_score']}</code>)\n"
             f"╰──────────────────────────╯"
         )
     else:
@@ -4843,7 +4920,7 @@ async def build_live_match_center_widget(user_id: int) -> tuple[str, InlineKeybo
             f"• Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{round(b['amount'] * b['odds'], 1)} FC</code></b>"
         )
     else:
-        coupon_card = "🎫 <i>Нет активных ставок — нажми на кнопку ниже, чтобы открыть интерактивный Live-Центр!</i>"
+        coupon_card = "🎫 <i>Нет активных ставок — открой интерактивный Live-Центр кнопкой ниже!</i>"
 
     text = (
         f"📱 <b>LIVE MATCH CENTER • MINI-APP WIDGET</b>\n"
@@ -4996,7 +5073,6 @@ async def api_get_match_ai(request):
     }, headers=CORS_HEADERS)
 
 def format_archive_bet_legs(b: dict) -> list[dict]:
-    """Форматирует каждый матч в архиве с явным статусом: ✅ Зашёл / ❌ Не зашёл / 🔄 Возврат"""
     st_overall = b.get("status", "loss")
     try:
         legs = json.loads(b.get("legs_json") or "[]")
@@ -5165,9 +5241,11 @@ async def api_get_state(request):
             "is_incognito": int(user.get("is_incognito") or 0),
             "referrals_count": int(user.get("referrals_count") or 0),
             "pvp_wins": int(user.get("pvp_wins") or 0),
+            "last_pvp": LAST_PVP_MATCH.get(uid),
             "achievements_unlocked": achievements_unlocked,
             "equipped_cards": buffs["squad_ids"],
             "owned_cards": buffs["owned_ids"],
+            "reserve_cards": buffs["reserve_ids"],
             "captain_role": buffs["captain"],
             "chemistry": buffs["chemistry"],
             "stadium_level": st_lvl,
@@ -5271,14 +5349,13 @@ async def api_handle_action(request):
             return web.json_response({"ok": False, "error": "Бонус уже получен сегодня! Заходи завтра."}, headers=CORS_HEADERS)
         return web.json_response({"ok": True, "message": f"🎁 Бонус ранга «{r_name}»: +{amt} FC зачислено!"}, headers=CORS_HEADERS)
 
-    # Смена игрока в активном составе FUT из собственной коллекции
     elif action == "equip_fut_card":
         card_id = str(body.get("card_id") or "")
         if card_id not in FUT_CARDS:
             return web.json_response({"ok": False, "error": "Карточка не найдена"}, headers=CORS_HEADERS)
         st = parse_user_fut_state(user)
         if card_id not in st["owned"]:
-            return web.json_response({"ok": False, "error": "Этой карточки еще нет в твоей коллекции! Выбей её в паках."}, headers=CORS_HEADERS)
+            return web.json_response({"ok": False, "error": "Этой карточки еще нет в твоей коллекции!"}, headers=CORS_HEADERS)
         c = FUT_CARDS[card_id]
         st["squad"][c["role"]] = card_id
         await db_manager.exec(
@@ -5287,7 +5364,6 @@ async def api_handle_action(request):
         )
         return web.json_response({"ok": True, "message": f"👕 {c['name']} поставлен в основной состав на позицию {c['role']}!"}, headers=CORS_HEADERS)
 
-    # Назначение Капитана состава (+25% к бонусу карточки)
     elif action == "set_fut_captain":
         role = str(body.get("role") or "FW")
         if role not in FUT_ROLES:
@@ -5299,6 +5375,45 @@ async def api_handle_action(request):
             save_user_fut_json(st["squad"], st["owned"], st["captain"]), uid
         )
         return web.json_response({"ok": True, "message": f"© Капитанская повязка передана позиции {role} (+25% к баффу)!"}, headers=CORS_HEADERS)
+
+    # ФИЧА 1: СБОРКА СОСТАВА (КРАФТ СПК — ОБМЕН 3 РЕЗЕРВНЫХ КАРТ НА ЗОЛОТОЙ ПАК ТОП-5)
+    elif action == "craft_fut_pack":
+        st = parse_user_fut_state(user)
+        active_set = set(v for v in st["squad"].values() if v)
+        reserves = [cid for cid in st["owned"] if cid not in active_set]
+        if len(reserves) < 3:
+            return web.json_response({
+                "ok": False,
+                "error": f"Для обмена СПК нужно 3 резервные карточки (не из стартового состава). Сейчас в резерве: {len(reserves)}."
+            }, headers=CORS_HEADERS)
+
+        # Сортируем резерв от самых слабых (tier 1) к сильным и забираем 3 карты
+        reserves.sort(key=lambda x: FUT_CARDS.get(x, {}).get("ovr", 80))
+        sacrificed = reserves[:3]
+        for sc_id in sacrificed:
+            if sc_id in st["owned"]:
+                st["owned"].remove(sc_id)
+
+        await db_manager.exec(
+            "UPDATE users SET fut_cards = $1 WHERE user_id = $2",
+            save_user_fut_json(st["squad"], st["owned"], st["captain"]), uid
+        )
+
+        # Выдаем бесплатный Золотой/Элитный дроп (Tier 2 или Tier 3)
+        pool_t2 = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+        pool_t3 = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
+        craft_pool = pool_t2 + pool_t3
+        craft_weights = [14] * len(pool_t2) + [5] * len(pool_t3)
+        won_card_id = random.choices(craft_pool, weights=craft_weights, k=1)[0]
+
+        res = await open_fut_pack_v2(uid, 0, won_card_id)
+        asyncio.create_task(db_manager.unlock_achievement(uid, "sbc_master"))
+        return web.json_response({
+            "ok": True,
+            "card": res["card"],
+            "status_note": f"🔄 СПК выполнен! Обменено 3 резервные карты. {res['status_note']}",
+            "new_balance": res["new_balance"]
+        }, headers=CORS_HEADERS)
 
     elif action == "set_stadium_prefs":
         ticket = str(body.get("ticket") or "optimal")
@@ -5362,12 +5477,22 @@ async def api_handle_action(request):
 
     elif action == "buy_pack":
         p_type = str(body.get("pack_type") or "basic")
+        tier1_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 1]
+        tier2_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+        tier3_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
+
         if p_type == "basic":
-            cost, pool, weights = 1500, ["fw_1", "mid_1", "def_1", "gk_1", "co_1", "fw_2", "gk_2"], [20, 20, 20, 15, 15, 5, 5]
+            cost = 1500
+            pool = tier1_keys + tier2_keys
+            weights = [12] * len(tier1_keys) + [3] * len(tier2_keys)
         elif p_type == "gold":
-            cost, pool, weights = 5000, ["fw_2", "fw_3", "mid_2", "def_2", "gk_2", "co_2", "fw_4", "mid_3"], [18, 16, 18, 16, 14, 10, 4, 4]
+            cost = 5000
+            pool = tier1_keys + tier2_keys + tier3_keys
+            weights = [4] * len(tier1_keys) + [14] * len(tier2_keys) + [3] * len(tier3_keys)
         else:
-            cost, pool, weights = 15000, ["fw_3", "mid_2", "def_2", "fw_4", "fw_5", "mid_3", "def_3", "gk_3", "co_3"], [8, 8, 8, 16, 15, 15, 10, 10, 10]
+            cost = 15000
+            pool = tier2_keys + tier3_keys
+            weights = [6] * len(tier2_keys) + [16] * len(tier3_keys)
 
         card_id = random.choices(pool, weights=weights, k=1)[0]
         res = await open_fut_pack_v2(uid, cost, card_id)
@@ -5501,9 +5626,10 @@ async def api_handle_action(request):
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
 
         asyncio.create_task(db_manager.unlock_achievement(uid, "winter_2027"))
+        boost_tag = f" [Экспресс-Буст +{res['exp_boost_pct']}%]" if res.get("exp_boost_pct", 0) > 0 else ""
         return web.json_response({
             "ok": True,
-            "message": f"⚡ Экспресс #{res['bet_id']} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC"
+            "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC"
         }, headers=CORS_HEADERS)
 
     elif action == "cashout_bet":
@@ -5562,6 +5688,7 @@ async def api_handle_action(request):
             bot_kick, bot_save = random.choice(["L", "C", "R"]), random.choice(["L", "C", "R"])
             g1, g2, log_txt = resolve_penalty_shootout(kick_dir, save_dir, bot_kick, bot_save)
             clean_log = re.sub(r"<.*?>", "", log_txt)
+            LAST_PVP_MATCH[uid] = {"mode": "bot", "target": "", "opponent_name": "🤖 Кипер Лиги", "stake": stake}
             if g1 > g2:
                 win_profit = round(stake * 0.90, 1)
                 await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $1 WHERE user_id = $2", win_profit, uid)
@@ -5591,6 +5718,7 @@ async def api_handle_action(request):
             if not res["ok"]:
                 return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
             duel_id = res["duel_id"]
+            LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(target_user["user_id"]), "opponent_name": target_user["username"], "stake": stake}
             try:
                 t_kb = InlineKeyboardBuilder()
                 t_kb.button(text=f"⚔️ Принять вызов ({stake} FC)", callback_data=f"pvp_accept_start:{duel_id}")
@@ -5618,6 +5746,10 @@ async def api_handle_action(request):
 
         await db_manager.exec("UPDATE pvp_duels SET status = 'closed' WHERE duel_id = $1", duel_id)
         await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(stake), uid)
+
+        # Сохраняем соперников для кнопки мгновенного реванша!
+        LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(d["creator_id"]), "opponent_name": d["creator_name"], "stake": stake}
+        LAST_PVP_MATCH[d["creator_id"]] = {"mode": "direct", "target": str(uid), "opponent_name": user["username"], "stake": stake}
 
         g1, g2, log_txt = resolve_penalty_shootout(d["kick_dir"], d["save_dir"], kick_dir, save_dir)
         bank = round(stake * 2 * 0.95, 1)
