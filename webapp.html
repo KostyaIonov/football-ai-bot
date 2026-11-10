@@ -33,6 +33,11 @@
             user-select: none;
         }
 
+        input, select, textarea {
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: radial-gradient(circle at 50% 0%, #102a4c 0%, #071120 45%, var(--bg-dark) 85%);
@@ -217,7 +222,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .promo-box {
@@ -248,6 +253,46 @@
         .promo-sub {
             font-size: 11px;
             color: var(--text-muted);
+        }
+
+        /* ПОИСК КОМАНДЫ НА АФИШЕ */
+        .search-box-wrap {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(14, 22, 38, 0.92);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 9px 34px 9px 12px;
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-ice);
+        }
+
+        .search-clear-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: var(--text-muted);
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            display: none;
         }
 
         /* ЛЕНТА ЛИГ */
@@ -389,8 +434,16 @@
             font-weight: 900;
             font-size: 13px;
             color: var(--accent-gold);
-            min-width: 56px;
+            min-width: 52px;
             text-align: center;
+        }
+
+        .score-pill.vs-badge {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .match-open-bar {
@@ -535,7 +588,7 @@
             border: 1px solid rgba(0, 230, 118, 0.35);
         }
 
-        /* ТАКТИЧЕСКОЕ ПОЛЕ FUT НА 5 ПОЗИЦИЙ (FW, MID, DEF, GK + COACH) */
+        /* ТАКТИЧЕСКОЕ ПОЛЕ FUT НА 5 ПОЗИЦИЙ */
         .fut-tactical-board {
             background:
                 repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 28px, transparent 28px, transparent 56px),
@@ -969,7 +1022,7 @@
 
     <div id="toast"></div>
 
-    <!-- ВЕРХНЯЯ ШАПКА С КНОПКОЙ LIVE-ЦЕНТРА -->
+    <!-- ВЕРХНЯЯ ШАПКА -->
     <header class="top-header">
         <div class="user-meta">
             <div class="user-name-row">
@@ -1019,6 +1072,13 @@
             </div>
         </div>
 
+        <!-- Быстрый поиск команды -->
+        <div class="search-box-wrap">
+            <input type="text" id="team-search-input" class="search-input" placeholder="🔎 Быстрый поиск команды (например: ЦСКА, Реал)..." oninput="onSearchTeamInput()">
+            <button class="search-clear-btn" id="search-clear-btn" onclick="clearTeamSearch()">✕</button>
+        </div>
+
+        <!-- Лента лиг + фильтр Сегодня -->
         <div class="leagues-bar" id="leagues-bar"></div>
 
         <div class="section-title" style="margin-top:4px;">
@@ -1038,6 +1098,9 @@
         </div>
 
         <div id="game-sub-pvp">
+            <!-- Баннер мгновенного реванша -->
+            <div id="pvp-rematch-banner" class="card" style="display:none; border-color:var(--accent-gold); background:rgba(255,202,40,0.08); align-items:center; justify-content:space-between; gap:10px; padding:11px 14px;"></div>
+
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <b style="font-size:15px;">⚽ Зимняя серия пенальти</b>
@@ -1123,14 +1186,13 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 3: ТАКТИЧЕСКАЯ СХЕМА FUT (5 СЛОТОВ), СЫГРАННОСТЬ И ПАКИ ==================== -->
+    <!-- ==================== ВКЛАДКА 3: ТАКТИЧЕСКАЯ СХЕМА FUT (5 СЛОТОВ), СПК И ПАКИ ==================== -->
     <section id="tab-fut" class="tab-section">
         <div class="section-title" style="margin-top:4px;">
             <span>👕 Тактическая схема (5 позиций)</span>
             <span style="font-size:12px; color:var(--accent-gold);" id="fut-chem-label">⚡ Сыгранность: 0%</span>
         </div>
 
-        <!-- Полоса сыгранности и активных баффов -->
         <div class="card" style="padding:10px 12px; margin-bottom:10px;">
             <div class="radar-bar-track" style="margin:2px 0 8px;">
                 <div id="fut-chem-bar" style="width:0%; background:linear-gradient(90deg, #ffca28, #00e676); transition:width 0.3s;"></div>
@@ -1141,18 +1203,22 @@
             </div>
         </div>
 
-        <!-- 5-слотовое футбольное поле (FW -> MID -> DEF -> GK + COACH) -->
         <div class="fut-tactical-board">
             <div class="pitch-center-circle"></div>
             <div id="fut-pitch-formation"></div>
         </div>
 
-        <!-- Отдельная кнопка открытия Коллекции и смены состава -->
-        <button class="btn-main gold btn-block" style="margin-bottom:16px; font-size:14px;" onclick="openCollectionModal('ALL')">
-            📚 Моя коллекция и смена состава (<span id="fut-owned-btn-cnt">0/21</span>)
-        </button>
+        <!-- Кнопки: Моя коллекция (без закрытых замков) и Крафт СПК -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+            <button class="btn-main gold" style="padding:11px 8px; font-size:12px;" onclick="openCollectionModal('ALL')">
+                📚 Моя коллекция (<span id="fut-owned-btn-cnt">0</span>)
+            </button>
+            <button class="btn-main" id="btn-sbc-main" style="padding:11px 8px; font-size:12px;" onclick="craftFutSbc()">
+                🔄 Крафт СПК (<span id="fut-reserve-cnt">0/3</span>)
+            </button>
+        </div>
 
-        <div class="section-title">🃏 Витрина наборов «Winter FUT»</div>
+        <div class="section-title">🃏 Витрина наборов «Winter FUT» (36 игроков)</div>
 
         <div class="pack-showcase-card">
             <div class="pack-visual-cover bronze">
@@ -1162,7 +1228,7 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:900; font-size:15px; margin-bottom:3px;">Базовый набор лиги</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Форварды, плеймейкеры, защитники, вратари и тренеры основы (+6%..+11%)</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Тюкавин, Головин, Акинфеев, Палмер, Мората, Хаби Алонсо и др. (+6%..+11%)</div>
                 <button class="btn-main" style="width:100%; padding:9px;" onclick="openFutPack('basic')">Открыть пак • 1 500 FC</button>
             </div>
         </div>
@@ -1175,7 +1241,7 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:900; font-size:15px; color:var(--accent-gold); margin-bottom:3px;">Золотой набор Топ-5</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Звезды европейских лиг: Беллингем, ван Дейк, Салах, Кейн и шанс на TOTY</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Ямаль, Левандовски, Беллингем, Родри, Рюдигер, Моуринью и шанс на TOTY!</div>
                 <button class="btn-main gold" style="width:100%; padding:9px;" onclick="openFutPack('gold')">Открыть пак • 5 000 FC</button>
             </div>
         </div>
@@ -1184,11 +1250,11 @@
             <div class="pack-visual-cover elite">
                 <span style="font-size:9px;">UCL TOTY</span>
                 <span style="font-size:26px;">💎</span>
-                <span style="font-size:10px; background:rgba(0,0,0,0.45); padding:1px 5px; border-radius:4px;">94-96</span>
+                <span style="font-size:10px; background:rgba(0,0,0,0.45); padding:1px 5px; border-radius:4px;">94-97</span>
             </div>
             <div style="flex:1;">
-                <div style="font-weight:900; font-size:15px; color:var(--accent-ice); margin-bottom:3px;">Элитный набор ЛЧ (TOTY)</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Мбаппе, Холанд, Де Брёйне, Мальдини, Куртуа и Анчелотти (до +20% и +0.30!)</div>
+                <div style="font-weight:900; font-size:15px; color:var(--accent-ice); margin-bottom:3px;">Элитный набор ЛЧ (TOTY & ICON)</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Мбаппе, Винисиус, Холанд, Зидан, Мальдини, Роберто Карлос, Буффон, Фергюсон!</div>
                 <button class="btn-main" style="width:100%; padding:9px;" onclick="openFutPack('elite')">Открыть пак • 15 000 FC</button>
             </div>
         </div>
@@ -1289,7 +1355,7 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 1: МАТЧ-ЦЕНТР (ЗАКРЫВАЕТСЯ КЛИКОМ ВВЕРХУ) ==================== -->
+    <!-- ==================== ШТОРКА 1: МАТЧ-ЦЕНТР ==================== -->
     <div class="drawer-overlay" id="match-detail-modal" onclick="handleOverlayClick(event, 'match-detail-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1300,7 +1366,7 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 2: КУПОН СТАВОК (ЗАКРЫВАЕТСЯ КЛИКОМ ВВЕРХУ) ==================== -->
+    <!-- ==================== ШТОРКА 2: КУПОН СТАВОК (С ПРОГРЕССИВНЫМ ЭКСПРЕСС-БУСТОМ) ==================== -->
     <div class="drawer-overlay" id="slip-drawer" onclick="handleOverlayClick(event, 'slip-drawer')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1309,7 +1375,10 @@
             </div>
             <div id="slip-items-list"></div>
 
-            <div style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.35); border-radius:11px; padding:8px 12px; margin:10px 0 6px; display:flex; justify-content:space-between; align-items:center;">
+            <!-- Прогрессивный Экспресс-Буст (3 матча: +5%, 4: +10%, 5: +15%, 6: +25%) -->
+            <div id="drawer-exp-boost-box" style="background:rgba(255,202,40,0.1); border:1px solid rgba(255,202,40,0.35); border-radius:11px; padding:7px 11px; margin:8px 0; font-size:11px;"></div>
+
+            <div style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.35); border-radius:11px; padding:8px 12px; margin:8px 0 6px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:12px; color:#cbd5e1;">💰 Твой доступный баланс:</span>
                 <b style="font-size:14px; color:var(--accent-green);" id="drawer-user-balance">0 FC</b>
             </div>
@@ -1338,19 +1407,20 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 3: ОТДЕЛЬНОЕ ОКНО КОЛЛЕКЦИИ И СМЕНЫ СОСТАВА FUT ==================== -->
+    <!-- ==================== ШТОРКА 3: МОЯ КОЛЛЕКЦИЯ КАРТОЧЕК (ТОЛЬКО ОТКРЫТЫЕ + СПК) ==================== -->
     <div class="drawer-overlay" id="collection-modal" onclick="handleOverlayClick(event, 'collection-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
-                <b style="font-size:15px;">📚 Коллекция карточек и Смена состава</b>
+                <b style="font-size:15px;">📚 Моя коллекция и Смена состава</b>
                 <button class="close-x" onclick="document.getElementById('collection-modal').classList.remove('show')">✕</button>
             </div>
+            <div id="collection-sbc-banner" style="margin-bottom:10px;"></div>
             <div id="collection-filter-bar" class="leagues-bar" style="margin-bottom:10px;"></div>
-            <div id="collection-modal-body" class="collection-grid"></div>
+            <div id="collection-modal-body"></div>
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 4: ИНТЕРАКТИВНЫЙ ВИДЖЕТ LIVE-ЦЕНТРА (BOT API 10.4 VIEW) ==================== -->
+    <!-- ==================== ШТОРКА 4: ИНТЕРАКТИВНЫЙ LIVE-ЦЕНТР (BOT API 10.4 VIEW) ==================== -->
     <div class="drawer-overlay" id="live-widget-modal" onclick="handleOverlayClick(event, 'live-widget-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-red);">
             <div class="sheet-header">
@@ -1403,8 +1473,7 @@
             <span class="ico">👤</span>
             <span>Профиль</span>
         </div>
-    </nav>
-    <script>
+        <script>
         const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
         if (tg) {
             tg.ready();
@@ -1415,6 +1484,25 @@
             } catch (e) {}
         }
 
+        // Автоматическое скрытие мобильной клавиатуры при нажатии в свободную часть экрана
+        document.addEventListener('touchstart', function(e) {
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+                if (!e.target.closest('input, textarea, select, button, .chip-btn')) {
+                    active.blur();
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('click', function(e) {
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+                if (!e.target.closest('input, textarea, select, button, .chip-btn')) {
+                    active.blur();
+                }
+            }
+        });
+
         const urlParams = new URLSearchParams(window.location.search);
         const CURRENT_UID = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id)
             ? tg.initDataUnsafe.user.id
@@ -1423,6 +1511,7 @@
 
         let APP_STATE = null;
         let SELECTED_LEAGUE = 'top';
+        let SEARCH_QUERY = '';
         let SLIP_ITEMS = [];
         let SE_DRAFTS = {};
         let PVP_DIRS = { kick: 'C', save: 'C' };
@@ -1477,6 +1566,7 @@
         function handleOverlayClick(event, modalId) {
             if (event.target.id === modalId) {
                 haptic('light');
+                if (document.activeElement) document.activeElement.blur();
                 document.getElementById(modalId).classList.remove('show');
                 if (modalId === 'match-detail-modal') {
                     CURRENT_OPEN_MATCH = null;
@@ -1487,6 +1577,7 @@
         /* НАВИГАЦИЯ ПО ВКЛАДКАМ */
         function switchTab(tabName, navEl) {
             haptic('light');
+            if (document.activeElement) document.activeElement.blur();
             document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             const target = document.getElementById('tab-' + tabName);
@@ -1497,6 +1588,7 @@
 
         function switchGameSub(subName, btnEl) {
             haptic('light');
+            if (document.activeElement) document.activeElement.blur();
             ['pvp', 'market', 'roulette'].forEach(k => {
                 document.getElementById('game-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
             });
@@ -1506,6 +1598,7 @@
 
         function switchProfileSub(subName, btnEl) {
             haptic('light');
+            if (document.activeElement) document.activeElement.blur();
             ['active', 'archive', 'top', 'trophies'].forEach(k => {
                 document.getElementById('prof-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
             });
@@ -1616,11 +1709,29 @@
             }
         }
 
-        /* ==================== 1. ЛЕНТА ТУРНИРОВ И ТОП-АФИША ==================== */
+        /* ==================== 1. ПОИСК КОМАНДЫ, ФИЛЬТР СЕГОДНЯ И ЛЕНТА ТУРНИРОВ ==================== */
+        function onSearchTeamInput() {
+            const inp = document.getElementById('team-search-input');
+            SEARCH_QUERY = (inp.value || '').trim().toLowerCase();
+            document.getElementById('search-clear-btn').style.display = SEARCH_QUERY ? 'block' : 'none';
+            renderMatchesFeed();
+        }
+
+        function clearTeamSearch() {
+            haptic('light');
+            const inp = document.getElementById('team-search-input');
+            inp.value = '';
+            SEARCH_QUERY = '';
+            document.getElementById('search-clear-btn').style.display = 'none';
+            inp.blur();
+            renderMatchesFeed();
+        }
+
         function renderLeaguesBar() {
             const bar = document.getElementById('leagues-bar');
             const allMatches = APP_STATE.matches || [];
             const liveCount = allMatches.filter(m => m.is_live).length;
+            const todayCount = allMatches.filter(m => m.is_today).length;
             const leagues = APP_STATE.leagues || [];
 
             let html = `
@@ -1632,6 +1743,13 @@
                 html += `
                     <div class="league-chip ${SELECTED_LEAGUE === 'live' ? 'active' : ''}" onclick="selectLeagueFilter('live')">
                         🔴 LIVE <span class="chip-cnt">${liveCount}</span>
+                    </div>
+                `;
+            }
+            if (todayCount > 0) {
+                html += `
+                    <div class="league-chip ${SELECTED_LEAGUE === 'today' ? 'active' : ''}" onclick="selectLeagueFilter('today')">
+                        📅 Сегодня <span class="chip-cnt">${todayCount}</span>
                     </div>
                 `;
             }
@@ -1654,18 +1772,29 @@
         }
 
         function getFilteredMatches() {
-            const all = APP_STATE.matches || [];
+            let list = APP_STATE.matches || [];
             if (SELECTED_LEAGUE === 'top') {
                 document.getElementById('current-feed-title').textContent = '🎄 Ближайшие матчи и LIVE';
-                return all;
-            }
-            if (SELECTED_LEAGUE === 'live') {
+            } else if (SELECTED_LEAGUE === 'live') {
                 document.getElementById('current-feed-title').textContent = '🔴 Прямой эфир (LIVE)';
-                return all.filter(m => m.is_live);
+                list = list.filter(m => m.is_live);
+            } else if (SELECTED_LEAGUE === 'today') {
+                document.getElementById('current-feed-title').textContent = '📅 Матчи сегодня';
+                list = list.filter(m => m.is_today);
+            } else {
+                const lgObj = (APP_STATE.leagues || []).find(l => l.key === SELECTED_LEAGUE);
+                document.getElementById('current-feed-title').textContent = lgObj ? lgObj.title : 'Матчи турнира';
+                list = list.filter(m => m.league_key === SELECTED_LEAGUE);
             }
-            const lgObj = (APP_STATE.leagues || []).find(l => l.key === SELECTED_LEAGUE);
-            document.getElementById('current-feed-title').textContent = lgObj ? lgObj.title : 'Матчи турнира';
-            return all.filter(m => m.league_key === SELECTED_LEAGUE);
+
+            if (SEARCH_QUERY) {
+                document.getElementById('current-feed-title').textContent = `🔎 Поиск: «${SEARCH_QUERY}»`;
+                list = (APP_STATE.matches || []).filter(m =>
+                    m.teams.toLowerCase().includes(SEARCH_QUERY) ||
+                    m.league_title.toLowerCase().includes(SEARCH_QUERY)
+                );
+            }
+            return list;
         }
 
         function renderMatchesFeed() {
@@ -1673,7 +1802,7 @@
             const list = getFilteredMatches();
 
             if (!list.length) {
-                box.innerHTML = '<div class="card" style="text-align:center; color:var(--text-muted); padding:22px;">В выбранной категории сейчас нет матчей.</div>';
+                box.innerHTML = '<div class="card" style="text-align:center; color:var(--text-muted); padding:22px;">Матчей по выбранному фильтру не найдено.</div>';
                 return;
             }
 
@@ -1688,9 +1817,10 @@
                     ? `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`
                     : `<span>🕒 ${m.short_date}</span>`;
 
+                // В центре табло только реальный счет для LIVE или четкий бейдж VS для предстоящих матчей!
                 const scoreCenter = m.is_live
                     ? `<div class="score-pill">${m.live_score}</div>`
-                    : `<div class="score-pill" style="color:var(--text-muted); font-size:11px;">${m.best_score}</div>`;
+                    : `<div class="score-pill vs-badge">VS</div>`;
 
                 const o = m.odds;
                 const safeTeams = escQuotes(m.teams);
@@ -1724,8 +1854,8 @@
                                 <div class="team-name away">${m.away_team}</div>
                             </div>
                             <div class="match-open-bar">
-                                <span>🤖 xG: ${m.exp_goals} • Прогноз: ${m.best_score}</span>
-                                <span>📊 Вся роспись (45+) ➔</span>
+                                <span>🤖 Прогноз ИИ: <b>${m.best_score}</b> (${m.exp_goals} xG)</span>
+                                <span>📊 Роспись (45+) ➔</span>
                             </div>
                         </div>
                         ${oddsRow}
@@ -1734,7 +1864,7 @@
             }).join('');
         }
 
-        /* ==================== 2. ИНТЕРАКТИВНЫЙ ВИДЖЕТ LIVE MATCH CENTER (BOT API 10.4) ==================== */
+        /* ==================== 2. ИНТЕРАКТИВНЫЙ ВИДЖЕТ LIVE MATCH CENTER (БЕЗ ПУТАНИЦЫ СЧЕТА) ==================== */
         function openLiveCenterWidget() {
             haptic('medium');
             renderLiveCenterWidgetBody();
@@ -1755,7 +1885,11 @@
                 const pxPct = Math.max(5, 100 - p1Pct - p2Pct);
                 const statusBadge = m.is_live
                     ? `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`
-                    : `<span style="font-size:11px; color:var(--accent-ice);">🕒 Ближайший • ${m.short_date}</span>`;
+                    : `<span style="font-size:11px; color:var(--accent-ice);">🕒 Старт: ${m.short_date} (Не начался)</span>`;
+
+                const centerTablo = m.is_live
+                    ? `<div class="score-pill" style="font-size:16px; color:var(--accent-red);">${m.live_score}</div>`
+                    : `<div class="score-pill vs-badge" style="font-size:12px;">VS</div>`;
 
                 return `
                     <div class="card" style="border-color:${m.is_live ? 'var(--accent-red)' : 'var(--border-frost)'}; margin-bottom:10px;">
@@ -1765,14 +1899,12 @@
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                             <b style="flex:1; font-size:14px;">🏠 ${m.home_team}</b>
-                            <div class="score-pill" style="font-size:16px; color:${m.is_live ? 'var(--accent-red)' : 'var(--accent-gold)'};">
-                                ${m.is_live ? m.live_score : m.best_score}
-                            </div>
+                            ${centerTablo}
                             <b style="flex:1; font-size:14px; text-align:right;">${m.away_team} ✈️</b>
                         </div>
                         <div style="font-size:10px; color:var(--text-muted); display:flex; justify-content:space-between;">
-                            <span>Импульс атаки: ${p1Pct}%</span>
-                            <span>Потенциал: <b style="color:var(--accent-green);">${m.exp_goals} xG</b></span>
+                            <span>Перевес: ${p1Pct}%</span>
+                            <span>🤖 Ожидание ИИ: <b style="color:var(--accent-gold);">${m.best_score}</b> (${m.exp_goals} xG)</span>
                             <span>${p2Pct}%</span>
                         </div>
                         <div class="radar-bar-track" style="margin:4px 0 8px;">
@@ -1847,9 +1979,9 @@
 
             const scoreHeader = m.is_live
                 ? `<div style="font-size:22px; font-weight:900; color:var(--accent-red); margin:3px 0;">${m.live_score}</div>
-                   <div style="font-size:11px; color:var(--accent-red); font-weight:800;">🔴 ИДЕТ МАТЧ (${m.live_detail})</div>`
-                : `<div style="font-size:16px; font-weight:900; color:var(--accent-gold); margin:3px 0;">Счет ИИ: ${m.best_score}</div>
-                   <div style="font-size:11px; color:var(--text-muted);">🏟 ${m.venue}</div>`;
+                   <div style="font-size:10px; color:var(--accent-red); font-weight:800;">🔴 СЧЕТ В LIVE (${m.live_detail})</div>`
+                : `<div style="font-size:14px; font-weight:900; color:var(--text-muted); margin:3px 0;">VS (Не начался)</div>
+                   <div style="font-size:11px; color:var(--accent-gold); font-weight:700;">🤖 Прогноз ИИ: ${m.best_score}</div>`;
 
             let marketsHtml = '';
             if (m.is_live) {
@@ -2006,7 +2138,16 @@
             document.getElementById('match-detail-modal').classList.remove('show');
         }
 
-        /* ==================== 4. КУПОН СТАВОК (BET SLIP) ==================== */
+        /* ==================== 4. КУПОН СТАВОК С ПРОГРЕССИВНЫМ ЭКСПРЕСС-БУСТОМ ==================== */
+        function getClientExpressBoost(count) {
+            if (count >= 6) return { mult: 1.25, pct: 25, nextTxt: '🔥 Максимальный Экспресс-Буст +25% активирован!' };
+            if (count === 5) return { mult: 1.15, pct: 15, nextTxt: '🚀 Активен буст +15% (добавь ещё 1 матч для +25%!)' };
+            if (count === 4) return { mult: 1.10, pct: 10, nextTxt: '🚀 Активен буст +10% (добавь ещё 1 матч для +15%!)' };
+            if (count === 3) return { mult: 1.05, pct: 5, nextTxt: '🚀 Активен буст +5% (добавь ещё 1 матч для +10%!)' };
+            const need = 3 - count;
+            return { mult: 1.0, pct: 0, nextTxt: `💡 Добавь ещё ${need} ${need === 1 ? 'матч' : 'матча'} для Экспресс-Буста +5% к кэфу!` };
+        }
+
         function togglePick(league_key, event_id, pick_code, pickLabel, oddVal, teamsTitle) {
             haptic('medium');
             const evStr = String(event_id);
@@ -2042,6 +2183,9 @@
         function calculateSlipOdd() {
             if (!SLIP_ITEMS.length) return 1.0;
             const raw = SLIP_ITEMS.reduce((acc, it) => acc * it.oddVal, 1.0);
+            const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
+            let boosted = raw * boostInfo.mult;
+
             const u = (APP_STATE && APP_STATE.user) ? APP_STATE.user : {};
             const buffs = u.fut_buffs || {};
             let bonus = Number(buffs.lab_odd_boost || 0);
@@ -2051,7 +2195,7 @@
             if (u.active_booster === 'boost035') {
                 bonus += 0.35;
             }
-            return raw + bonus;
+            return boosted + bonus;
         }
 
         function renderSlipUI() {
@@ -2063,7 +2207,9 @@
             bar.style.display = 'flex';
             document.getElementById('slip-count').textContent = SLIP_ITEMS.length;
             document.getElementById('slip-total-odd').textContent = calculateSlipOdd().toFixed(2);
-            document.getElementById('slip-mode-label').textContent = SLIP_ITEMS.length > 1 ? '• ⚡ Экспресс' : '• ⚽ Ординар';
+            const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
+            const boostBadge = boostInfo.pct > 0 ? ` (+${boostInfo.pct}%)` : '';
+            document.getElementById('slip-mode-label').textContent = SLIP_ITEMS.length > 1 ? `• ⚡ Экспресс${boostBadge}` : '• ⚽ Ординар';
         }
 
         function openSlipDrawer() {
@@ -2075,6 +2221,10 @@
 
             const uBal = (APP_STATE && APP_STATE.user) ? APP_STATE.user.balance : 0;
             document.getElementById('drawer-user-balance').textContent = formatFC(uBal);
+
+            const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
+            const boostBox = document.getElementById('drawer-exp-boost-box');
+            boostBox.innerHTML = `<b style="color:var(--accent-gold);">${boostInfo.nextTxt}</b>`;
 
             document.getElementById('slip-items-list').innerHTML = SLIP_ITEMS.map((it, idx) => `
                 <div class="stadium-row" style="margin-bottom:6px;">
@@ -2092,6 +2242,7 @@
         }
 
         function closeSlipDrawer() {
+            if (document.activeElement) document.activeElement.blur();
             document.getElementById('slip-drawer').classList.remove('show');
         }
 
@@ -2131,6 +2282,7 @@
         }
 
         async function submitSlip() {
+            if (document.activeElement) document.activeElement.blur();
             const stake = parseInt(document.getElementById('slip-stake-input').value || '0', 10);
             if (!stake || stake < 10) return showToast('Минимальная сумма ставки — 10 FC!', true);
 
@@ -2176,10 +2328,10 @@
             renderMatchesFeed();
             renderSlipUI();
             openSlipDrawer();
-            showToast('⚡ Экспресс дня загружен в твой купон!');
+            showToast('⚡ Экспресс дня (+25% буст) загружен в купон!');
         }
 
-        /* ==================== 5. ТАКТИЧЕСКОЕ ПОЛЕ FUT (5 ПОЗИЦИЙ) И ОКНО КОЛЛЕКЦИИ ==================== */
+        /* ==================== 5. ТАКТИЧЕСКОЕ ПОЛЕ FUT, ЧИСТАЯ КОЛЛЕКЦИЯ И КРАФТ СПК ==================== */
         function renderFutSlotHtml(roleKey, roleTitle, eqCards, catalog, captainRole) {
             const cid = eqCards[roleKey] || '';
             const c = cid ? catalog[cid] : null;
@@ -2201,7 +2353,7 @@
             const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
             const shortName = c.name.split(' ').slice(1).join(' ') || c.name;
             return `
-                <div class="fut-shield ${tierCls}" onclick="onPitchCardClick('${roleKey}')">
+                <div class="fut-shield ${tierCls}" onclick="openCollectionModal('${roleKey}')">
                     ${capBadge}
                     <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 85}</span></div>
                     <div class="shield-avatar">${c.nation || '⚽'}</div>
@@ -2214,20 +2366,28 @@
         function renderFutTab(u, catalog) {
             const eqCards = u.equipped_cards || {};
             const ownedIds = u.owned_cards || [];
+            const reserveIds = u.reserve_cards || [];
             const capRole = u.captain_role || 'FW';
             const chem = u.chemistry || 0;
             const buffs = u.fut_buffs || {};
 
             document.getElementById('fut-chem-label').textContent = `⚡ Сыгранность: ${chem}%`;
             document.getElementById('fut-chem-bar').style.width = `${chem}%`;
-            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length}/${Object.keys(catalog).length}`;
+            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length} карт`;
+            document.getElementById('fut-reserve-cnt').textContent = `${reserveIds.length}/3`;
+
+            const sbcBtn = document.getElementById('btn-sbc-main');
+            if (reserveIds.length >= 3) {
+                sbcBtn.classList.remove('ghost');
+            } else {
+                sbcBtn.classList.add('ghost');
+            }
 
             document.getElementById('fut-active-buffs-summary').innerHTML = `
                 • ⚡ Форвард (Тоталы): <b style="color:var(--accent-green);">+${buffs.totals_profit_pct || 0}%</b> | 🎯 Плеймейкер (1Х2/Таймы): <b style="color:var(--accent-green);">+${buffs.outcomes_profit_pct || 0}%</b><br>
                 • 🛡 Защитник (Форы/ОЗ): <b style="color:var(--accent-green);">+${buffs.handicap_profit_pct || 0}%</b> | 🧤 Вратарь (Кэшбэк): <b style="color:var(--accent-gold);">${buffs.loss_cashback_pct || 0}%</b> | 📋 Тренер: <b style="color:var(--accent-ice);">+${buffs.express_odd_boost || 0}</b>
             `;
 
-            // Строим тактическую схему: Атака (FW) -> Центр (MID + DEF) -> Ворота и Тренер (GK + COACH)
             document.getElementById('fut-pitch-formation').innerHTML = `
                 <div class="pitch-row">
                     ${renderFutSlotHtml('FW', 'Форвард', eqCards, catalog, capRole)}
@@ -2243,11 +2403,6 @@
             `;
         }
 
-        async function onPitchCardClick(roleKey) {
-            haptic('light');
-            openCollectionModal(roleKey);
-        }
-
         function openCollectionModal(roleFilter = 'ALL') {
             haptic('light');
             COLLECTION_FILTER = roleFilter;
@@ -2260,11 +2415,32 @@
             const u = APP_STATE.user;
             const catalog = APP_STATE.fut_catalog || {};
             const ownedIds = u.owned_cards || [];
+            const reserveIds = u.reserve_cards || [];
             const eqCards = u.equipped_cards || {};
             const capRole = u.captain_role || 'FW';
 
+            // Баннер Крафта СПК внутри коллекции
+            const sbcBanner = document.getElementById('collection-sbc-banner');
+            if (reserveIds.length >= 3) {
+                sbcBanner.innerHTML = `
+                    <div class="card" style="padding:10px 12px; border-color:var(--accent-gold); background:rgba(255,202,40,0.08); display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+                        <div style="font-size:11px;">
+                            <b style="color:var(--accent-gold);">🔄 Мастерская СПК готова!</b><br>
+                            <span style="color:var(--text-muted);">В резерве ${reserveIds.length} карт. Обменяй 3 слабые резервные карты на Золотой Пак Топ-5!</span>
+                        </div>
+                        <button class="btn-main gold" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="craftFutSbc()">Обменять 3➔1</button>
+                    </div>
+                `;
+            } else {
+                sbcBanner.innerHTML = `
+                    <div style="font-size:11px; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:8px 11px; border-radius:10px;">
+                        🔄 <b>Крафт СПК:</b> собери 3 резервные карточки (не в стартовом составе), чтобы бесплатно обменять их на <b>Золотой Пак Топ-5</b>! Сейчас в резерве: <b>${reserveIds.length}/3</b>.
+                    </div>
+                `;
+            }
+
             const roles = [
-                { k: 'ALL', lbl: 'Все карты' },
+                { k: 'ALL', lbl: `Мои карты (${ownedIds.length})` },
                 { k: 'FW', lbl: '⚡ FW' },
                 { k: 'MID', lbl: '🎯 MID' },
                 { k: 'DEF', lbl: '🛡 DEF' },
@@ -2278,32 +2454,47 @@
                 </div>
             `).join('');
 
-            const keys = Object.keys(catalog).filter(cid => COLLECTION_FILTER === 'ALL' || catalog[cid].role === COLLECTION_FILTER);
+            // Отображаем СТРОГО ТОЛЬКО карточки, которые есть у игрока! Никаких закрытых замков!
+            const myFilteredKeys = ownedIds
+                .filter(cid => catalog[cid] && (COLLECTION_FILTER === 'ALL' || catalog[cid].role === COLLECTION_FILTER))
+                .sort((a, b) => (catalog[b].ovr || 85) - (catalog[a].ovr || 85));
 
-            document.getElementById('collection-modal-body').innerHTML = keys.map(cid => {
+            const bodyBox = document.getElementById('collection-modal-body');
+            if (!myFilteredKeys.length) {
+                bodyBox.className = '';
+                bodyBox.innerHTML = `
+                    <div class="card" style="text-align:center; padding:22px 14px;">
+                        <div style="font-size:32px; margin-bottom:6px;">🃏</div>
+                        <div style="font-weight:800; font-size:14px; margin-bottom:4px;">На этой позиции у тебя пока нет карточек</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Открой любой набор на витрине «Winter FUT», чтобы пополнить свою коллекцию!</div>
+                        <button class="btn-main" onclick="document.getElementById('collection-modal').classList.remove('show')">Перейти к наборам</button>
+                    </div>
+                `;
+                return;
+            }
+
+            bodyBox.className = 'collection-grid';
+            bodyBox.innerHTML = myFilteredKeys.map(cid => {
                 const c = catalog[cid];
-                const isOwned = ownedIds.includes(cid);
                 const isEquipped = eqCards[c.role] === cid;
                 const isCap = (isEquipped && capRole === c.role);
                 const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
                 const shortName = c.name.split(' ').slice(1).join(' ') || c.name;
 
                 let actionBtn = '';
-                if (!isOwned) {
-                    actionBtn = `<div class="shield-buff" style="color:var(--text-muted); background:rgba(255,255,255,0.05);">🔒 Пак: ${c.pack}</div>`;
-                } else if (isEquipped) {
+                if (isEquipped) {
                     actionBtn = isCap
-                        ? `<div class="shield-buff" style="background:var(--accent-gold); color:#041019;">© Капитан состава</div>`
-                        : `<div class="shield-buff" style="background:var(--accent-blue); color:#041019;" onclick="event.stopPropagation(); setFutCaptain('${c.role}')">Назначить © Капитаном</div>`;
+                        ? `<div class="shield-buff" style="background:var(--accent-gold); color:#041019;">© Капитан</div>`
+                        : `<div class="shield-buff" style="background:var(--accent-blue); color:#041019;" onclick="event.stopPropagation(); setFutCaptain('${c.role}')">Дать © Капитана</div>`;
                 } else {
-                    actionBtn = `<div class="shield-buff" style="background:var(--accent-green); color:#041019;" onclick="event.stopPropagation(); equipFutCard('${cid}')">Поставить в состав</div>`;
+                    actionBtn = `<div class="shield-buff" style="background:var(--accent-green); color:#041019;" onclick="event.stopPropagation(); equipFutCard('${cid}')">В состав</div>`;
                 }
 
                 return `
-                    <div class="fut-shield ${isOwned ? tierCls : 'locked'}" onclick="${isOwned && !isEquipped ? `equipFutCard('${cid}')` : ''}">
-                        ${isEquipped ? '<span class="captain-badge" style="background:#00e676;">В СОСТАВЕ</span>' : ''}
+                    <div class="fut-shield ${tierCls}" onclick="${!isEquipped ? `equipFutCard('${cid}')` : ''}">
+                        ${isEquipped ? '<span class="captain-badge" style="background:#00e676;">ОСНОВА</span>' : '<span class="captain-badge" style="background:rgba(255,255,255,0.2); color:#fff;">РЕЗЕРВ</span>'}
                         <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 85}</span></div>
-                        <div class="shield-avatar">${isOwned ? (c.nation || '⚽') : '🔒'}</div>
+                        <div class="shield-avatar">${c.nation || '⚽'}</div>
                         <div class="shield-name">${shortName}</div>
                         <div style="font-size:8.5px; color:#cbd5e1; margin-bottom:4px;">${c.desc}</div>
                         ${actionBtn}
@@ -2328,6 +2519,28 @@
             showToast(res.message);
             await loadAppState(true);
             renderCollectionModalContent();
+        }
+
+        async function craftFutSbc() {
+            haptic('medium');
+            const res = await apiAction({ action: 'craft_fut_pack' });
+            if (!res.ok) return showToast(res.error, true);
+
+            document.getElementById('collection-modal').classList.remove('show');
+            const c = res.card;
+            const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
+            document.getElementById('pack-modal-card-preview').innerHTML = `
+                <div class="fut-shield ${tierCls}" style="width:140px;">
+                    <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 91}</span></div>
+                    <div class="shield-avatar" style="font-size:32px;">${c.nation || '⭐'}</div>
+                    <div class="shield-name" style="font-size:12px;">${c.name}</div>
+                    <div class="shield-buff" style="font-size:10px;">${c.desc}</div>
+                </div>
+            `;
+            document.getElementById('pack-modal-note').textContent = res.status_note;
+            document.getElementById('pack-modal').classList.add('show');
+            haptic('success');
+            await loadAppState(true);
         }
 
         async function openFutPack(type) {
@@ -2376,7 +2589,6 @@
                 `<option value="${c}" ${c === u.favorite_club ? 'selected' : ''}>${c === u.favorite_club ? '⭐ ' + c : c}</option>`
             ).join('');
 
-            // Активные ставки
             const actBox = document.getElementById('prof-sub-active');
             const actList = APP_STATE.active_bets || [];
             if (!actList.length) {
@@ -2398,7 +2610,6 @@
                 `).join('');
             }
 
-            // АРХИВ СТАВОК: статус (✅ Зашёл / ❌ Не зашёл) прямо напротив каждого матча!
             const archBox = document.getElementById('prof-sub-archive');
             const archList = APP_STATE.archive_bets || [];
             if (!archList.length) {
@@ -2437,7 +2648,6 @@
                 }).join('');
             }
 
-            // Топ-10 капперов
             const topBox = document.getElementById('prof-sub-top');
             const medals = ['🥇', '🥈', '🥉'];
             const incogLabel = u.is_incognito ? '🟢 Режим Инкогнито: ВКЛ' : '🕶 Режим Инкогнито: ВЫКЛ';
@@ -2452,7 +2662,6 @@
             `).join('');
             topBox.innerHTML = `<button class="btn-main ghost btn-block" style="margin-bottom:10px;" onclick="toggleIncognito()">${incogLabel}</button>${topRows}`;
 
-            // Трофеи (25 достижений)
             const trBox = document.getElementById('prof-sub-trophies');
             const unlocked = u.achievements_unlocked || [];
             const allAch = APP_STATE.all_achievements || {};
@@ -2470,7 +2679,7 @@
             }).join('');
         }
 
-        /* ==================== 7. ОСТАЛЬНЫЕ ИГРОВЫЕ ДЕЙСТВИЯ (ИМПЕРИЯ, PVP, РУЛЕТКА) ==================== */
+        /* ==================== 7. АРЕНА, PVP С РЕВАНШЕМ И РУЛЕТКА ==================== */
         function renderEmpireTab(u, catalog, secretOffer, sponsorsList) {
             const st = u.stadium_info || {};
             const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_bet' };
@@ -2558,6 +2767,21 @@
             const u = APP_STATE.user;
             document.getElementById('ui-pvp-wins').textContent = u.pvp_wins || 0;
 
+            // Баннер мгновенного реванша
+            const remBanner = document.getElementById('pvp-rematch-banner');
+            if (u.last_pvp && u.last_pvp.stake) {
+                remBanner.style.display = 'flex';
+                remBanner.innerHTML = `
+                    <div style="font-size:12px;">
+                        <b style="color:var(--accent-gold);">⚔️ Быстрый реванш!</b><br>
+                        <span style="font-size:11px; color:var(--text-muted);">Соперник: <b style="color:#fff;">${u.last_pvp.opponent_name}</b> • Ставка: <b>${formatFC(u.last_pvp.stake)}</b></span>
+                    </div>
+                    <button class="btn-main gold" style="padding:8px 12px; font-size:11px; white-space:nowrap;" onclick="triggerPvpRematch()">🔥 Реванш!</button>
+                `;
+            } else {
+                remBanner.style.display = 'none';
+            }
+
             const duels = APP_STATE.pvp_duels || [];
             const lobbyBox = document.getElementById('pvp-lobby-container');
             if (!duels.length) {
@@ -2625,7 +2849,25 @@
             btnEl.classList.add('active');
         }
 
+        async function triggerPvpRematch() {
+            if (!APP_STATE || !APP_STATE.user || !APP_STATE.user.last_pvp) return;
+            haptic('medium');
+            const lp = APP_STATE.user.last_pvp;
+            const res = await apiAction({
+                action: 'pvp_create',
+                mode: lp.mode,
+                stake: lp.stake,
+                kick: PVP_DIRS.kick,
+                save: PVP_DIRS.save,
+                target: lp.target || ''
+            });
+            if (!res.ok) return showToast(res.error, true);
+            showToast('⚔️ ' + res.message);
+            await loadAppState(true);
+        }
+
         async function createPvpDuel(mode) {
+            if (document.activeElement) document.activeElement.blur();
             const stake = parseInt(document.getElementById('pvp-stake-input').value || '0', 10);
             const target = document.getElementById('pvp-target-input').value || '';
             const res = await apiAction({ action: 'pvp_create', mode, stake, kick: PVP_DIRS.kick, save: PVP_DIRS.save, target });
@@ -2783,6 +3025,7 @@
         }
 
         async function saveNickname(mode) {
+            if (document.activeElement) document.activeElement.blur();
             const val = document.getElementById('nick-input').value || '';
             const res = await apiAction({ action: 'set_nickname', mode, nickname: val });
             if (!res.ok) return showToast(res.error, true);
@@ -2822,3 +3065,4 @@
     </script>
 </body>
 </html>
+    </nav>
