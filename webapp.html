@@ -1350,3 +1350,1180 @@
             <span>Профиль</span>
         </div>
     </nav>
+    <script>
+        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            try {
+                tg.setHeaderColor('#060a12');
+                tg.setBackgroundColor('#060a12');
+            } catch (e) {}
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const CURRENT_UID = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id)
+            ? tg.initDataUnsafe.user.id
+            : (parseInt(urlParams.get('uid') || '0', 10));
+
+        let APP_STATE = null;
+        let SELECTED_LEAGUE = 'top';
+        let SLIP_ITEMS = [];         // Выбранные исходы для купона
+        let SE_DRAFTS = {};          // Выборы Суперэкспресса
+        let PVP_DIRS = { kick: 'C', save: 'C' };
+        let MATCH_AI_CACHE = {};
+        let CURRENT_OPEN_MATCH = null;
+        let WHEEL_ROTATION = 0;
+        let IS_SPINNING = false;
+
+        function haptic(type = 'light') {
+            if (!tg || !tg.HapticFeedback) return;
+            try {
+                if (['success', 'warning', 'error'].includes(type)) tg.HapticFeedback.notificationOccurred(type);
+                else tg.HapticFeedback.impactOccurred(type);
+            } catch (e) {}
+        }
+
+        function showToast(msg, isError = false) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.style.borderColor = isError ? 'var(--accent-red)' : 'var(--accent-green)';
+            el.style.display = 'block';
+            haptic(isError ? 'error' : 'success');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2900);
+        }
+
+        function formatFC(num) {
+            return Number(num || 0).toLocaleString('ru-RU') + ' FC';
+        }
+
+        function escQuotes(str) {
+            return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        function copyUserId() {
+            if (!CURRENT_UID) return;
+            if (navigator.clipboard) navigator.clipboard.writeText(String(CURRENT_UID));
+            showToast('📋 Твой ID (' + CURRENT_UID + ') скопирован!');
+        }
+
+        /* НАВИГАЦИЯ */
+        function switchTab(tabName, navEl) {
+            haptic('light');
+            document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const target = document.getElementById('tab-' + tabName);
+            if (target) target.classList.add('active');
+            if (navEl) navEl.classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function switchGameSub(subName, btnEl) {
+            haptic('light');
+            ['pvp', 'market', 'roulette'].forEach(k => {
+                document.getElementById('game-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
+            });
+            btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+
+        function switchProfileSub(subName, btnEl) {
+            haptic('light');
+            ['active', 'archive', 'top', 'trophies'].forEach(k => {
+                document.getElementById('prof-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
+            });
+            btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+
+        async function apiAction(payload) {
+            try {
+                const res = await fetch('/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: CURRENT_UID, ...payload })
+                });
+                return await res.json();
+            } catch (e) {
+                return { ok: false, error: 'Ошибка соединения с сервером' };
+            }
+        }
+
+        async function loadAppState() {
+            if (!CURRENT_UID) {
+                document.getElementById('ui-username').textContent = 'Открой через бота';
+                return;
+            }
+            try {
+                const resp = await fetch('/api/state/' + CURRENT_UID);
+                const data = await resp.json();
+                if (!data.ok) return showToast(data.error || 'Ошибка', true);
+                APP_STATE = data;
+                renderAll();
+            } catch (e) {
+                showToast('Ошибка сети', true);
+            }
+        }
+
+        function renderAll() {
+            if (!APP_STATE) return;
+            const u = APP_STATE.user;
+
+            document.getElementById('ui-username').textContent = u.username;
+            document.getElementById('ui-user-id').textContent = u.user_id;
+            document.getElementById('ui-rank').textContent = u.rank + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
+            document.getElementById('ui-balance').textContent = formatFC(u.balance);
+
+            const bonusBanner = document.getElementById('bonus-banner');
+            if (u.can_claim_bonus) {
+                bonusBanner.style.display = 'flex';
+                document.getElementById('ui-bonus-desc').textContent = `Награда: +${u.daily_bonus_amt} FC`;
+            } else {
+                bonusBanner.style.display = 'none';
+            }
+
+            if (APP_STATE.daily_express) {
+                document.getElementById('ui-exp-day-odd').textContent = 'Кэф ' + APP_STATE.daily_express.total_odd;
+            } else {
+                document.getElementById('ui-exp-day-odd').textContent = 'Нет матчей';
+            }
+
+            const se = APP_STATE.superexpress;
+            if (se && se.entry) {
+                document.getElementById('ui-se-status-sub').textContent = se.entry.status === 'pending'
+                    ? '✅ Прогноз в игре'
+                    : `🏁 Угадано: ${se.entry.guessed}/6`;
+            }
+
+            renderLeaguesBar();
+            renderMatchesFeed();
+            renderGamesTab();
+            renderFutTab(u.equipped_cards || {}, APP_STATE.fut_catalog || {});
+            renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.secret_bet_offer, APP_STATE.stadium_sponsors || []);
+            renderProfileTab(u);
+            renderSlipUI();
+        }
+
+        /* ==================== 1. ЛЕНТА ЛИГ И ТОП-АФИША ==================== */
+        function renderLeaguesBar() {
+            const bar = document.getElementById('leagues-bar');
+            const allMatches = APP_STATE.matches || [];
+            const liveCount = allMatches.filter(m => m.is_live).length;
+            const leagues = APP_STATE.leagues || [];
+
+            let html = `
+                <div class="league-chip ${SELECTED_LEAGUE === 'top' ? 'active' : ''}" onclick="selectLeagueFilter('top')">
+                    🔥 Топ-Афиша <span class="chip-cnt">${allMatches.length}</span>
+                </div>
+            `;
+            if (liveCount > 0) {
+                html += `
+                    <div class="league-chip ${SELECTED_LEAGUE === 'live' ? 'active' : ''}" onclick="selectLeagueFilter('live')">
+                        🔴 LIVE <span class="chip-cnt">${liveCount}</span>
+                    </div>
+                `;
+            }
+            leagues.forEach(lg => {
+                const badge = lg.live_count > 0 ? `🔴${lg.live_count}` : lg.count;
+                html += `
+                    <div class="league-chip ${SELECTED_LEAGUE === lg.key ? 'active' : ''}" onclick="selectLeagueFilter('${lg.key}')">
+                        ${lg.title} <span class="chip-cnt">${badge}</span>
+                    </div>
+                `;
+            });
+            bar.innerHTML = html;
+        }
+
+        function selectLeagueFilter(key) {
+            haptic('light');
+            SELECTED_LEAGUE = key;
+            renderLeaguesBar();
+            renderMatchesFeed();
+        }
+
+        function getFilteredMatches() {
+            const all = APP_STATE.matches || [];
+            if (SELECTED_LEAGUE === 'top') {
+                document.getElementById('current-feed-title').textContent = '🎄 Ближайшие матчи и LIVE';
+                return all;
+            }
+            if (SELECTED_LEAGUE === 'live') {
+                document.getElementById('current-feed-title').textContent = '🔴 Прямой эфир (LIVE)';
+                return all.filter(m => m.is_live);
+            }
+            const lgObj = (APP_STATE.leagues || []).find(l => l.key === SELECTED_LEAGUE);
+            document.getElementById('current-feed-title').textContent = lgObj ? lgObj.title : 'Матчи турнира';
+            return all.filter(m => m.league_key === SELECTED_LEAGUE);
+        }
+
+        function renderMatchesFeed() {
+            const box = document.getElementById('matches-container');
+            const list = getFilteredMatches();
+
+            if (!list.length) {
+                box.innerHTML = '<div class="card" style="text-align:center; color:var(--text-muted); padding:22px;">Матчей в данной категории не найдено.</div>';
+                return;
+            }
+
+            const favClub = (APP_STATE.user && APP_STATE.user.favorite_club) ? APP_STATE.user.favorite_club : '';
+
+            box.innerHTML = list.map(m => {
+                const isFav = favClub && m.teams.includes(favClub);
+                const topBadge = m.is_top ? `<span class="badge-top">🔥 ТОП</span>` : '';
+                const favBadge = isFav ? `<span class="badge-top" style="color:var(--accent-green); border-color:var(--accent-green);">⭐ +10%</span>` : '';
+
+                const rightStatus = m.is_live
+                    ? `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`
+                    : `<span>🕒 ${m.short_date}</span>`;
+
+                const scoreCenter = m.is_live
+                    ? `<div class="score-pill">${m.live_score}</div>`
+                    : `<div class="score-pill" style="color:var(--text-muted); font-size:11px;">${m.best_score}</div>`;
+
+                const o = m.odds;
+                const safeTeams = escQuotes(m.teams);
+                const safeH = escQuotes(m.home_team);
+                const safeA = escQuotes(m.away_team);
+
+                // Быстрые ставки на главной афише строго на П1, Х, П2
+                const oddsRow = m.is_live
+                    ? `<div style="text-align:center; font-size:11px; color:var(--accent-gold); padding:4px 0;" onclick="openMatchDetail('${m.league_key}','${m.event_id}')">🔴 Матч идет в LIVE • Открыть полный Матч-Центр ➔</div>`
+                    : `<div class="odds-grid">
+                         <div class="odd-btn ${isOddSelected(m.event_id, 'p1') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p1','П1 (${safeH})','${o.p1}','${safeTeams}')">
+                             <span class="mkt">П1</span><span class="k">${o.p1}</span>
+                         </div>
+                         <div class="odd-btn ${isOddSelected(m.event_id, 'x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x','Ничья','${o.x}','${safeTeams}')">
+                             <span class="mkt">Ничья</span><span class="k">${o.x}</span>
+                         </div>
+                         <div class="odd-btn ${isOddSelected(m.event_id, 'p2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p2','П2 (${safeA})','${o.p2}','${safeTeams}')">
+                             <span class="mkt">П2</span><span class="k">${o.p2}</span>
+                         </div>
+                       </div>`;
+
+                return `
+                    <div class="match-card ${m.is_live ? 'is-live' : (m.is_top ? 'is-top' : '')}">
+                        <div class="match-top-bar">
+                            <span>${m.league_title}${topBadge}${favBadge}</span>
+                            ${rightStatus}
+                        </div>
+                        <div class="match-clickable-area" onclick="openMatchDetail('${m.league_key}','${m.event_id}')">
+                            <div class="match-teams-row">
+                                <div class="team-name">${m.home_team}</div>
+                                ${scoreCenter}
+                                <div class="team-name away">${m.away_team}</div>
+                            </div>
+                            <div class="match-open-bar">
+                                <span>🤖 xG: ${m.exp_goals} • ИИ: ${m.best_score}</span>
+                                <span>📊 Вся роспись (45+) ➔</span>
+                            </div>
+                        </div>
+                        ${oddsRow}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /* ==================== 2. МАТЧ-ЦЕНТР (БИТВА ИИ, РАДАР И 45+ РЫНКОВ) ==================== */
+        async function openMatchDetail(leagueKey, eventId) {
+            haptic('light');
+            const m = (APP_STATE.matches || []).find(x => x.league_key === leagueKey && String(x.event_id) === String(eventId));
+            if (!m) return;
+            CURRENT_OPEN_MATCH = m;
+
+            document.getElementById('md-league').textContent = m.league_title + ' • ' + (m.is_live ? '🔴 LIVE' : m.date);
+            renderMatchDetailBody(m, MATCH_AI_CACHE[m.event_id] || '🧠 <i>ИИ-скауты анализируют тактику команд...</i>');
+            document.getElementById('match-detail-modal').classList.add('show');
+
+            try {
+                const resp = await fetch(`/api/match_ai/${leagueKey}/${eventId}`);
+                const data = await resp.json();
+                if (data.ok) {
+                    MATCH_AI_CACHE[m.event_id] = data.ai_analysis;
+                    if (data.live_score) m.live_score = data.live_score;
+                    if (data.live_detail) m.live_detail = data.live_detail;
+                    if (CURRENT_OPEN_MATCH && CURRENT_OPEN_MATCH.event_id === m.event_id) {
+                        renderMatchDetailBody(m, data.ai_analysis);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function renderMatchDetailBody(m, aiHtml) {
+            const o = m.odds;
+            const p = m.probs || {};
+            const hs = m.h_stats || {};
+            const as = m.a_stats || {};
+            const safeTeams = escQuotes(m.teams);
+            const safeH = escQuotes(m.home_team);
+            const safeA = escQuotes(m.away_team);
+            const battle = m.ai_battle || {};
+            const radar = m.radar || {};
+
+            const scoreHeader = m.is_live
+                ? `<div style="font-size:22px; font-weight:900; color:var(--accent-red); margin:3px 0;">${m.live_score}</div>
+                   <div style="font-size:11px; color:var(--accent-red); font-weight:800;">🔴 ИДЕТ МАТЧ (${m.live_detail})</div>`
+                : `<div style="font-size:16px; font-weight:900; color:var(--accent-gold); margin:3px 0;">Счет ИИ: ${m.best_score}</div>
+                   <div style="font-size:11px; color:var(--text-muted);">🏟 ${m.venue}</div>`;
+
+            let marketsHtml = '';
+            if (m.is_live) {
+                marketsHtml = `<div class="card" style="text-align:center; border-color:var(--accent-red); margin-top:10px;">🔴 Матч идет в LIVE. Активные купоны на ТБ или ОЗ рассчитаются досрочно сразу после голов!</div>`;
+            } else {
+                // Битва ИИ (Прагматик vs Романтик)
+                const prag = battle.pragmatist || {};
+                const rom = battle.romantic || {};
+                const aiBattleHtml = `
+                    <div class="section-title" style="font-size:13px;">⚔️ Битва ИИ-аналитиков</div>
+                    <div class="ai-battle-grid">
+                        <div class="ai-fighter-card" onclick="togglePick('${m.league_key}','${m.event_id}','${prag.pick_code}','${escQuotes(prag.pick_label)}','${prag.odds}','${safeTeams}')">
+                            <div>
+                                <div style="font-size:11px; font-weight:800; color:var(--accent-blue); margin-bottom:3px;">${prag.name}</div>
+                                <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">${prag.text}</div>
+                            </div>
+                            <div style="background:var(--accent-green-dim); padding:5px; border-radius:8px; text-align:center; font-size:11px; font-weight:800; color:var(--accent-green);">
+                                ${prag.pick_label} • Кэф ${prag.odds}
+                            </div>
+                        </div>
+                        <div class="ai-fighter-card romantic" onclick="togglePick('${m.league_key}','${m.event_id}','${rom.pick_code}','${escQuotes(rom.pick_label)}','${rom.odds}','${safeTeams}')">
+                            <div>
+                                <div style="font-size:11px; font-weight:800; color:var(--accent-purple); margin-bottom:3px;">${rom.name}</div>
+                                <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">${rom.text}</div>
+                            </div>
+                            <div style="background:rgba(213,0,249,0.15); padding:5px; border-radius:8px; text-align:center; font-size:11px; font-weight:800; color:var(--accent-purple);">
+                                ${rom.pick_label} • Кэф ${rom.odds}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Радар Толпа vs Топ-10
+                const sm = radar.smart_money || {};
+                const radarHtml = `
+                    <div class="card" style="background:rgba(19,32,56,0.95); margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800; margin-bottom:4px;">
+                            <span>👥 Мнение толпы: П1 (${radar.crowd_p1}%)</span>
+                            <span style="color:var(--accent-gold);">П2 (${radar.crowd_p2}%)</span>
+                        </div>
+                        <div class="radar-bar-track">
+                            <div style="width:${radar.crowd_p1}%; background:var(--accent-blue);"></div>
+                            <div style="width:${radar.crowd_x}%; background:rgba(255,255,255,0.25);"></div>
+                            <div style="width:${radar.crowd_p2}%; background:var(--accent-red);"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+                            <span style="color:var(--text-muted);">${sm.title} (${sm.share_pct}% профи):</span>
+                            <button class="btn-main gold" style="padding:4px 8px; font-size:11px;" onclick="togglePick('${m.league_key}','${m.event_id}','${sm.pick_code}','${escQuotes(sm.pick_label)}','${sm.odds}','${safeTeams}')">
+                                👑 ${sm.pick_label} (${sm.odds})
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Тоталы
+                const totalsRows = (m.totals_markets || []).map(t => `
+                    <div class="odd-btn ${isOddSelected(m.event_id, t.tb_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tb_code}','${escQuotes(t.tb_label)}','${t.tb_odd}','${safeTeams}')">
+                        <span class="mkt">${t.tb_label}</span><span class="k">${t.tb_odd}</span>
+                    </div>
+                    <div class="odd-btn ${isOddSelected(m.event_id, t.tm_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tm_code}','${escQuotes(t.tm_label)}','${t.tm_odd}','${safeTeams}')">
+                        <span class="mkt">${t.tm_label}</span><span class="k">${t.tm_odd}</span>
+                    </div>
+                `).join('');
+
+                // Точный счёт
+                const exactRows = (m.exact_scores || []).map(es => `
+                    <div class="odd-btn ${isOddSelected(m.event_id, es.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${es.pick_code}','${escQuotes(es.label)}','${es.odds}','${safeTeams}')">
+                        <span class="mkt">${es.score}</span><span class="k">${es.odds}</span>
+                    </div>
+                `).join('');
+
+                // 1-й тайм
+                const halfRows = (m.half_markets || []).map(hm => `
+                    <div class="odd-btn ${isOddSelected(m.event_id, hm.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${hm.pick_code}','${escQuotes(hm.label)}','${hm.odds}','${safeTeams}')">
+                        <span class="mkt">${hm.label}</span><span class="k">${hm.odds}</span>
+                    </div>
+                `).join('');
+
+                marketsHtml = `
+                    ${aiBattleHtml}
+                    ${radarHtml}
+
+                    <div class="section-title" style="font-size:13px;">🎯 Основной исход (1Х2)</div>
+                    <div class="odds-grid cols-3">
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'p1') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p1','П1 (${safeH})','${o.p1}','${safeTeams}')">
+                            <span class="mkt">П1 (${p.p1 || 50}%)</span><span class="k">${o.p1}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x','Ничья','${o.x}','${safeTeams}')">
+                            <span class="mkt">Ничья (${p.x || 25}%)</span><span class="k">${o.x}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'p2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p2','П2 (${safeA})','${o.p2}','${safeTeams}')">
+                            <span class="mkt">П2 (${p.p2 || 25}%)</span><span class="k">${o.p2}</span>
+                        </div>
+                    </div>
+
+                    <div class="section-title" style="font-size:13px;">🛡️ Двойной шанс, Фора (0) и Обе забьют</div>
+                    <div class="odds-grid cols-3" style="margin-bottom:6px;">
+                        <div class="odd-btn ${isOddSelected(m.event_id, '1x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','1x','1Х (${safeH})','${o['1x']}','${safeTeams}')">
+                            <span class="mkt">1Х</span><span class="k">${o['1x']}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'x2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x2','Х2 (${safeA})','${o['x2']}','${safeTeams}')">
+                            <span class="mkt">Х2</span><span class="k">${o['x2']}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'btts') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts','Обе забьют: Да','${o.btts}','${safeTeams}')">
+                            <span class="mkt">ОЗ: Да ⚡</span><span class="k">${o.btts}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'f10') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f10','Фора 1 (0)','${o.f10}','${safeTeams}')">
+                            <span class="mkt">Фора 1 (0)</span><span class="k">${o.f10}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'f20') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f20','Фора 2 (0)','${o.f20}','${safeTeams}')">
+                            <span class="mkt">Фора 2 (0)</span><span class="k">${o.f20}</span>
+                        </div>
+                        <div class="odd-btn ${isOddSelected(m.event_id, 'btts_no') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts_no','Обе забьют: Нет','${o.btts_no}','${safeTeams}')">
+                            <span class="mkt">ОЗ: Нет</span><span class="k">${o.btts_no}</span>
+                        </div>
+                    </div>
+
+                    <div class="section-title" style="font-size:13px;">📈 Тоталы голов (⚡ Досрочный расчет ТБ)</div>
+                    <div class="odds-grid cols-2" style="margin-bottom:6px;">${totalsRows}</div>
+
+                    <div class="section-title" style="font-size:13px;">⏱ 1-й Тайм и Голы в обоих таймах</div>
+                    <div class="odds-grid cols-2" style="margin-bottom:6px;">${halfRows}</div>
+
+                    <div class="section-title" style="font-size:13px;">⚽ Точный счёт матча</div>
+                    <div class="odds-grid cols-4">${exactRows}</div>
+                `;
+            }
+
+            document.getElementById('md-body').innerHTML = `
+                <div class="card" style="text-align:center; padding:11px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                        <div style="flex:1; font-weight:900; font-size:14px;">🏠 ${m.home_team}</div>
+                        <div>${scoreHeader}</div>
+                        <div style="flex:1; font-weight:900; font-size:14px;">✈️ ${m.away_team}</div>
+                    </div>
+                </div>
+
+                <div class="card" style="border-color:rgba(128,216,255,0.35); background:rgba(128,216,255,0.05); font-size:12px; line-height:1.45;">
+                    <div style="font-weight:800; color:var(--accent-ice); margin-bottom:4px;">🤖 Тактический разбор скаутов ИИ:</div>
+                    <div>${aiHtml}</div>
+                </div>
+
+                ${marketsHtml}
+            `;
+        }
+
+        function closeMatchDetail() {
+            CURRENT_OPEN_MATCH = null;
+            document.getElementById('match-detail-modal').classList.remove('show');
+        }
+
+        /* ==================== 3. ЕДИНЫЙ КУПОН СТАВОК (BET SLIP) ==================== */
+        function togglePick(league_key, event_id, pick_code, pickLabel, oddVal, teamsTitle) {
+            haptic('medium');
+            const evStr = String(event_id);
+            const oddNum = parseFloat(oddVal);
+
+            const exactIdx = SLIP_ITEMS.findIndex(i => String(i.event_id) === evStr && i.pick_code === pick_code);
+            if (exactIdx !== -1) {
+                SLIP_ITEMS.splice(exactIdx, 1);
+            } else {
+                const sameMatchIdx = SLIP_ITEMS.findIndex(i => String(i.event_id) === evStr);
+                const itemObj = { league_key, event_id: evStr, pick_code, pickLabel, oddVal: oddNum, teamsTitle };
+                if (sameMatchIdx !== -1) {
+                    SLIP_ITEMS[sameMatchIdx] = itemObj;
+                } else {
+                    if (SLIP_ITEMS.length >= 6) {
+                        return showToast('⚠️ Максимум 6 событий в одном купоне!', true);
+                    }
+                    SLIP_ITEMS.push(itemObj);
+                }
+            }
+
+            renderMatchesFeed();
+            if (CURRENT_OPEN_MATCH && String(CURRENT_OPEN_MATCH.event_id) === evStr) {
+                renderMatchDetailBody(CURRENT_OPEN_MATCH, MATCH_AI_CACHE[evStr] || '');
+            }
+            renderSlipUI();
+        }
+
+        function isOddSelected(event_id, pick_code) {
+            return SLIP_ITEMS.some(i => String(i.event_id) === String(event_id) && i.pick_code === pick_code);
+        }
+
+        function calculateSlipOdd() {
+            if (!SLIP_ITEMS.length) return 1.0;
+            const raw = SLIP_ITEMS.reduce((acc, it) => acc * it.oddVal, 1.0);
+            const u = (APP_STATE && APP_STATE.user) ? APP_STATE.user : {};
+            const buffs = u.fut_buffs || {};
+            let bonus = Number(buffs.lab_odd_boost || 0);
+            if (SLIP_ITEMS.length > 1) {
+                bonus += Number(buffs.express_odd_boost || 0);
+            }
+            if (u.active_booster === 'boost035') {
+                bonus += 0.35;
+            }
+            return raw + bonus;
+        }
+
+        function renderSlipUI() {
+            const bar = document.getElementById('floating-slip');
+            if (!SLIP_ITEMS.length) {
+                bar.style.display = 'none';
+                return;
+            }
+            bar.style.display = 'flex';
+            document.getElementById('slip-count').textContent = SLIP_ITEMS.length;
+            document.getElementById('slip-total-odd').textContent = calculateSlipOdd().toFixed(2);
+            document.getElementById('slip-mode-label').textContent = SLIP_ITEMS.length > 1 ? '• ⚡ Экспресс' : '• ⚽ Ординар';
+        }
+
+        function openSlipDrawer() {
+            haptic('light');
+            const isExp = SLIP_ITEMS.length > 1;
+            document.getElementById('drawer-title').textContent = isExp
+                ? `⚡ Купон Экспресса (${SLIP_ITEMS.length} матчей)`
+                : '⚽ Купон Ординара';
+
+            // Выводим актуальный баланс в шторку купона
+            const uBal = (APP_STATE && APP_STATE.user) ? APP_STATE.user.balance : 0;
+            document.getElementById('drawer-user-balance').textContent = formatFC(uBal);
+
+            document.getElementById('slip-items-list').innerHTML = SLIP_ITEMS.map((it, idx) => `
+                <div class="stadium-row" style="margin-bottom:6px;">
+                    <div>
+                        <div style="font-size:12px; font-weight:800;">${idx + 1}. ${it.teamsTitle}</div>
+                        <div style="font-size:11px; color:var(--accent-green);">🎯 ${it.pickLabel} • Кэф <b>${it.oddVal}</b></div>
+                    </div>
+                    <button class="close-x" style="width:26px; height:26px; font-size:12px;" onclick="removeSlipItem(${idx})">✕</button>
+                </div>
+            `).join('');
+
+            document.getElementById('drawer-total-odd').textContent = calculateSlipOdd().toFixed(2);
+            updatePotentialWin();
+            document.getElementById('slip-drawer').classList.add('show');
+        }
+
+        function closeSlipDrawer() {
+            document.getElementById('slip-drawer').classList.remove('show');
+        }
+
+        function removeSlipItem(idx) {
+            SLIP_ITEMS.splice(idx, 1);
+            renderMatchesFeed();
+            renderSlipUI();
+            if (!SLIP_ITEMS.length) closeSlipDrawer();
+            else openSlipDrawer();
+        }
+
+        function clearSlip() {
+            SLIP_ITEMS = [];
+            closeSlipDrawer();
+            renderMatchesFeed();
+            renderSlipUI();
+        }
+
+        function setSlipStake(val) {
+            haptic('light');
+            document.getElementById('slip-stake-input').value = val;
+            updatePotentialWin();
+        }
+
+        function setSlipAllIn() {
+            haptic('medium');
+            const uBal = (APP_STATE && APP_STATE.user) ? Math.floor(APP_STATE.user.balance) : 0;
+            document.getElementById('slip-stake-input').value = Math.max(10, uBal);
+            updatePotentialWin();
+        }
+
+        function updatePotentialWin() {
+            const stake = parseInt(document.getElementById('slip-stake-input').value || '0', 10);
+            const odd = calculateSlipOdd();
+            document.getElementById('drawer-payout').textContent = formatFC(Math.round(stake * odd));
+        }
+
+        async function submitSlip() {
+            const stake = parseInt(document.getElementById('slip-stake-input').value || '0', 10);
+            if (!stake || stake < 10) return showToast('Минимальная сумма ставки — 10 FC!', true);
+
+            const btn = document.getElementById('btn-submit-slip');
+            btn.classList.add('disabled');
+            btn.textContent = '⏳ Принимаем пари...';
+
+            const res = await apiAction({
+                action: 'submit_slip',
+                items: SLIP_ITEMS,
+                stake: stake
+            });
+
+            btn.classList.remove('disabled');
+            btn.textContent = '✅ Заключить пари';
+
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            clearSlip();
+            closeMatchDetail();
+            await loadAppState();
+        }
+
+        /* Загрузка Экспресса дня */
+        function loadDailyExpressToSlip() {
+            if (!APP_STATE || !APP_STATE.daily_express || !APP_STATE.daily_express.legs) {
+                return showToast('На сегодня матчей для Экспресса дня нет', true);
+            }
+            const allMatches = APP_STATE.matches || [];
+            SLIP_ITEMS = [];
+            APP_STATE.daily_express.legs.forEach(leg => {
+                const found = allMatches.find(m => String(m.event_id) === String(leg.event_id));
+                const lKey = found ? found.league_key : 'ucl';
+                SLIP_ITEMS.push({
+                    league_key: lKey,
+                    event_id: String(leg.event_id),
+                    pick_code: leg.pick_code,
+                    pickLabel: leg.pick_label,
+                    oddVal: parseFloat(leg.odds),
+                    teamsTitle: leg.teams
+                });
+            });
+            renderMatchesFeed();
+            renderSlipUI();
+            openSlipDrawer();
+            showToast('⚡ Экспресс дня загружен в твой купон!');
+        }
+
+        /* Суперэкспресс */
+        function openSuperExpressModal() {
+            haptic('light');
+            const se = (APP_STATE && APP_STATE.superexpress) ? APP_STATE.superexpress : null;
+            const body = document.getElementById('se-modal-body');
+
+            if (!se || !se.matches || se.matches.length < 6) {
+                body.innerHTML = '<div class="card" style="text-align:center;">Тираж этой недели формируется.</div>';
+                document.getElementById('se-modal').classList.add('show');
+                return;
+            }
+
+            if (se.entry) {
+                const picksHtml = (se.entry.picks || []).map((p, i) => `
+                    <div class="stadium-row">
+                        <div style="font-size:12px;"><b>${i + 1}. ${p.teams}</b></div>
+                        <div style="font-size:12px; color:var(--accent-green); font-weight:800;">Выбор: ${p.pick_label}</div>
+                    </div>
+                `).join('');
+                body.innerHTML = `
+                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+                        Прогноз зафиксирован на эту неделю! Новый тираж — в пятницу.
+                    </div>
+                    ${picksHtml}
+                `;
+                document.getElementById('se-modal').classList.add('show');
+                return;
+            }
+
+            const rows = se.matches.map((m, idx) => {
+                const cur = SE_DRAFTS[idx] || '';
+                return `
+                    <div class="card" style="padding:10px; margin-bottom:8px;">
+                        <div style="font-size:12px; font-weight:800; margin-bottom:6px;">${idx + 1}. ${m.teams}</div>
+                        <div class="odds-grid cols-3">
+                            <div class="odd-btn ${cur === 'p1' ? 'selected' : ''}" onclick="selectSePick(${idx},'p1')"><span class="k">П1</span></div>
+                            <div class="odd-btn ${cur === 'x' ? 'selected' : ''}" onclick="selectSePick(${idx},'x')"><span class="k">Х</span></div>
+                            <div class="odd-btn ${cur === 'p2' ? 'selected' : ''}" onclick="selectSePick(${idx},'p2')"><span class="k">П2</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            body.innerHTML = `
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Угадай 6 исходов бесплатно!</div>
+                ${rows}
+                <button class="btn-main gold btn-block" onclick="submitSuperExpress()">🔥 Зафиксировать купон недели</button>
+            `;
+            document.getElementById('se-modal').classList.add('show');
+        }
+
+        function selectSePick(idx, code) {
+            haptic('light');
+            SE_DRAFTS[idx] = code;
+            openSuperExpressModal();
+        }
+
+        async function submitSuperExpress() {
+            if (Object.keys(SE_DRAFTS).length < 6) return showToast('Выбери исходы для всех 6 матчей!', true);
+            const res = await apiAction({ action: 'se_submit', picks: SE_DRAFTS });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            closeSuperExpressModal();
+            await loadAppState();
+        }
+
+        function closeSuperExpressModal() {
+            document.getElementById('se-modal').classList.remove('show');
+        }
+
+        /* ==================== 4. ИГРЫ (PVP, АУКЦИОН, РУЛЕТКА) ==================== */
+        function setPvpDir(type, dir, btnEl) {
+            haptic('light');
+            PVP_DIRS[type] = dir;
+            btnEl.parentElement.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+
+        async function createPvpDuel(mode) {
+            const stake = parseInt(document.getElementById('pvp-stake-input').value || '0', 10);
+            const target = document.getElementById('pvp-target-input').value || '';
+            const res = await apiAction({
+                action: 'pvp_create',
+                mode: mode,
+                stake: stake,
+                kick: PVP_DIRS.kick,
+                save: PVP_DIRS.save,
+                target: target
+            });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function acceptPvpDuel(duelId) {
+            const res = await apiAction({
+                action: 'pvp_accept',
+                duel_id: duelId,
+                kick: PVP_DIRS.kick,
+                save: PVP_DIRS.save
+            });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function cancelPvpDuel(duelId) {
+            const res = await apiAction({ action: 'pvp_cancel', duel_id: duelId });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        function renderGamesTab() {
+            const u = APP_STATE.user;
+            document.getElementById('ui-pvp-wins').textContent = u.pvp_wins || 0;
+
+            const duels = APP_STATE.pvp_duels || [];
+            const lobbyBox = document.getElementById('pvp-lobby-container');
+            if (!duels.length) {
+                lobbyBox.innerHTML = '<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted);">Активных вызовов нет.</div>';
+            } else {
+                lobbyBox.innerHTML = duels.map(d => {
+                    if (d.is_mine) {
+                        return `
+                            <div class="stadium-row">
+                                <div style="font-size:12px;">⚔️ Мой вызов #${d.duel_id} • <b>${formatFC(d.stake)}</b></div>
+                                <button class="btn-main ghost" style="padding:6px 10px; font-size:11px; color:var(--accent-red);" onclick="cancelPvpDuel(${d.duel_id})">Отменить</button>
+                            </div>
+                        `;
+                    }
+                    const tag = d.is_for_me ? '<span style="color:var(--accent-gold); font-weight:800;">🔥 ТЕБЕ ВЫЗОВ: </span>' : '';
+                    return `
+                        <div class="stadium-row" style="${d.is_for_me ? 'border-color:var(--accent-gold);' : ''}">
+                            <div style="font-size:12px;">${tag}<b>${d.creator_name}</b> • <b style="color:var(--accent-green);">${formatFC(d.stake)}</b></div>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-main" style="padding:6px 10px; font-size:11px;" onclick="acceptPvpDuel(${d.duel_id})">Принять</button>
+                                ${d.is_for_me ? `<button class="btn-main ghost" style="padding:6px 8px; font-size:11px;" onclick="cancelPvpDuel(${d.duel_id})">✕</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const bm = APP_STATE.black_market || {};
+            if (bm.card) {
+                document.getElementById('black-market-card').innerHTML = `
+                    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                        <div class="fut-shield tier-4" style="width:72px; flex-shrink:0;">
+                            <div class="shield-top"><span>GOAT</span><span class="shield-ovr">99</span></div>
+                            <div class="shield-avatar">🐐</div>
+                            <div class="shield-name" style="font-size:10px;">${bm.card.name.split(' ')[0]}</div>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:11px; color:var(--accent-gold); font-weight:800;">🏆 ЭКСКЛЮЗИВНЫЙ ЛОТ 99 OVR</div>
+                            <div style="font-size:15px; font-weight:900; margin:2px 0;">${bm.card.name}</div>
+                            <div style="font-size:11px; color:var(--accent-green); font-weight:700;">⚡ ${bm.card.desc}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+                        Ставка: <b style="color:#fff;">${formatFC(bm.highest_bid)}</b> • Лидер: <b style="color:var(--accent-blue);">${bm.leader_name}</b>
+                    </div>
+                    <button class="btn-main gold btn-block" onclick="placeBlackMarketBid(${bm.min_next_bid})">🔨 Поставить (${formatFC(bm.min_next_bid)})</button>
+                    <button class="btn-main ghost btn-block" onclick="placeBlackMarketBid(${bm.min_next_bid + 1500})">🔥 Шаг +2 000 (${formatFC(bm.min_next_bid + 1500)})</button>
+                `;
+            }
+
+            const spinBtn = document.getElementById('btn-spin-wheel');
+            if (u.can_spin_roulette) {
+                spinBtn.classList.remove('disabled');
+                spinBtn.textContent = '🎲 Крутить барабан (Бесплатно)';
+            } else {
+                spinBtn.classList.add('disabled');
+                spinBtn.textContent = '⏳ Доступно завтра (Уже прокручено)';
+            }
+        }
+
+        async function placeBlackMarketBid(amount) {
+            const res = await apiAction({ action: 'bm_bid', amount: amount });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function spinWheel() {
+            if (IS_SPINNING) return;
+            IS_SPINNING = true;
+            haptic('medium');
+
+            const res = await apiAction({ action: 'spin_roulette' });
+            if (!res.ok) {
+                IS_SPINNING = false;
+                return showToast(res.error, true);
+            }
+
+            const wheel = document.getElementById('roulette-wheel');
+            WHEEL_ROTATION += 1440 + Math.floor(Math.random() * 340);
+            wheel.style.transform = `rotate(${WHEEL_ROTATION}deg)`;
+            document.getElementById('wheel-status-txt').textContent = '🎰 Барабан вращается...';
+
+            setTimeout(async () => {
+                IS_SPINNING = false;
+                document.getElementById('wheel-status-txt').innerHTML = `🎉 Выпал приз: <b style="color:var(--accent-gold);">${res.sector.name}</b>`;
+                showToast('🎰 Выигрыш: ' + res.sector.name);
+                await loadAppState();
+            }, 3250);
+        }
+
+        /* ==================== 5. FUT И АЛЬБОМ КОЛЛЕКЦИИ ==================== */
+        function renderFutTab(eqCards, catalog) {
+            const slots = [
+                { role: '⚡ Форвард', cardId: eqCards.FW },
+                { role: '🧤 Вратарь', cardId: eqCards.GK },
+                { role: '📋 Тренер', cardId: eqCards.COACH }
+            ];
+
+            document.getElementById('fut-slots-container').innerHTML = slots.map(s => {
+                const c = s.cardId ? catalog[s.cardId] : null;
+                if (!c) {
+                    return `
+                        <div class="fut-shield locked">
+                            <span style="font-size:9px; color:var(--text-muted); font-weight:800; display:block;">${s.role}</span>
+                            <div class="shield-avatar">🔒</div>
+                            <div class="shield-name" style="color:var(--text-muted);">Пусто</div>
+                            <div class="shield-buff">Открой пак</div>
+                        </div>
+                    `;
+                }
+                const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
+                return `
+                    <div class="fut-shield ${tierCls}">
+                        <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 85}</span></div>
+                        <div class="shield-avatar">${c.nation || '⚽'}</div>
+                        <div class="shield-name">${c.name.split(' ').slice(1).join(' ') || c.name}</div>
+                        <div class="shield-buff">${c.desc}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Альбом коллекции карточек
+            const allKeys = Object.keys(catalog);
+            let unCount = 0;
+            document.getElementById('fut-collection-grid').innerHTML = allKeys.map(k => {
+                const c = catalog[k];
+                const isOwned = Object.values(eqCards).includes(k) || (APP_STATE.user && APP_STATE.user.achievements_unlocked && Math.random() < 0.3); // Пример проверки
+                if (isOwned) unCount++;
+                const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
+                return `
+                    <div class="fut-shield ${isOwned ? tierCls : 'locked'}">
+                        <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 85}</span></div>
+                        <div class="shield-avatar">${isOwned ? (c.nation || '⚽') : '🔒'}</div>
+                        <div class="shield-name">${c.name.split(' ').slice(1).join(' ') || c.name}</div>
+                        <div class="shield-buff">${isOwned ? 'В коллекции' : c.pack || 'Пак'}</div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('fut-collection-counter').textContent = `${Math.min(allKeys.length, unCount + 3)} / ${allKeys.length}`;
+        }
+
+        async function openFutPack(type) {
+            haptic('medium');
+            const res = await apiAction({ action: 'buy_pack', pack_type: type });
+            if (!res.ok) return showToast(res.error, true);
+
+            const c = res.card;
+            const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
+            document.getElementById('pack-modal-card-preview').innerHTML = `
+                <div class="fut-shield ${tierCls}" style="transform:scale(1.15);">
+                    <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 90}</span></div>
+                    <div class="shield-avatar">${c.nation || '⭐'}</div>
+                    <div class="shield-name">${c.name}</div>
+                    <div class="shield-buff">${c.desc}</div>
+                </div>
+            `;
+            document.getElementById('pack-modal-note').textContent = res.status_note;
+            document.getElementById('pack-modal').classList.add('show');
+            haptic('success');
+            await loadAppState();
+        }
+
+        /* ==================== 6. ИМПЕРИЯ (МАТЧДЭЙ-МЕНЕДЖЕР И СТАДИОНЫ) ==================== */
+        function renderEmpireTab(u, catalog, secretOffer, sponsorsList) {
+            const st = u.stadium_info || {};
+            const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_bet' };
+
+            const claimBtn = u.can_claim_stadium
+                ? `<button class="btn-main btn-block" onclick="claimStadiumRevenue()">💰 Провести Матчдэй и собрать кассу</button>`
+                : `<button class="btn-main btn-block disabled">⏳ Матчдэй уже проведен сегодня</button>`;
+
+            document.getElementById('current-stadium-card').innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:14px;">✅ ${st.name} (Ур. ${u.stadium_level}/10)</b>
+                    <b style="color:var(--accent-green); font-size:13px;">База: +${st.income} FC</b>
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); margin:4px 0 10px;">Вместимость: ${st.cap}</div>
+
+                <div style="font-size:11px; font-weight:800; margin-bottom:4px;">🎫 Тариф билетов на матчдэй:</div>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px;">
+                    <button class="chip-btn ${prefs.ticket === 'social' ? 'selected' : ''}" style="padding:8px 4px;" onclick="setStadiumPref('ticket','social')">Социальный</button>
+                    <button class="chip-btn ${prefs.ticket === 'optimal' ? 'selected' : ''}" style="padding:8px 4px;" onclick="setStadiumPref('ticket','optimal')">Оптимальный</button>
+                    <button class="chip-btn ${prefs.ticket === 'vip' ? 'selected' : ''}" style="padding:8px 4px; color:var(--accent-gold);" onclick="setStadiumPref('ticket','vip')">👑 VIP-Аншлаг</button>
+                </div>
+
+                <div style="font-size:11px; font-weight:800; margin-bottom:4px;">🤝 Спонсорский контракт:</div>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <select id="sponsor-select" class="stake-input" style="margin:0; font-size:12px; padding:7px; flex:1; background:#132038;" onchange="setStadiumPref('sponsor', this.value)">
+                        ${sponsorsList.map(s => `<option value="${s.id}" ${s.id === prefs.sponsor ? 'selected' : ''}>${s.name} (+${s.bonus} FC)</option>`).join('')}
+                    </select>
+                </div>
+                ${claimBtn}
+            `;
+
+            // Секретная ставка дня
+            const secBox = document.getElementById('secret-bet-card');
+            if (secretOffer) {
+                secBox.style.display = 'block';
+                secBox.innerHTML = `
+                    <div style="font-size:11px; color:var(--accent-ice); font-weight:800;">🕵️‍♂️ СЕКРЕТНАЯ СТАВКА ДНЯ ОТ ИИ</div>
+                    <div style="font-size:14px; font-weight:800; margin:4px 0;">${secretOffer.teams} <span style="font-size:11px; color:var(--text-muted);">(${secretOffer.date})</span></div>
+                    <div style="font-size:12px; color:var(--accent-green); margin-bottom:8px;">🎯 ${secretOffer.pick_label} • Кэф <b>${secretOffer.odds}</b> (${secretOffer.exp_goals} xG)</div>
+                    <button class="btn-main btn-block" onclick="togglePickAndMarkSecret('${secretOffer.league_key}','${secretOffer.event_id}','${secretOffer.pick_code}','${escQuotes(secretOffer.pick_label)}','${secretOffer.odds}','${escQuotes(secretOffer.teams)}')">➕ Добавить Секретную ставку в купон</button>
+                `;
+            } else {
+                secBox.style.display = 'none';
+            }
+
+            const lab = u.lab_info || {};
+            const labBtn = u.next_lab
+                ? `<button class="btn-main btn-block" onclick="upgradeBuilding('lab')">🧠 Улучшить до Ур.${u.lab_level + 1} (${formatFC(u.next_lab.price)})</button>`
+                : `<button class="btn-main btn-block disabled">✅ Максимальный уровень ИИ</button>`;
+
+            document.getElementById('current-lab-card').innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:14px;">🧠 ${lab.name} (Ур. ${u.lab_level}/5)</b>
+                    <b style="color:var(--accent-blue); font-size:13px;">+${lab.odd_bonus} к кэфам</b>
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">${lab.desc || ''}</div>
+                ${labBtn}
+            `;
+
+            document.getElementById('stadiums-list-container').innerHTML = Object.keys(catalog).map(lvlStr => {
+                const lvl = parseInt(lvlStr, 10);
+                const item = catalog[lvlStr];
+                const isOwned = lvl <= u.stadium_level;
+                const isCurrent = lvl === u.stadium_level;
+                const isNext = lvl === u.stadium_level + 1;
+
+                let actionHtml = '';
+                if (isCurrent) actionHtml = `<span style="font-size:11px; color:var(--accent-gold); font-weight:800;">✅ Твоя арена</span>`;
+                else if (isOwned) actionHtml = `<span style="font-size:11px; color:var(--accent-green); font-weight:700;">✅ Куплен</span>`;
+                else if (isNext) actionHtml = `<button class="btn-main" style="padding:7px 11px; font-size:11px;" onclick="upgradeBuilding('stadium')">Купить • ${formatFC(item.price)}</button>`;
+                else actionHtml = `<span style="font-size:11px; color:var(--text-muted);">🔒 ${formatFC(item.price)}</span>`;
+
+                return `
+                    <div class="stadium-row ${isOwned ? 'owned' : ''}">
+                        <div>
+                            <div style="font-size:13px; font-weight:800;">${isOwned ? '✅ ' : ''}${lvl}. ${item.name}</div>
+                            <div style="font-size:11px; color:var(--text-muted);">${item.cap} • <b style="color:var(--accent-green);">+${item.income} FC/день</b></div>
+                        </div>
+                        <div>${actionHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function setStadiumPref(type, val) {
+            haptic('light');
+            const u = APP_STATE.user;
+            const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_bet' };
+            prefs[type] = val;
+            await apiAction({ action: 'set_stadium_prefs', ticket: prefs.ticket, sponsor: prefs.sponsor });
+            await loadAppState();
+        }
+
+        async function claimStadiumRevenue() {
+            const res = await apiAction({ action: 'claim_stadium' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        let IS_SECRET_BET = false;
+        function togglePickAndMarkSecret(lk, ev, pc, lbl, odd, tm) {
+            IS_SECRET_BET = true;
+            togglePick(lk, ev, pc, lbl, odd, tm);
+            showToast('🕵️‍♂️ Секретная ставка добавлена в купон!');
+        }
+
+        /* ==================== 7. ПРОФИЛЬ, CASHOUT И ТОП-10 ==================== */
+        function renderProfileTab(u) {
+            document.getElementById('p-username').textContent = u.username;
+            document.getElementById('p-id-val').textContent = u.user_id;
+            document.getElementById('p-rank').textContent = u.rank;
+            const total = u.wins + u.losses;
+            document.getElementById('p-winrate').textContent = total > 0 ? Math.round((u.wins / total) * 100) + '%' : '0%';
+            document.getElementById('p-wins').textContent = u.wins;
+            document.getElementById('p-streak').textContent = u.streak + ' 🔥';
+            document.getElementById('p-profit').textContent = (u.profit >= 0 ? '+' : '') + u.profit;
+            document.getElementById('p-refs').textContent = u.referrals_count || 0;
+
+            const bLine = document.getElementById('p-booster-line');
+            if (u.active_booster_name) {
+                bLine.style.display = 'block';
+                bLine.textContent = '🚀 Активный бустер: ' + u.active_booster_name;
+            } else {
+                bLine.style.display = 'none';
+            }
+
+            const clubSel = document.getElementById('club-select');
+            clubSel.innerHTML = (APP_STATE.popular_clubs || []).map(c =>
+                `<option value="${c}" ${c === u.favorite_club ? 'selected' : ''}>${c === u.favorite_club ? '⭐ ' + c : c}</option>`
+            ).join('');
+
+            // Активные купоны с CashOut
+            const actBox = document.getElementById('prof-sub-active');
+            const actList = APP_STATE.active_bets || [];
+            if (!actList.length) {
+                actBox.innerHTML = '<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted);">Нет активных купонов в игре.</div>';
+            } else {
+                actBox.innerHTML = actList.map(b => `
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:4px;">
+                            <span>🎫 Купон #${b.bet_id} (${b.bet_type === 'express' ? '⚡ Экспресс' : '⚽ Ординар'})</span>
+                            <b style="color:var(--accent-green);">Кэф ${b.odds}</b>
+                        </div>
+                        <div style="font-size:13px; font-weight:800; margin-bottom:4px;">${b.match_title}</div>
+                        <div style="font-size:11px; color:#cbd5e1; white-space:pre-line; margin-bottom:8px;">🎯 ${b.pick}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-glass); padding-top:8px;">
+                            <div style="font-size:11px;">Ставка: <b>${b.amount} FC</b> ➔ <b style="color:var(--accent-gold);">${b.potential_win} FC</b></div>
+                            <button class="btn-main gold" style="padding:6px 10px; font-size:11px;" onclick="cashoutBet(${b.bet_id})">💸 CashOut</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Архив
+            const archBox = document.getElementById('prof-sub-archive');
+            const archList = APP_STATE.archive_bets || [];
+            if (!archList.length) {
+                archBox.innerHTML = '<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted);">Архив пуст.</div>';
+            } else {
+                archBox.innerHTML = archList.map(b => {
+                    const badge = b.status === 'win'
+                        ? `<span style="color:var(--accent-green); font-weight:800;">✅ +${b.payout} FC</span>`
+                        : (b.status === 'push' ? `<span style="color:var(--accent-gold);">🔄 Возврат</span>` : (b.status === 'cashout' ? `<span style="color:var(--accent-blue);">💸 ${b.score_result}</span>` : `<span style="color:var(--accent-red);">❌ -${b.amount} FC</span>`));
+                    return `
+                        <div class="card" style="padding:11px; font-size:12px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                                <b>🎫 Купон #${b.bet_id} (Кэф ${b.odds})</b>
+                                ${badge}
+                            </div>
+                            <div style="font-weight:700;">${b.match_title}</div>
+                            <div style="font-size:11px; color:var(--text-muted); white-space:pre-line;">${b.pick} ${b.score_result ? '• ' + b.score_result : ''}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Топ-10 + Инкогнито
+            const topBox = document.getElementById('prof-sub-top');
+            const medals = ['🥇', '🥈', '🥉'];
+            const incogLabel = u.is_incognito ? '🟢 Режим Инкогнито: ВКЛ' : '🕶 Режим Инкогнито: ВЫКЛ';
+            const topRows = (APP_STATE.leaderboard || []).map(item => `
+                <div class="stadium-row" style="${item.is_me ? 'border-color:var(--accent-gold);' : ''}">
+                    <div style="font-size:12px;">
+                        ${item.place <= 3 ? medals[item.place - 1] : `<b>${item.place}.</b>`}
+                        <b>${item.name}</b> ${item.club ? `<span style="font-size:10px; color:var(--text-muted);">• ${item.club}</span>` : ''}
+                    </div>
+                    <div style="font-size:12px; font-weight:800; color:var(--accent-green);">${formatFC(item.balance)}</div>
+                </div>
+            `).join('');
+            topBox.innerHTML = `
+                <button class="btn-main ghost btn-block" style="margin-bottom:10px;" onclick="toggleIncognito()">${incogLabel}</button>
+                ${topRows}
+            `;
+
+            // Трофеи (25 достижений)
+            const trBox = document.getElementById('prof-sub-trophies');
+            const unlocked = u.achievements_unlocked || [];
+            const allAch = APP_STATE.all_achievements || {};
+            trBox.innerHTML = Object.keys(allAch).map(k => {
+                const isUn = unlocked.includes(k);
+                return `
+                    <div class="stadium-row ${isUn ? 'owned' : ''}">
+                        <div>
+                            <div style="font-size:12px; font-weight:800;">${isUn ? '✅' : '🔒'} ${allAch[k].title}</div>
+                            <div style="font-size:11px; color:var(--text-muted);">${allAch[k].desc}</div>
+                        </div>
+                        <div style="font-size:11px; font-weight:800; color:var(--accent-gold);">+${allAch[k].reward} FC</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function cashoutBet(betId) {
+            const res = await apiAction({ action: 'cashout_bet', bet_id: betId });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function saveNickname(mode) {
+            const val = document.getElementById('nick-input').value || '';
+            const res = await apiAction({ action: 'set_nickname', mode: mode, nickname: val });
+            if (!res.ok) return showToast(res.error, true);
+            document.getElementById('nick-input').value = '';
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function saveFavoriteClub() {
+            const club = document.getElementById('club-select').value;
+            const res = await apiAction({ action: 'set_club', club: club });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        async function toggleIncognito() {
+            const res = await apiAction({ action: 'toggle_incognito' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            await loadAppState();
+        }
+
+        function shareReferralLink() {
+            const botUser = (APP_STATE && APP_STATE.bot_username) ? APP_STATE.bot_username : '';
+            const refLink = `https://t.me/${botUser}?start=ref_${CURRENT_UID}`;
+            const text = '⚽ Залетай в AI_BET_BOT! Реальная линия, FUT-карточки, PvP-пенальти и +1 500 FC на старт по моей ссылке:';
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`;
+            if (tg && tg.openTelegramLink) tg.openTelegramLink(shareUrl);
+            else window.open(shareUrl, '_blank');
+        }
+
+        window.addEventListener('DOMContentLoaded', loadAppState);
+    </script>
+</body>
+</html>
