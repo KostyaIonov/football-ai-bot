@@ -1522,6 +1522,7 @@
         let IS_SPINNING = false;
         let IS_SECRET_BET = false;
         let FIRST_LOAD_DONE = false;
+        let IS_LOADING_STATE = false;
 
         function haptic(type = 'light') {
             if (!tg || !tg.HapticFeedback) return;
@@ -1606,12 +1607,12 @@
             btnEl.classList.add('active');
         }
 
-        /* НАДЕЖНЫЙ СЕРВЕРНЫЙ ЗАПРОС С АВТО-ПОВТОРОМ ПРИ ПРОБУЖДЕНИИ СОКЕТА */
-        async function apiAction(payload) {
+        /* СВЕРХБЫСТРЫЙ СЕРВЕРНЫЙ ЗАПРОС (ПРИНИМАЕТ STATE ЗА 1 ЗАПРОС БЕЗ ПОВТОРНОГО GET) */
+        async function apiAction(payload, skipAutoRender = false) {
             for (let attempt = 0; attempt < 2; attempt++) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 15000);
                 try {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 9000);
                     const res = await fetch('/api/action', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1620,16 +1621,24 @@
                     });
                     clearTimeout(timer);
                     if (res.ok) {
-                        return await res.json();
+                        const data = await res.json();
+                        if (data.ok && data.state) {
+                            APP_STATE = data.state;
+                            if (!skipAutoRender) {
+                                renderAll();
+                            }
+                        }
+                        return data;
                     }
                 } catch (e) {
+                    clearTimeout(timer);
                     if (attempt === 0) {
-                        await new Promise(r => setTimeout(r, 220));
+                        await new Promise(r => setTimeout(r, 180));
                         continue;
                     }
                 }
             }
-            return { ok: false, error: 'Сервер обновляет соединение, нажми ещё раз' };
+            return { ok: false, error: 'Нестабильное соединение, повтори нажатие' };
         }
 
         async function loadAppState(silent = false) {
@@ -1637,30 +1646,41 @@
                 document.getElementById('ui-username').textContent = 'Открой через бота';
                 return;
             }
-            for (let attempt = 0; attempt < 2; attempt++) {
-                try {
-                    const resp = await fetch('/api/state/' + CURRENT_UID);
-                    const data = await resp.json();
-                    if (!data.ok) {
-                        if (!silent) showToast(data.error || 'Ошибка загрузки', true);
-                        return;
-                    }
-                    APP_STATE = data;
-                    renderAll();
-                    if (!FIRST_LOAD_DONE) {
-                        FIRST_LOAD_DONE = true;
-                        if (INITIAL_VIEW === 'live') {
-                            openLiveCenterWidget();
+            if (IS_LOADING_STATE) return;
+            IS_LOADING_STATE = true;
+
+            try {
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 14000);
+                    try {
+                        const resp = await fetch('/api/state/' + CURRENT_UID, { signal: controller.signal });
+                        clearTimeout(timer);
+                        const data = await resp.json();
+                        if (!data.ok) {
+                            if (!silent) showToast(data.error || 'Ошибка загрузки', true);
+                            return;
                         }
+                        APP_STATE = data;
+                        renderAll();
+                        if (!FIRST_LOAD_DONE) {
+                            FIRST_LOAD_DONE = true;
+                            if (INITIAL_VIEW === 'live') {
+                                openLiveCenterWidget();
+                            }
+                        }
+                        return;
+                    } catch (e) {
+                        clearTimeout(timer);
+                        if (attempt === 0) {
+                            await new Promise(r => setTimeout(r, 200));
+                            continue;
+                        }
+                        if (!silent) showToast('Обновление связи с сервером...', true);
                     }
-                    return;
-                } catch (e) {
-                    if (attempt === 0) {
-                        await new Promise(r => setTimeout(r, 250));
-                        continue;
-                    }
-                    if (!silent) showToast('Синхронизация с сервером...', true);
                 }
+            } finally {
+                IS_LOADING_STATE = false;
             }
         }
 
@@ -1709,7 +1729,7 @@
             }
         }
 
-        /* ==================== 1. ПОИСК КОМАНДЫ, ФИЛЬТР СЕГОДНЯ И ЛЕНТА ТУРНИРОВ ==================== */
+        /* ==================== 1. ПОИСК КОМАНДЫ, ФИЛЬТР СЕГОДНЯ И ТОЧНЫЙ СЧЕТЧИК ЛИГ ==================== */
         function onSearchTeamInput() {
             const inp = document.getElementById('team-search-input');
             SEARCH_QUERY = (inp.value || '').trim().toLowerCase();
@@ -1754,7 +1774,10 @@
                 `;
             }
             leagues.forEach(lg => {
-                const badge = lg.live_count > 0 ? `🔴${lg.live_count}` : lg.count;
+                // Считаем точное число матчей данной лиги напрямую из массива матчей (100% совпадение!)
+                const exactCnt = allMatches.filter(m => m.league_key === lg.key).length;
+                if (exactCnt === 0) return;
+                const badge = lg.live_count > 0 ? `🔴${lg.live_count} / ${exactCnt}` : exactCnt;
                 html += `
                     <div class="league-chip ${SELECTED_LEAGUE === lg.key ? 'active' : ''}" onclick="selectLeagueFilter('${lg.key}')">
                         ${lg.title} <span class="chip-cnt">${badge}</span>
@@ -1783,8 +1806,10 @@
                 list = list.filter(m => m.is_today);
             } else {
                 const lgObj = (APP_STATE.leagues || []).find(l => l.key === SELECTED_LEAGUE);
-                document.getElementById('current-feed-title').textContent = lgObj ? lgObj.title : 'Матчи турнира';
                 list = list.filter(m => m.league_key === SELECTED_LEAGUE);
+                document.getElementById('current-feed-title').textContent = lgObj
+                    ? `${lgObj.title} (${list.length})`
+                    : 'Матчи турнира';
             }
 
             if (SEARCH_QUERY) {
@@ -1817,7 +1842,6 @@
                     ? `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`
                     : `<span>🕒 ${m.short_date}</span>`;
 
-                // В центре табло только реальный счет для LIVE или четкий бейдж VS для предстоящих матчей!
                 const scoreCenter = m.is_live
                     ? `<div class="score-pill">${m.live_score}</div>`
                     : `<div class="score-pill vs-badge">VS</div>`;
@@ -1864,7 +1888,7 @@
             }).join('');
         }
 
-        /* ==================== 2. ИНТЕРАКТИВНЫЙ ВИДЖЕТ LIVE MATCH CENTER (БЕЗ ПУТАНИЦЫ СЧЕТА) ==================== */
+        /* ==================== 2. ИНТЕРАКТИВНЫЙ ВИДЖЕТ LIVE MATCH CENTER ==================== */
         function openLiveCenterWidget() {
             haptic('medium');
             renderLiveCenterWidgetBody();
@@ -2288,23 +2312,23 @@
 
             const btn = document.getElementById('btn-submit-slip');
             btn.classList.add('disabled');
-            btn.textContent = '⏳ Принимаем купон...';
+            btn.textContent = '⏳ Оформляем купон...';
 
-            const res = await apiAction({
-                action: 'submit_slip',
-                items: SLIP_ITEMS,
-                stake: stake,
-                is_secret: IS_SECRET_BET
-            });
-
-            btn.classList.remove('disabled');
-            btn.textContent = '✅ Заключить пари';
-
-            if (!res.ok) return showToast(res.error, true);
-            showToast(res.message);
-            clearSlip();
-            closeMatchDetail();
-            await loadAppState(true);
+            try {
+                const res = await apiAction({
+                    action: 'submit_slip',
+                    items: SLIP_ITEMS,
+                    stake: stake,
+                    is_secret: IS_SECRET_BET
+                });
+                if (!res.ok) return showToast(res.error, true);
+                clearSlip();
+                closeMatchDetail();
+                showToast(res.message);
+            } finally {
+                btn.classList.remove('disabled');
+                btn.textContent = '✅ Заключить пари';
+            }
         }
 
         function loadDailyExpressToSlip() {
@@ -2419,7 +2443,6 @@
             const eqCards = u.equipped_cards || {};
             const capRole = u.captain_role || 'FW';
 
-            // Баннер Крафта СПК внутри коллекции
             const sbcBanner = document.getElementById('collection-sbc-banner');
             if (reserveIds.length >= 3) {
                 sbcBanner.innerHTML = `
@@ -2454,7 +2477,6 @@
                 </div>
             `).join('');
 
-            // Отображаем СТРОГО ТОЛЬКО карточки, которые есть у игрока! Никаких закрытых замков!
             const myFilteredKeys = ownedIds
                 .filter(cid => catalog[cid] && (COLLECTION_FILTER === 'ALL' || catalog[cid].role === COLLECTION_FILTER))
                 .sort((a, b) => (catalog[b].ovr || 85) - (catalog[a].ovr || 85));
@@ -2508,7 +2530,6 @@
             const res = await apiAction({ action: 'equip_fut_card', card_id: cardId });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
             renderCollectionModalContent();
         }
 
@@ -2517,7 +2538,6 @@
             const res = await apiAction({ action: 'set_fut_captain', role: roleKey });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
             renderCollectionModalContent();
         }
 
@@ -2540,7 +2560,6 @@
             document.getElementById('pack-modal-note').textContent = res.status_note;
             document.getElementById('pack-modal').classList.add('show');
             haptic('success');
-            await loadAppState(true);
         }
 
         async function openFutPack(type) {
@@ -2561,7 +2580,6 @@
             document.getElementById('pack-modal-note').textContent = res.status_note;
             document.getElementById('pack-modal').classList.add('show');
             haptic('success');
-            await loadAppState(true);
         }
 
         /* ==================== 6. ПРОФИЛЬ И АРХИВ СО СТАТУСАМИ НАПРОТИВ МАТЧА ==================== */
@@ -2767,7 +2785,6 @@
             const u = APP_STATE.user;
             document.getElementById('ui-pvp-wins').textContent = u.pvp_wins || 0;
 
-            // Баннер мгновенного реванша
             const remBanner = document.getElementById('pvp-rematch-banner');
             if (u.last_pvp && u.last_pvp.stake) {
                 remBanner.style.display = 'flex';
@@ -2863,7 +2880,6 @@
             });
             if (!res.ok) return showToast(res.error, true);
             showToast('⚔️ ' + res.message);
-            await loadAppState(true);
         }
 
         async function createPvpDuel(mode) {
@@ -2873,28 +2889,24 @@
             const res = await apiAction({ action: 'pvp_create', mode, stake, kick: PVP_DIRS.kick, save: PVP_DIRS.save, target });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function acceptPvpDuel(duelId) {
             const res = await apiAction({ action: 'pvp_accept', duel_id: duelId, kick: PVP_DIRS.kick, save: PVP_DIRS.save });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function cancelPvpDuel(duelId) {
             const res = await apiAction({ action: 'pvp_cancel', duel_id: duelId });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function placeBlackMarketBid(amount) {
             const res = await apiAction({ action: 'bm_bid', amount });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function spinWheel() {
@@ -2902,7 +2914,7 @@
             IS_SPINNING = true;
             haptic('medium');
 
-            const res = await apiAction({ action: 'spin_roulette' });
+            const res = await apiAction({ action: 'spin_roulette' }, true);
             if (!res.ok) {
                 IS_SPINNING = false;
                 return showToast(res.error, true);
@@ -2913,11 +2925,11 @@
             wheel.style.transform = `rotate(${WHEEL_ROTATION}deg)`;
             document.getElementById('wheel-status-txt').textContent = '🎰 Барабан вращается...';
 
-            setTimeout(async () => {
+            setTimeout(() => {
                 IS_SPINNING = false;
+                renderAll();
                 document.getElementById('wheel-status-txt').innerHTML = `🎉 Выпал приз: <b style="color:var(--accent-gold);">${res.sector.name}</b>`;
                 showToast('🎰 Выигрыш: ' + res.sector.name);
-                await loadAppState(true);
             }, 3250);
         }
 
@@ -2974,7 +2986,6 @@
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
             closeSuperExpressModal();
-            await loadAppState(true);
         }
 
         function closeSuperExpressModal() {
@@ -2987,28 +2998,24 @@
             const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_bet' };
             prefs[type] = val;
             await apiAction({ action: 'set_stadium_prefs', ticket: prefs.ticket, sponsor: prefs.sponsor });
-            await loadAppState(true);
         }
 
         async function claimStadiumRevenue() {
             const res = await apiAction({ action: 'claim_stadium' });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function claimDailyBonus() {
             const res = await apiAction({ action: 'claim_bonus' });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function upgradeBuilding(bType) {
             const res = await apiAction({ action: 'upgrade_building', b_type: bType });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         function togglePickAndMarkSecret(lk, ev, pc, lbl, odd, tm) {
@@ -3021,7 +3028,6 @@
             const res = await apiAction({ action: 'cashout_bet', bet_id: betId });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function saveNickname(mode) {
@@ -3031,7 +3037,6 @@
             if (!res.ok) return showToast(res.error, true);
             document.getElementById('nick-input').value = '';
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function saveFavoriteClub() {
@@ -3039,14 +3044,12 @@
             const res = await apiAction({ action: 'set_club', club });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         async function toggleIncognito() {
             const res = await apiAction({ action: 'toggle_incognito' });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
-            await loadAppState(true);
         }
 
         function shareReferralLink() {
@@ -3060,7 +3063,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             loadAppState();
-            setInterval(() => loadAppState(true), 45000);
+            setInterval(() => loadAppState(true), 60000);
         });
     </script>
 </body>
