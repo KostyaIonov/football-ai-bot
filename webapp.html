@@ -25,18 +25,8 @@
             --text-muted: #94a3b8;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-
-        input, select, textarea {
-            user-select: text;
-            -webkit-user-select: text;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+        input, select, textarea { user-select: text; -webkit-user-select: text; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -49,744 +39,209 @@
         }
 
         /* НОВОГОДНИЙ СНЕГОПАД */
-        .snow-container {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 1;
-            overflow: hidden;
-        }
-
-        .snowflake {
-            position: absolute;
-            top: -20px;
-            color: rgba(255, 255, 255, 0.32);
-            font-size: 12px;
-            animation: snowfall linear infinite;
-        }
-
+        .snow-container { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+        .snowflake { position: absolute; top: -20px; color: rgba(255, 255, 255, 0.28); font-size: 12px; will-change: transform; animation: snowfall linear infinite; }
         @keyframes snowfall {
-            0% { transform: translateY(-10px) translateX(0) rotate(0deg); opacity: 0.8; }
-            50% { transform: translateY(50vh) translateX(14px) rotate(180deg); opacity: 0.5; }
-            100% { transform: translateY(105vh) translateX(-10px) rotate(360deg); opacity: 0.1; }
+            0% { transform: translate3d(0, -10px, 0) rotate(0deg); opacity: 0.8; }
+            50% { transform: translate3d(12px, 50vh, 0) rotate(180deg); opacity: 0.5; }
+            100% { transform: translate3d(-8px, 105vh, 0) rotate(360deg); opacity: 0.1; }
         }
 
-        /* НОВОГОДНЯЯ ГИРЛЯНДА */
-        .garland-bar {
-            display: flex;
-            justify-content: space-around;
-            padding: 3px 8px 5px;
-            background: rgba(5, 9, 17, 0.88);
-            border-bottom: 1px solid var(--border-frost);
-            position: sticky;
-            top: 58px;
-            z-index: 89;
-            backdrop-filter: blur(8px);
-        }
-
-        .bulb {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            animation: glowBulb 1.8s infinite alternate;
-        }
-        .bulb.r { background: #ff5252; box-shadow: 0 0 8px #ff5252; animation-delay: 0.1s; }
-        .bulb.g { background: #00e676; box-shadow: 0 0 8px #00e676; animation-delay: 0.5s; }
-        .bulb.b { background: #00b0ff; box-shadow: 0 0 8px #00b0ff; animation-delay: 0.9s; }
-        .bulb.y { background: #ffca28; box-shadow: 0 0 8px #ffca28; animation-delay: 1.3s; }
-
-        @keyframes glowBulb {
-            from { opacity: 0.45; transform: scale(0.88); }
-            to { opacity: 1; transform: scale(1.15); }
-        }
-
-        /* ВЕРХНЯЯ ШАПКА И ИНДИКАТОР ВАЛЮТЫ */
+        /* ВЕРХНЯЯ ШАПКА + АНИМАЦИЯ ВАЛЮТЫ */
         .top-header {
-            position: sticky;
-            top: 0;
-            z-index: 90;
-            height: 58px;
-            background: rgba(6, 12, 24, 0.94);
-            backdrop-filter: blur(16px);
-            padding: 8px 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            position: sticky; top: 0; z-index: 90; height: 58px;
+            background: rgba(6, 12, 24, 0.95); backdrop-filter: blur(14px);
+            padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
         }
-
-        .user-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .user-name-row {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-weight: 800;
-            font-size: 13.5px;
-        }
-
+        .user-meta { display: flex; flex-direction: column; gap: 2px; }
+        .user-name-row { display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 13.5px; flex-wrap: nowrap; }
         .id-badge {
-            font-size: 10px;
-            font-weight: 700;
-            color: var(--accent-ice);
-            background: rgba(0, 176, 255, 0.14);
-            border: 1px solid rgba(128, 216, 255, 0.35);
-            padding: 2px 6px;
-            border-radius: 6px;
-            cursor: pointer;
+            font-size: 10px; font-weight: 700; color: var(--accent-ice);
+            background: rgba(0, 176, 255, 0.14); border: 1px solid rgba(128, 216, 255, 0.35);
+            padding: 2px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap;
         }
-
         .live-hub-btn {
-            font-size: 10px;
-            font-weight: 800;
-            color: #fff;
+            font-size: 10px; font-weight: 800; color: #fff;
             background: linear-gradient(135deg, #ff5252, #d50000);
-            padding: 3px 7px;
-            border-radius: 99px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            box-shadow: 0 0 10px rgba(255, 82, 82, 0.45);
+            padding: 2px 7px; border-radius: 99px; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 3px;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.45); white-space: nowrap;
         }
-
-        .share-top-btn {
-            font-size: 10px;
-            font-weight: 800;
-            color: #041019;
-            background: var(--accent-gold);
-            padding: 3px 7px;
-            border-radius: 99px;
-            cursor: pointer;
-        }
-
-        .user-rank {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
+        .user-rank { font-size: 11px; color: var(--text-muted); }
 
         .balance-pill {
             position: relative;
             background: linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(0, 176, 255, 0.16));
-            border: 1px solid rgba(0, 230, 118, 0.45);
-            padding: 6px 11px;
-            border-radius: 13px;
-            text-align: right;
-            box-shadow: 0 4px 14px rgba(0, 230, 118, 0.14);
-            transition: transform 0.18s;
+            border: 1px solid rgba(0, 230, 118, 0.45); padding: 6px 11px; border-radius: 13px;
+            text-align: right; box-shadow: 0 4px 14px rgba(0, 230, 118, 0.14);
+            transition: transform 0.18s ease; flex-shrink: 0;
+        }
+        .balance-pill.pulse { transform: scale(1.09); }
+        .balance-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-ice); display: block; }
+        .balance-val { font-size: 14.5px; font-weight: 900; color: var(--accent-green); }
+
+        .coin-float {
+            position: absolute; right: 8px; bottom: -20px; font-size: 13px; font-weight: 900;
+            pointer-events: none; z-index: 200; animation: coinFly 1.15s ease-out forwards;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.9); white-space: nowrap;
+        }
+        @keyframes coinFly {
+            0% { opacity: 1; transform: translateY(0) scale(0.9); }
+            100% { opacity: 0; transform: translateY(-34px) scale(1.15); }
         }
 
-        .balance-pill.pulse {
-            transform: scale(1.08);
+        /* НОВОГОДНЯЯ ГИРЛЯНДА И БЕГУЩАЯ СТРОКА ЗАНОСОВ */
+        .garland-bar {
+            display: flex; justify-content: space-around; padding: 3px 8px 5px;
+            background: rgba(5, 9, 17, 0.9); border-bottom: 1px solid var(--border-frost);
+            position: sticky; top: 58px; z-index: 89;
         }
+        .bulb { width: 7px; height: 7px; border-radius: 50%; animation: glowBulb 1.8s infinite alternate; }
+        .bulb.r { background: #ff5252; box-shadow: 0 0 7px #ff5252; animation-delay: 0.1s; }
+        .bulb.g { background: #00e676; box-shadow: 0 0 7px #00e676; animation-delay: 0.5s; }
+        .bulb.b { background: #00b0ff; box-shadow: 0 0 7px #00b0ff; animation-delay: 0.9s; }
+        .bulb.y { background: #ffca28; box-shadow: 0 0 7px #ffca28; animation-delay: 1.3s; }
+        @keyframes glowBulb { from { opacity: 0.45; transform: scale(0.88); } to { opacity: 1; transform: scale(1.15); } }
 
-        .balance-label {
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--accent-ice);
-            display: block;
+        .ticker-wrap {
+            background: rgba(9, 17, 32, 0.92); border-bottom: 1px solid rgba(255, 202, 40, 0.22);
+            overflow: hidden; white-space: nowrap; padding: 5px 0; position: relative; z-index: 2;
         }
-
-        .balance-val {
-            font-size: 14.5px;
-            font-weight: 900;
-            color: var(--accent-green);
+        .ticker-move {
+            display: inline-block; padding-left: 100%;
+            animation: tickerScroll 28s linear infinite;
+            font-size: 11px; font-weight: 700; color: #e2e8f0;
         }
+        .ticker-item { margin-right: 36px; display: inline-block; }
+        @keyframes tickerScroll { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
 
-        /* ВЗЛЕТАЮЩИЙ ИНДИКАТОР НАЧИСЛЕНИЯ/СПИСАНИЯ МОНЕТ (+FC / -FC) */
-        #coin-delta-floater {
-            position: fixed;
-            top: 48px;
-            right: 16px;
-            z-index: 400;
-            font-size: 15px;
-            font-weight: 900;
-            padding: 4px 10px;
-            border-radius: 99px;
-            pointer-events: none;
-            display: none;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-        }
-
-        #coin-delta-floater.plus {
-            background: rgba(0, 230, 118, 0.22);
-            border: 1.5px solid var(--accent-green);
-            color: var(--accent-green);
-            animation: floatCoinUp 1.35s ease-out forwards;
-        }
-
-        #coin-delta-floater.minus {
-            background: rgba(255, 82, 82, 0.22);
-            border: 1.5px solid var(--accent-red);
-            color: var(--accent-red);
-            animation: floatCoinUp 1.35s ease-out forwards;
-        }
-
-        @keyframes floatCoinUp {
-            0% { opacity: 0; transform: translateY(10px) scale(0.85); }
-            20% { opacity: 1; transform: translateY(0px) scale(1.06); }
-            80% { opacity: 1; transform: translateY(-16px) scale(1); }
-            100% { opacity: 0; transform: translateY(-26px) scale(0.92); }
-        }
-
-        /* ВКЛАДКИ */
-        .tab-section {
-            display: none;
-            padding: 12px 12px 24px;
-            position: relative;
-            z-index: 2;
-            animation: fadeIn 0.16s ease-out;
-        }
-
-        .tab-section.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .section-title {
-            font-size: 15px;
-            font-weight: 800;
-            margin: 14px 0 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
+        /* СЕКЦИИ ВКЛАДОК И КАРТОЧКИ */
+        .tab-section { display: none; padding: 11px 12px 24px; position: relative; z-index: 2; }
+        .tab-section.active { display: block; }
+        .section-title { font-size: 14.5px; font-weight: 800; margin: 13px 0 9px; display: flex; align-items: center; justify-content: space-between; }
         .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 16px;
-            padding: 14px;
-            margin-bottom: 11px;
+            background: var(--bg-card); border: 1px solid var(--border-glass);
+            border-radius: 16px; padding: 13px; margin-bottom: 10px;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         }
 
-        /* ПРОМО-ВИДЖЕТЫ ЛИНИИ */
-        .promo-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 10px;
+        /* СТАРТОВЫЙ КВЕСТ НОВИЧКА (ОНБОРДИНГ) */
+        .rookie-card {
+            background: linear-gradient(135deg, rgba(0, 230, 118, 0.14), rgba(0, 176, 255, 0.12), rgba(14, 22, 38, 0.96));
+            border: 1.5px solid rgba(0, 230, 118, 0.45); border-radius: 16px;
+            padding: 12px; margin-bottom: 11px;
         }
+        .rookie-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+        .rk-step {
+            background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass);
+            border-radius: 10px; padding: 7px 5px; text-align: center; font-size: 10px; font-weight: 700;
+            cursor: pointer;
+        }
+        .rk-step.done { border-color: var(--accent-green); background: rgba(0, 230, 118, 0.14); color: var(--accent-green); }
 
+        /* ПРОМО-БАННЕРЫ И ПОИСК */
+        .promo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .promo-box {
             background: linear-gradient(135deg, rgba(0, 176, 255, 0.18), rgba(14, 22, 38, 0.95));
-            border: 1px solid var(--border-frost);
-            border-radius: 14px;
-            padding: 10px 12px;
-            cursor: pointer;
-            transition: transform 0.12s;
+            border: 1px solid var(--border-frost); border-radius: 14px; padding: 10px 12px; cursor: pointer;
         }
+        .promo-box.gold { background: linear-gradient(135deg, rgba(255, 202, 40, 0.18), rgba(14, 22, 38, 0.95)); border-color: rgba(255, 202, 40, 0.45); }
+        .promo-title { font-size: 13px; font-weight: 800; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between; }
+        .promo-sub { font-size: 11px; color: var(--text-muted); }
 
-        .promo-box.gold {
-            background: linear-gradient(135deg, rgba(255, 202, 40, 0.18), rgba(14, 22, 38, 0.95));
-            border-color: rgba(255, 202, 40, 0.45);
-        }
-
-        .promo-box:active { transform: scale(0.96); }
-
-        .promo-title {
-            font-size: 13px;
-            font-weight: 800;
-            margin-bottom: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .promo-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        /* ПОИСК КОМАНДЫ */
-        .search-box-wrap {
-            position: relative;
-            margin-bottom: 10px;
-        }
-
+        .search-box-wrap { position: relative; margin-bottom: 10px; }
         .search-input {
-            width: 100%;
-            background: rgba(14, 22, 38, 0.92);
-            border: 1px solid var(--border-glass);
-            border-radius: 12px;
-            padding: 9px 34px 9px 12px;
-            color: var(--text-main);
-            font-size: 13px;
-            font-weight: 600;
-            outline: none;
+            width: 100%; background: rgba(14, 22, 38, 0.92); border: 1px solid var(--border-glass);
+            border-radius: 12px; padding: 9px 34px 9px 12px; color: var(--text-main); font-size: 13px; font-weight: 600; outline: none;
         }
-
         .search-input:focus { border-color: var(--accent-ice); }
-
         .search-clear-btn {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: var(--text-muted);
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            font-size: 11px;
-            font-weight: 800;
-            cursor: pointer;
-            display: none;
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.1); border: none; color: var(--text-muted);
+            width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 800; cursor: pointer; display: none;
         }
 
         /* ЛЕНТА ЛИГ */
-        .leagues-bar {
-            display: flex;
-            gap: 7px;
-            overflow-x: auto;
-            padding: 2px 0 10px;
-            margin-bottom: 4px;
-            scrollbar-width: none;
-        }
+        .leagues-bar { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 4px; scrollbar-width: none; }
         .leagues-bar::-webkit-scrollbar { display: none; }
-
         .league-chip {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glass);
-            color: var(--text-muted);
-            padding: 8px 13px;
-            border-radius: 99px;
-            font-size: 12px;
-            font-weight: 700;
-            white-space: nowrap;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.14s;
+            background: var(--bg-card); border: 1px solid var(--border-glass); color: var(--text-muted);
+            padding: 8px 13px; border-radius: 99px; font-size: 12px; font-weight: 700;
+            white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
         }
+        .league-chip.active { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #041019; border-color: transparent; font-weight: 800; }
+        .chip-cnt { font-size: 10px; padding: 1px 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.12); }
+        .league-chip.active .chip-cnt { background: rgba(0, 0, 0, 0.2); color: #041019; }
 
-        .league-chip.active {
-            background: linear-gradient(135deg, var(--accent-green), #00b0ff);
-            color: #041019;
-            border-color: transparent;
-            font-weight: 800;
-            box-shadow: 0 4px 12px rgba(0, 230, 118, 0.28);
-        }
-
-        .chip-cnt {
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 99px;
-            background: rgba(255, 255, 255, 0.12);
-        }
-        .league-chip.active .chip-cnt {
-            background: rgba(0, 0, 0, 0.2);
-            color: #041019;
-        }
-
-        /* КАРТОЧКА МАТЧА */
+        /* КАРТОЧКА МАТЧА И ТАЙМЕР СТАРТА */
         .match-card {
             background: linear-gradient(180deg, rgba(19, 31, 53, 0.95) 0%, rgba(12, 20, 35, 0.96) 100%);
-            border: 1px solid var(--border-glass);
-            border-radius: 17px;
-            padding: 13px;
-            margin-bottom: 11px;
-            position: relative;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-glass); border-radius: 17px; padding: 13px; margin-bottom: 11px; position: relative;
         }
-
         .match-card.is-top { border-color: rgba(128, 216, 255, 0.35); }
-        .match-card.is-live {
-            border-color: rgba(255, 82, 82, 0.65);
-            box-shadow: 0 0 18px rgba(255, 82, 82, 0.15);
-        }
+        .match-card.is-live { border-color: rgba(255, 82, 82, 0.65); }
+        .match-top-bar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+        .badge-top { background: var(--accent-gold-dim); color: var(--accent-gold); border: 1px solid rgba(255, 202, 40, 0.4); padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; margin-left: 5px; }
+        .soon-badge { background: rgba(255, 145, 0, 0.2); color: #ffab40; border: 1px solid rgba(255, 171, 64, 0.45); padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+        .live-badge { background: rgba(255, 82, 82, 0.2); color: var(--accent-red); border: 1px solid rgba(255, 82, 82, 0.5); padding: 2px 8px; border-radius: 99px; font-weight: 800; font-size: 10px; display: inline-flex; align-items: center; gap: 5px; }
+        .live-dot { width: 6px; height: 6px; background: var(--accent-red); border-radius: 50%; animation: pulseRed 1.1s infinite; }
+        @keyframes pulseRed { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        .match-top-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .badge-top {
-            background: var(--accent-gold-dim);
-            color: var(--accent-gold);
-            border: 1px solid rgba(255, 202, 40, 0.4);
-            padding: 1px 6px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-weight: 800;
-            margin-left: 5px;
-        }
-
-        .live-badge {
-            background: rgba(255, 82, 82, 0.2);
-            color: var(--accent-red);
-            border: 1px solid rgba(255, 82, 82, 0.5);
-            padding: 2px 8px;
-            border-radius: 99px;
-            font-weight: 800;
-            font-size: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .live-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--accent-red);
-            border-radius: 50%;
-            animation: pulseRed 1.1s infinite;
-        }
-
-        @keyframes pulseRed {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.3; transform: scale(1.3); }
-        }
-
-        .match-clickable-area {
-            cursor: pointer;
-            padding: 4px 0 6px;
-        }
-
-        .match-teams-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 9px;
-        }
-
-        .team-name {
-            font-size: 15px;
-            font-weight: 800;
-            flex: 1;
-            line-height: 1.25;
-        }
-
+        .match-clickable-area { cursor: pointer; padding: 4px 0 6px; }
+        .match-teams-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 9px; }
+        .team-name { font-size: 15px; font-weight: 800; flex: 1; line-height: 1.25; }
         .team-name.away { text-align: right; }
+        .score-pill { background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.15); padding: 5px 11px; border-radius: 10px; font-weight: 900; font-size: 13px; color: var(--accent-gold); min-width: 52px; text-align: center; }
+        .score-pill.vs-badge { color: var(--text-muted); font-size: 11px; font-weight: 800; background: rgba(255, 255, 255, 0.04); }
+        .match-open-bar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--accent-ice); background: rgba(0, 176, 255, 0.09); border: 1px solid rgba(128, 216, 255, 0.22); padding: 6px 10px; border-radius: 9px; margin-bottom: 9px; font-weight: 700; }
 
-        .score-pill {
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 5px 11px;
-            border-radius: 10px;
-            font-weight: 900;
-            font-size: 13px;
-            color: var(--accent-gold);
-            min-width: 52px;
-            text-align: center;
-        }
-
-        .score-pill.vs-badge {
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.6px;
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        .match-open-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-            color: var(--accent-ice);
-            background: rgba(0, 176, 255, 0.09);
-            border: 1px solid rgba(128, 216, 255, 0.22);
-            padding: 6px 10px;
-            border-radius: 9px;
-            margin-bottom: 9px;
-            font-weight: 700;
-        }
-
-        /* СЕТКА КОТИРОВОК */
-        .odds-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-        }
+        /* КОТИРОВКИ И БИТВА ИИ */
+        .odds-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         .odds-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
         .odds-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
         .odds-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+        .odd-btn { background: rgba(255, 255, 255, 0.055); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 11px; padding: 8px 4px; text-align: center; color: var(--text-main); cursor: pointer; }
+        .odd-btn.selected { background: var(--accent-green) !important; border-color: var(--accent-green) !important; color: #041019 !important; }
+        .odd-btn.selected .mkt, .odd-btn.selected .k { color: #041019 !important; }
+        .odd-btn .mkt { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .odd-btn .k { font-size: 13px; font-weight: 900; color: var(--accent-green); }
 
-        .odd-btn {
-            background: rgba(255, 255, 255, 0.055);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 11px;
-            padding: 8px 4px;
-            text-align: center;
-            color: var(--text-main);
-            cursor: pointer;
-            transition: all 0.12s;
-        }
+        .ai-battle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .ai-fighter-card { background: rgba(19, 32, 56, 0.9); border: 1px solid rgba(0, 176, 255, 0.35); border-radius: 13px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
+        .ai-fighter-card.romantic { border-color: rgba(213, 0, 249, 0.45); background: rgba(36, 17, 56, 0.85); }
+        .radar-bar-track { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; display: flex; margin: 6px 0 10px; }
 
-        .odd-btn:active { transform: scale(0.95); }
-
-        .odd-btn.selected {
-            background: var(--accent-green) !important;
-            border-color: var(--accent-green) !important;
-            color: #041019 !important;
-            box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
-        }
-
-        .odd-btn.selected .mkt,
-        .odd-btn.selected .k { color: #041019 !important; }
-
-        .odd-btn .mkt {
-            font-size: 10px;
-            color: var(--text-muted);
-            display: block;
-            margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .odd-btn .k {
-            font-size: 13px;
-            font-weight: 900;
-            color: var(--accent-green);
-        }
-
-        /* БИТВА ИИ И РАДАР */
-        .ai-battle-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .ai-fighter-card {
-            background: rgba(19, 32, 56, 0.9);
-            border: 1px solid rgba(0, 176, 255, 0.35);
-            border-radius: 13px;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            cursor: pointer;
-        }
-
-        .ai-fighter-card.romantic {
-            border-color: rgba(213, 0, 249, 0.45);
-            background: rgba(36, 17, 56, 0.85);
-        }
-
-        .radar-bar-track {
-            height: 8px;
-            border-radius: 99px;
-            background: rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-            display: flex;
-            margin: 6px 0 10px;
-        }
-
-        /* КНОПКИ */
-        .btn-main {
-            background: linear-gradient(135deg, #00e676, #00b0ff);
-            color: #041019;
-            border: none;
-            border-radius: 12px;
-            padding: 11px 15px;
-            font-weight: 800;
-            font-size: 13px;
-            cursor: pointer;
-            transition: transform 0.12s, opacity 0.12s;
-            text-align: center;
-        }
-        .btn-main:active { transform: scale(0.96); }
+        /* КНОПКИ И ПОДВКЛАДКИ */
+        .btn-main { background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019; border: none; border-radius: 12px; padding: 11px 14px; font-weight: 800; font-size: 13px; cursor: pointer; text-align: center; }
+        .btn-main:active { transform: scale(0.97); }
         .btn-main.gold { background: linear-gradient(135deg, #ffca28, #ff9100); }
-        .btn-main.purple { background: linear-gradient(135deg, #d500f9, #651fff); color: #fff; }
         .btn-main.ghost { background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-glass); }
         .btn-main.disabled { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); pointer-events: none; opacity: 0.6; }
         .btn-block { width: 100%; display: block; margin-top: 8px; }
 
-        /* ПОДВКЛАДКИ */
-        .sub-nav {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            background: rgba(255, 255, 255, 0.04);
-            padding: 5px;
-            border-radius: 13px;
-            margin-bottom: 12px;
-        }
-
-        .sub-nav-btn {
-            padding: 8px 4px;
-            text-align: center;
-            font-size: 11px;
-            font-weight: 800;
-            color: var(--text-muted);
-            border-radius: 9px;
-            cursor: pointer;
-        }
-
-        .sub-nav-btn.active {
-            background: var(--bg-elevated);
-            color: var(--accent-green);
-            border: 1px solid rgba(0, 230, 118, 0.35);
-        }
-
-        /* СТАРТАП «ПОРТОВЫЙ МАГНАТ» (КОНТЕЙНЕРЫ, СКЛАД, ШОУРУМ, P2P) */
-        .container-box-card {
-            background: linear-gradient(135deg, rgba(19, 32, 56, 0.96), rgba(9, 15, 28, 0.98));
-            border: 1.5px solid var(--border-glass);
-            border-radius: 18px;
-            padding: 13px;
-            margin-bottom: 11px;
-            display: flex;
-            align-items: center;
-            gap: 13px;
-            position: relative;
-        }
-
-        .container-box-card.tier-high {
-            border-color: rgba(255, 202, 40, 0.5);
-            box-shadow: 0 0 18px rgba(255, 202, 40, 0.12);
-        }
-
-        .container-box-card.tier-ultra {
-            border-color: rgba(213, 0, 249, 0.65);
-            box-shadow: 0 0 22px rgba(213, 0, 249, 0.18);
-        }
-
-        .container-ico-badge {
-            width: 64px;
-            height: 78px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            flex-shrink: 0;
-        }
-
-        .loot-item-card {
-            background: rgba(16, 26, 46, 0.96);
-            border: 1.5px solid var(--border-glass);
-            border-radius: 16px;
-            padding: 12px;
-            margin-bottom: 10px;
-        }
-
-        .loot-item-card.rar-2 { border-color: var(--accent-blue); }
-        .loot-item-card.rar-3 { border-color: var(--accent-gold); }
-        .loot-item-card.rar-4 { border-color: var(--accent-purple); box-shadow: 0 0 16px rgba(213, 0, 249, 0.2); }
-
-        /* 7-ДНЕВНЫЙ КАЛЕНДАРЬ НАГРАД ПРИ ВХОДЕ */
-        .streak-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 7px;
-            margin: 12px 0;
-        }
-
-        .streak-day-box {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-glass);
-            border-radius: 12px;
-            padding: 9px 4px;
-            text-align: center;
-        }
-
-        .streak-day-box.done {
-            border-color: rgba(0, 230, 118, 0.45);
-            background: rgba(0, 230, 118, 0.08);
-        }
-
-        .streak-day-box.current {
-            border: 2px solid var(--accent-gold);
-            background: rgba(255, 202, 40, 0.16);
-            transform: scale(1.03);
-            box-shadow: 0 0 15px rgba(255, 202, 40, 0.3);
-        }
-
-        .streak-day-box.day-7 {
-            grid-column: span 2;
-        }
+        .sub-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: rgba(255, 255, 255, 0.04); padding: 5px; border-radius: 13px; margin-bottom: 12px; }
+        .sub-nav-btn { padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 800; color: var(--text-muted); border-radius: 9px; cursor: pointer; }
+        .sub-nav-btn.active { background: var(--bg-elevated); color: var(--accent-green); border: 1px solid rgba(0, 230, 118, 0.35); }
 
         /* ТАКТИЧЕСКОЕ ПОЛЕ FUT НА 5 ПОЗИЦИЙ */
         .fut-tactical-board {
-            background:
-                repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 28px, transparent 28px, transparent 56px),
-                linear-gradient(180deg, #0b4125 0%, #062816 100%);
-            border: 2px solid rgba(0, 230, 118, 0.45);
-            border-radius: 20px;
-            padding: 14px 10px;
-            margin-bottom: 12px;
-            position: relative;
-            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.65);
+            background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 28px, transparent 28px, transparent 56px), linear-gradient(180deg, #0b4125 0%, #062816 100%);
+            border: 2px solid rgba(0, 230, 118, 0.45); border-radius: 20px; padding: 14px 10px; margin-bottom: 12px; position: relative; box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.65);
         }
-
-        .pitch-center-circle {
-            position: absolute;
-            top: 46%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 84px;
-            height: 84px;
-            border: 1.5px solid rgba(255, 255, 255, 0.14);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .pitch-row {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 2;
-        }
-
+        .pitch-center-circle { position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%); width: 84px; height: 84px; border: 1.5px solid rgba(255, 255, 255, 0.14); border-radius: 50%; pointer-events: none; }
+        .pitch-row { display: flex; justify-content: center; gap: 12px; margin-bottom: 10px; position: relative; z-index: 2; }
         .pitch-row:last-child { margin-bottom: 0; }
 
         .fut-shield {
-            background: linear-gradient(160deg, #2a3950, #101929);
-            border: 2px solid rgba(255, 255, 255, 0.28);
-            border-radius: 13px 13px 20px 20px;
-            padding: 7px 6px 9px;
-            text-align: center;
-            position: relative;
-            width: 104px;
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.55);
-            cursor: pointer;
-            transition: transform 0.12s;
+            background: linear-gradient(160deg, #2a3950, #101929); border: 2px solid rgba(255, 255, 255, 0.28);
+            border-radius: 13px 13px 20px 20px; padding: 7px 6px 9px; text-align: center;
+            position: relative; width: 104px; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.55); cursor: pointer;
         }
-
-        .fut-shield:active { transform: scale(0.95); }
         .fut-shield.tier-2 { background: linear-gradient(160deg, #5c4308, #1e1604); border-color: var(--accent-gold); }
         .fut-shield.tier-3 { background: linear-gradient(160deg, #3b1054, #0c2540); border-color: var(--accent-ice); box-shadow: 0 0 15px rgba(0, 176, 255, 0.3); }
         .fut-shield.tier-4 { background: linear-gradient(160deg, #7a5800, #310b36, #0d1526); border: 2px solid #ffca28; box-shadow: 0 0 22px rgba(255, 202, 40, 0.45); }
         .fut-shield.locked { opacity: 0.65; border-style: dashed; background: rgba(10, 18, 30, 0.8); }
-
-        .captain-badge {
-            position: absolute;
-            top: -7px;
-            right: -7px;
-            background: var(--accent-gold);
-            color: #041019;
-            font-size: 9px;
-            font-weight: 900;
-            padding: 2px 6px;
-            border-radius: 99px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.6);
-        }
-
+        .captain-badge { position: absolute; top: -7px; right: -7px; background: var(--accent-gold); color: #041019; font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 99px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
         .shield-top { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: 900; padding: 0 2px; }
         .shield-ovr { font-size: 13px; font-weight: 900; color: var(--accent-gold); }
         .shield-avatar { font-size: 20px; margin: 2px 0; }
@@ -794,267 +249,93 @@
         .shield-buff { font-size: 8.5px; font-weight: 800; color: var(--accent-green); background: rgba(0, 230, 118, 0.14); padding: 2px 4px; border-radius: 5px; }
 
         /* 3D-ВИТРИНА ПАКОВ */
-        .pack-showcase-card {
-            background: linear-gradient(135deg, rgba(20, 31, 52, 0.96), rgba(10, 16, 28, 0.98));
-            border: 1px solid var(--border-glass);
-            border-radius: 18px;
-            padding: 14px;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .pack-visual-cover {
-            width: 68px;
-            height: 92px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 4px;
-            font-weight: 900;
-            position: relative;
-            overflow: hidden;
-            flex-shrink: 0;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
-        }
-
-        .pack-visual-cover::after {
-            content: "";
-            position: absolute;
-            top: -50%;
-            left: -60%;
-            width: 50%;
-            height: 200%;
-            background: rgba(255, 255, 255, 0.22);
-            transform: rotate(25deg);
-            animation: packShine 3.2s infinite;
-        }
-
-        @keyframes packShine {
-            0% { left: -60%; }
-            45%, 100% { left: 140%; }
-        }
-
+        .pack-showcase-card { background: linear-gradient(135deg, rgba(20, 31, 52, 0.96), rgba(10, 16, 28, 0.98)); border: 1px solid var(--border-glass); border-radius: 18px; padding: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+        .pack-visual-cover { width: 68px; height: 92px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 4px; font-weight: 900; position: relative; overflow: hidden; flex-shrink: 0; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55); }
         .pack-visual-cover.bronze { background: linear-gradient(160deg, #8d5524, #3d220a); border: 2px solid #d49a6a; color: #ffe0b2; }
         .pack-visual-cover.gold { background: linear-gradient(160deg, #ffca28, #b26a00); border: 2px solid #fff59d; color: #1a1100; }
         .pack-visual-cover.elite { background: linear-gradient(160deg, #aa00ff, #00b0ff, #0d1b3e); border: 2px solid #80d8ff; color: #ffffff; }
-
         .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .collection-grid .fut-shield { width: 100%; }
 
-        /* РУЛЕТКА SVG С ТОЧНОЙ КАЛИБРОВКОЙ СЕКТОРОВ */
-        .wheel-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px 0;
+        /* ВКЛАДКА «📦 КОНТЕЙНЕРЫ» + АНИМАЦИЯ ВСКРЫТИЯ */
+        .container-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .container-box {
+            background: linear-gradient(155deg, rgba(22, 36, 62, 0.96), rgba(10, 17, 30, 0.98));
+            border: 1px solid var(--border-frost); border-radius: 16px; padding: 12px 10px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            position: relative; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.4);
         }
+        .container-box.tier-high { border-color: rgba(255, 202, 40, 0.55); }
+        .container-box.tier-ultra { border-color: rgba(213, 0, 249, 0.65); background: linear-gradient(155deg, rgba(42, 16, 68, 0.95), rgba(11, 20, 38, 0.98)); }
+        .rarity-pill { font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; display: inline-block; }
+        .rarity-1 { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+        .rarity-2 { background: rgba(0, 176, 255, 0.2); color: #80d8ff; }
+        .rarity-3 { background: rgba(213, 0, 249, 0.22); color: #ea80fc; }
+        .rarity-4 { background: rgba(255, 202, 40, 0.25); color: #ffca28; border: 1px solid rgba(255,202,40,0.5); }
 
-        .wheel-svg-box {
-            width: 256px;
-            height: 256px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .crate-shake-box { font-size: 64px; margin: 14px 0; display: inline-block; animation: shakeCrate 0.45s infinite; }
+        @keyframes shakeCrate {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.08); }
+            75% { transform: rotate(10deg) scale(1.08); }
         }
+        .reveal-pop { animation: popReveal 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        @keyframes popReveal { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
 
-        #roulette-wheel {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            box-shadow: 0 0 28px rgba(255, 202, 40, 0.28);
-            transition: transform 3.3s cubic-bezier(0.14, 0.86, 0.22, 1);
-        }
+        /* СПОНСОРЫ, 7-ДНЕВНЫЙ КАЛЕНДАРЬ И ЧЕК ПОБЕДЫ */
+        .sponsor-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 13px; padding: 10px 12px; margin-bottom: 7px; cursor: pointer; }
+        .sponsor-card.active { border: 1.5px solid var(--accent-green); background: rgba(0,230,118,0.08); }
+        .sponsor-card.locked { opacity: 0.55; }
+        .streak-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
+        .streak-day-box { background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 12px; padding: 9px 5px; text-align: center; }
+        .streak-day-box.active { background: linear-gradient(145deg, rgba(0,230,118,0.22), rgba(0,176,255,0.18)); border: 1.5px solid var(--accent-green); box-shadow: 0 0 15px rgba(0,230,118,0.3); }
+        .streak-day-box.done { opacity: 0.5; border-color: rgba(0,230,118,0.3); }
+        .receipt-card { background: radial-gradient(circle at 50% 0%, #172d52 0%, #091224 100%); border: 2px solid var(--accent-gold); border-radius: 20px; padding: 18px 14px; text-align: center; box-shadow: 0 0 30px rgba(255,202,40,0.25); margin-bottom: 12px; }
 
-        /* ВОРОТА ПЕНАЛЬТИ */
-        .penalty-goal-box {
-            background: linear-gradient(180deg, rgba(16, 36, 24, 0.9), rgba(9, 20, 14, 0.95));
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            border-radius: 14px;
-            padding: 12px;
-            margin: 10px 0;
-        }
-
+        /* РУЛЕТКА И ПЕНАЛЬТИ */
+        .wheel-wrapper { display: flex; flex-direction: column; align-items: center; padding: 10px 0; }
+        .wheel-svg-box { width: 256px; height: 256px; position: relative; display: flex; align-items: center; justify-content: center; }
+        #roulette-wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 28px rgba(255, 202, 40, 0.28); transition: transform 3.4s cubic-bezier(0.14, 0.86, 0.24, 1); }
+        .penalty-goal-box { background: linear-gradient(180deg, rgba(16, 36, 24, 0.9), rgba(9, 20, 14, 0.95)); border: 2px solid rgba(255, 255, 255, 0.25); border-radius: 14px; padding: 12px; margin: 10px 0; }
         .dir-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
         .dir-btn { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-glass); border-radius: 10px; padding: 9px 4px; text-align: center; font-size: 12px; font-weight: 700; color: #fff; cursor: pointer; }
         .dir-btn.active { background: var(--accent-green-dim); border-color: var(--accent-green); color: var(--accent-green); }
 
-        .stadium-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 11px 12px;
-            border-radius: 13px;
-            background: var(--bg-glass);
-            border: 1px solid var(--border-glass);
-            margin-bottom: 8px;
-        }
+        .stadium-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 12px; border-radius: 13px; background: var(--bg-glass); border: 1px solid var(--border-glass); margin-bottom: 8px; }
+        .stadium-row.owned { border-color: rgba(0, 230, 118, 0.38); background: rgba(0, 230, 118, 0.06); }
 
-        .stadium-row.owned {
-            border-color: rgba(0, 230, 118, 0.38);
-            background: rgba(0, 230, 118, 0.06);
-        }
-
-        /* ПЛАВАЮЩИЙ КУПОН И ШТОРКИ */
+        /* КУПОН, МОДАЛЬНЫЕ ШТОРКИ И НИЖНЕЕ МЕНЮ (6 ВКЛАДОК) */
         .floating-slip-bar {
-            position: fixed;
-            bottom: 72px;
-            left: 12px;
-            right: 12px;
-            z-index: 140;
-            background: linear-gradient(135deg, #00e676, #00b0ff);
-            color: #041019;
-            border-radius: 15px;
-            padding: 12px 16px;
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 10px 26px rgba(0, 230, 118, 0.4);
-            cursor: pointer;
+            position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 140;
+            background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019;
+            border-radius: 15px; padding: 12px 16px; display: none; align-items: center; justify-content: space-between;
+            box-shadow: 0 10px 26px rgba(0, 230, 118, 0.4); cursor: pointer;
         }
-
-        .drawer-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 220;
-            background: rgba(0, 0, 0, 0.82);
-            backdrop-filter: blur(8px);
-            display: none;
-            align-items: flex-end;
-            justify-content: center;
-            cursor: pointer;
-        }
-
+        .drawer-overlay { position: fixed; inset: 0; z-index: 220; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; cursor: pointer; }
         .drawer-overlay.show { display: flex; }
+        .drawer-sheet { background: #0b1322; border-top: 1.5px solid var(--border-frost); border-radius: 22px 22px 0 0; padding: 18px 15px 28px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; cursor: default; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-glass); }
+        .close-x { background: rgba(255, 255, 255, 0.09); border: none; color: #fff; width: 30px; height: 30px; border-radius: 50%; font-size: 15px; font-weight: 800; cursor: pointer; }
+        .stake-input { width: 100%; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border-glass); border-radius: 12px; padding: 11px; color: #fff; font-size: 15px; font-weight: 800; text-align: center; margin: 8px 0; outline: none; }
+        .preset-chips { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 10px; }
+        .chip-btn { background: var(--bg-glass); border: 1px solid var(--border-glass); color: #fff; padding: 7px 0; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; }
+        .chip-btn.selected { background: var(--accent-green-dim); border-color: var(--accent-green); color: var(--accent-green); }
 
-        .drawer-sheet {
-            background: #0b1322;
-            border-top: 1.5px solid var(--border-frost);
-            border-radius: 22px 22px 0 0;
-            padding: 18px 15px 28px;
-            width: 100%;
-            max-width: 520px;
-            max-height: 88vh;
-            overflow-y: auto;
-            cursor: default;
-            animation: slideSheet 0.2s ease-out;
-        }
-
-        @keyframes slideSheet {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        .sheet-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-glass);
-        }
-
-        .close-x {
-            background: rgba(255, 255, 255, 0.09);
-            border: none;
-            color: #fff;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            font-size: 15px;
-            font-weight: 800;
-            cursor: pointer;
-        }
-
-        .stake-input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid var(--border-glass);
-            border-radius: 12px;
-            padding: 11px;
-            color: #fff;
-            font-size: 15px;
-            font-weight: 800;
-            text-align: center;
-            margin: 8px 0;
-            outline: none;
-        }
-
-        .preset-chips {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-
-        .chip-btn {
-            background: var(--bg-glass);
-            border: 1px solid var(--border-glass);
-            color: #fff;
-            padding: 7px 0;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 800;
-            cursor: pointer;
-        }
-
-        .chip-btn.selected {
-            background: var(--accent-green-dim);
-            border-color: var(--accent-green);
-            color: var(--accent-green);
-        }
-
-        /* НИЖНЯЯ НАВИГАЦИЯ (6 РАЗДЕЛОВ С ВЫДЕЛЕННЫМ СТАРТАПОМ) */
         .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
-            background: rgba(5, 9, 17, 0.96);
-            backdrop-filter: blur(16px);
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(5, 9, 17, 0.96); backdrop-filter: blur(16px);
             border-top: 1px solid var(--border-frost);
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            padding: 6px 2px 13px;
+            display: grid; grid-template-columns: repeat(6, 1fr); padding: 7px 2px 13px;
         }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-            color: var(--text-muted);
-            font-size: 9.5px;
-            font-weight: 700;
-            cursor: pointer;
-        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 9.5px; font-weight: 700; cursor: pointer; }
         .nav-item .ico { font-size: 18px; }
         .nav-item.active { color: var(--accent-green); }
 
         #toast {
-            position: fixed;
-            top: 72px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 350;
-            background: #101c33;
-            border: 1.5px solid var(--accent-green);
-            color: #fff;
-            padding: 9px 16px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 700;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.65);
-            display: none;
-            max-width: 92vw;
-            text-align: center;
+            position: fixed; top: 72px; left: 50%; transform: translateX(-50%); z-index: 350;
+            background: #101c33; border: 1.5px solid var(--accent-green); color: #fff;
+            padding: 9px 16px; border-radius: 12px; font-size: 12px; font-weight: 700;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.65); display: none; max-width: 92vw; text-align: center;
         }
     </style>
 </head>
@@ -1062,16 +343,13 @@
 
     <div class="snow-container" aria-hidden="true">
         <span class="snowflake" style="left:6%; animation-duration:9s; animation-delay:0s;">❄️</span>
-        <span class="snowflake" style="left:18%; animation-duration:12s; animation-delay:2s;">❅</span>
-        <span class="snowflake" style="left:32%; animation-duration:10s; animation-delay:4s;">🎄</span>
-        <span class="snowflake" style="left:48%; animation-duration:14s; animation-delay:1s;">❄️</span>
-        <span class="snowflake" style="left:64%; animation-duration:11s; animation-delay:3s;">❅</span>
-        <span class="snowflake" style="left:79%; animation-duration:13s; animation-delay:5s;">❄️</span>
-        <span class="snowflake" style="left:91%; animation-duration:9.5s; animation-delay:2.5s;">✨</span>
+        <span class="snowflake" style="left:22%; animation-duration:12s; animation-delay:2s;">❅</span>
+        <span class="snowflake" style="left:45%; animation-duration:10s; animation-delay:4s;">🎄</span>
+        <span class="snowflake" style="left:68%; animation-duration:13s; animation-delay:1s;">❄️</span>
+        <span class="snowflake" style="left:88%; animation-duration:10s; animation-delay:3s;">✨</span>
     </div>
 
     <div id="toast"></div>
-    <div id="coin-delta-floater"></div>
 
     <!-- ВЕРХНЯЯ ШАПКА -->
     <header class="top-header">
@@ -1080,32 +358,43 @@
                 <span>🎄</span>
                 <span id="ui-username">Загрузка...</span>
                 <span class="id-badge" onclick="copyUserId()">ID: <span id="ui-user-id">...</span></span>
+                <span class="id-badge" style="background:rgba(255,202,40,0.18); border-color:rgba(255,202,40,0.45); color:var(--accent-gold);" onclick="openShareReceiptModal()">📸 Чек</span>
                 <span class="live-hub-btn" onclick="openLiveCenterWidget()">🔴 LIVE</span>
-                <span class="share-top-btn" onclick="openShareAppCheck()">📤</span>
             </div>
             <div class="user-rank" id="ui-rank">🏅 Синхронизация...</div>
         </div>
-        <div class="balance-pill" id="balance-pill-box" onclick="openStreakModal()">
+        <div class="balance-pill" id="header-balance-pill">
             <span class="balance-label">❄️ Банк каппера</span>
             <span class="balance-val" id="ui-balance">0 FC</span>
         </div>
     </header>
 
+    <!-- НОВОГОДНЯЯ ГИРЛЯНДА -->
     <div class="garland-bar">
         <span class="bulb r"></span><span class="bulb g"></span><span class="bulb b"></span><span class="bulb y"></span>
         <span class="bulb r"></span><span class="bulb g"></span><span class="bulb b"></span><span class="bulb y"></span>
         <span class="bulb r"></span><span class="bulb g"></span><span class="bulb b"></span><span class="bulb y"></span>
     </div>
 
+    <!-- БЕГУЩАЯ СТРОКА ПРЯМОГО ЭФИРА ПОБЕД И НАХОДОК -->
+    <div class="ticker-wrap">
+        <div class="ticker-move" id="live-ticker-bar">
+            <span class="ticker-item">🔥 Добро пожаловать в новогоднее обновление AI_BET_BOT! Вскрывай контейнеры до 100 000 FC и забирай +25% к экспрессам!</span>
+        </div>
+    </div>
+
     <!-- ==================== ВКЛАДКА 1: АФИША И ЛИНИЯ ==================== -->
     <section id="tab-matches" class="tab-section active">
-        <div class="card" id="bonus-banner" style="display:none; align-items:center; justify-content:space-between; padding:11px 14px; border-color:var(--accent-gold); cursor:pointer;" onclick="openStreakModal()">
+        <div class="card" id="bonus-banner" style="display:none; align-items:center; justify-content:space-between; padding:11px 14px; border-color:var(--accent-gold); cursor:pointer;" onclick="openStreakCalendarModal()">
             <div>
-                <div style="font-weight:800; font-size:13px;">🎁 Календарь наград (Серия входов)</div>
-                <div style="font-size:11px; color:var(--text-muted);" id="ui-bonus-desc">Награда сегодняшнего дня ждет!</div>
+                <div style="font-weight:800; font-size:13px;">🎁 Серия ежедневных входов (7 дней)</div>
+                <div style="font-size:11px; color:var(--text-muted);" id="ui-bonus-desc">Нажми, чтобы открыть календарь наград</div>
             </div>
-            <button class="btn-main gold" style="padding:8px 14px;">Открыть</button>
+            <button class="btn-main gold" style="padding:8px 13px;">Открыть</button>
         </div>
+
+        <!-- СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +2 500 FC + КАРТА FUT) -->
+        <div class="rookie-card" id="rookie-quest-card" style="display:none;"></div>
 
         <div class="promo-row">
             <div class="promo-box" onclick="loadDailyExpressToSlip()">
@@ -1139,56 +428,7 @@
         <div id="matches-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 2: СТАРТАП «ПОРТОВЫЙ МАГНАТ & P2P-БИРЖА» ==================== -->
-    <section id="tab-startup" class="tab-section">
-        <div class="card" style="background:linear-gradient(135deg, rgba(213,0,249,0.16), rgba(14,22,38,0.96)); border-color:rgba(213,0,249,0.4); padding:12px 14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <b style="font-size:15px;">📦 Стартап «Портовый Магнат»</b>
-                <span style="font-size:12px; font-weight:800; color:var(--accent-gold);" id="startup-profit-val">Профит: 0 FC</span>
-            </div>
-            <div style="font-size:11px; color:#cbd5e1;" id="startup-showroom-buffs">
-                🏛 Бонус Шоурума: +0 FC/день к кассе • +0.00 к кэфам ставок
-            </div>
-        </div>
-
-        <div class="sub-nav" style="grid-template-columns:repeat(4, 1fr);">
-            <div class="sub-nav-btn active" onclick="switchStartupSub('boxes', this)">🚢 Порт</div>
-            <div class="sub-nav-btn" onclick="switchStartupSub('storage', this)">🔧 Склад (<span id="st-cnt-storage">0</span>)</div>
-            <div class="sub-nav-btn" onclick="switchStartupSub('showroom', this)">🏛 Шоурум (<span id="st-cnt-show">0/3</span>)</div>
-            <div class="sub-nav-btn" onclick="switchStartupSub('p2p', this)">🌐 Биржа (<span id="st-cnt-p2p">0</span>)</div>
-        </div>
-
-        <!-- 2.1: Контейнеры в порту (от 1 000 до 100 000 FC) -->
-        <div id="st-sub-boxes">
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-                Выкупай забытые контейнеры в мировых портах, реставрируй редкие находки, торгуйся со скупщиками или продавай их другим игрокам на P2P-Бирже!
-            </div>
-            <div id="containers-grid"></div>
-        </div>
-
-        <!-- 2.2: Склад находок, Реставрация и Живой Торг -->
-        <div id="st-sub-storage" style="display:none;">
-            <div id="storage-list"></div>
-        </div>
-
-        <!-- 2.3: Личный Шоурум (Музей пассивных баффов) -->
-        <div id="st-sub-showroom" style="display:none;">
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-                Поставь до 3 ценных находок под бронестекло в офисе стартапа: они каждый день приносят доход к кассе арены и повышают коэффициенты всех твоих купонов!
-            </div>
-            <div id="showroom-list"></div>
-        </div>
-
-        <!-- 2.4: P2P-Биржа находок между реальными игроками -->
-        <div id="st-sub-p2p" style="display:none;">
-            <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-                Покупай редкие предметы у других игроков для своего Шоурума или перепродажи со скупщиками!
-            </div>
-            <div id="p2p-market-list"></div>
-        </div>
-    </section>
-
-    <!-- ==================== ВКЛАДКА 3: ИГРЫ (PVP, РЫНОК, РУЛЕТКА) ==================== -->
+    <!-- ==================== ВКЛАДКА 2: ИГРЫ (PVP, РЫНОК, РУЛЕТКА) ==================== -->
     <section id="tab-games" class="tab-section">
         <div class="sub-nav">
             <div class="sub-nav-btn active" onclick="switchGameSub('pvp', this)">⚽ PvP-Пенальти</div>
@@ -1248,35 +488,27 @@
             <div class="card" id="black-market-card"></div>
         </div>
 
-        <!-- Подвкладка 3.3: Откалиброванная Рулетка (Сектора 0..6 по 51.43 градуса) -->
         <div id="game-sub-roulette" style="display:none;">
             <div class="card wheel-wrapper">
                 <div style="font-size:24px; margin-bottom:-10px; z-index:5; filter:drop-shadow(0 3px 6px #000);">🔻</div>
                 <div class="wheel-svg-box">
                     <svg id="roulette-wheel" viewBox="0 0 260 260">
                         <g transform="translate(130,130)">
-                            <!-- Сектор 0 (0..51.4°): +150 FC -->
                             <path d="M0,0 L0,-124 A124,124 0 0,1 97,-77 Z" fill="#1e3a8a" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 1 (51.4..102.8°): +300 FC -->
                             <path d="M0,0 L97,-77 A124,124 0 0,1 121,27 Z" fill="#065f46" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 2 (102.8..154.3°): Страховка 50% -->
                             <path d="M0,0 L121,27 A124,124 0 0,1 54,111 Z" fill="#581c87" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 3 (154.3..205.7°): Буст +0.35 -->
                             <path d="M0,0 L54,111 A124,124 0 0,1 -54,111 Z" fill="#0f766e" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 4 (205.7..257.1°): Спин +100 -->
                             <path d="M0,0 L-54,111 A124,124 0 0,1 -121,27 Z" fill="#b45309" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 5 (257.1..308.6°): +750 FC -->
                             <path d="M0,0 L-121,27 A124,124 0 0,1 -97,-77 Z" fill="#9f1239" stroke="#ffca28" stroke-width="1.5"/>
-                            <!-- Сектор 6 (308.6..360°): Джекпот 2000 FC -->
                             <path d="M0,0 L-97,-77 A124,124 0 0,1 0,-124 Z" fill="#ca8a04" stroke="#ffca28" stroke-width="1.5"/>
 
-                            <text x="36" y="-75" fill="#fff" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(25.7, 36, -75)">+150 FC</text>
-                            <text x="82" y="-18" fill="#00e676" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(77.1, 82, -18)">+300 FC</text>
-                            <text x="68" y="56" fill="#e9d5ff" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(128.5, 68, 56)">🛡 Страховка</text>
+                            <text x="36" y="-75" fill="#fff" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(25, 36, -75)">+150 FC</text>
+                            <text x="82" y="-18" fill="#00e676" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(77, 82, -18)">+300 FC</text>
+                            <text x="68" y="56" fill="#e9d5ff" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(128, 68, 56)">🛡 Страховка</text>
                             <text x="0" y="88" fill="#80d8ff" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(180, 0, 88)">⚡ Буст +0.35</text>
-                            <text x="-68" y="56" fill="#fde68a" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(231.4, -68, 56)">🎟 Спин +100</text>
-                            <text x="-82" y="-18" fill="#fecdd3" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(282.8, -82, -18)">💎 +750 FC</text>
-                            <text x="-36" y="-75" fill="#041019" font-size="9.5" font-weight="900" text-anchor="middle" transform="rotate(334.3, -36, -75)">🔥 2000 FC</text>
+                            <text x="-68" y="56" fill="#fde68a" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(231, -68, 56)">🎟 Спин +100</text>
+                            <text x="-82" y="-18" fill="#fecdd3" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(283, -82, -18)">💎 +750 FC</text>
+                            <text x="-36" y="-75" fill="#041019" font-size="9.5" font-weight="900" text-anchor="middle" transform="rotate(334, -36, -75)">🔥 2000 FC</text>
 
                             <circle r="124" fill="none" stroke="#ffca28" stroke-width="5"/>
                             <circle r="30" fill="#060b16" stroke="#ffca28" stroke-width="3"/>
@@ -1292,7 +524,7 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 4: ТАКТИЧЕСКАЯ СХЕМА FUT (5 СЛОТОВ), СПК И ПАКИ ==================== -->
+    <!-- ==================== ВКЛАДКА 3: ТАКТИЧЕСКАЯ СХЕМА FUT (5 СЛОТОВ), СПК И ПАКИ ==================== -->
     <section id="tab-fut" class="tab-section">
         <div class="section-title" style="margin-top:4px;">
             <span>👕 Тактическая схема (5 позиций)</span>
@@ -1327,8 +559,7 @@
 
         <div class="pack-showcase-card">
             <div class="pack-visual-cover bronze">
-                <span style="font-size:9px;">BASIC</span>
-                <span style="font-size:26px;">🥉</span>
+                <span style="font-size:9px;">BASIC</span><span style="font-size:26px;">🥉</span>
                 <span style="font-size:10px; background:rgba(0,0,0,0.4); padding:1px 5px; border-radius:4px;">84-90</span>
             </div>
             <div style="flex:1;">
@@ -1340,8 +571,7 @@
 
         <div class="pack-showcase-card" style="border-color:rgba(255,202,40,0.45);">
             <div class="pack-visual-cover gold">
-                <span style="font-size:9px;">GOLD TOP-5</span>
-                <span style="font-size:26px;">🥇</span>
+                <span style="font-size:9px;">GOLD TOP-5</span><span style="font-size:26px;">🥇</span>
                 <span style="font-size:10px; background:rgba(0,0,0,0.25); color:#fff; padding:1px 5px; border-radius:4px;">90-95</span>
             </div>
             <div style="flex:1;">
@@ -1353,8 +583,7 @@
 
         <div class="pack-showcase-card" style="border-color:rgba(128,216,255,0.55);">
             <div class="pack-visual-cover elite">
-                <span style="font-size:9px;">UCL TOTY</span>
-                <span style="font-size:26px;">💎</span>
+                <span style="font-size:9px;">UCL TOTY</span><span style="font-size:26px;">💎</span>
                 <span style="font-size:10px; background:rgba(0,0,0,0.45); padding:1px 5px; border-radius:4px;">94-97</span>
             </div>
             <div style="flex:1;">
@@ -1365,13 +594,36 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 5: АРЕНА И УРОВНЕВЫЕ СПОНСОРЫ С КВЕСТАМИ ==================== -->
-    <section id="tab-empire" class="tab-section">
-        <div class="section-title">🏟 Домашний Матчдэй и Касса Арены</div>
-        <div class="card" id="current-stadium-card"></div>
+    <!-- ==================== ВКЛАДКА 4: КОНТЕЙНЕРЫ, РЕСТАВРАЦИЯ И P2P-БИРЖА (СТАТИЧЕСКАЯ ВЕРСТКА) ==================== -->
+    <section id="tab-startup" class="tab-section">
+        <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.16), rgba(14,22,38,0.96)); border-color:rgba(255,202,40,0.4); padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-size:15px; font-weight:900; color:var(--accent-gold);">📦 Портовый Аукцион & Склад</div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Вскрывай контейнеры до 100 000 FC, реставрируй и торгуйся!</div>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:10px; color:var(--text-muted); display:block;">Чистый профит</span>
+                    <b style="font-size:14px; color:var(--accent-green);" id="st-total-profit">0 FC</b>
+                </div>
+            </div>
+        </div>
 
-        <div class="section-title">🤝 Спонсорские контракты (По уровню арены)</div>
-        <div id="sponsors-list-card"></div>
+        <div class="sub-nav">
+            <div class="sub-nav-btn active" id="st-nav-port" onclick="switchStartupSub('port', this)">🚢 Порт (6)</div>
+            <div class="sub-nav-btn" id="st-nav-storage" onclick="switchStartupSub('storage', this)">🔧 Склад (0/8)</div>
+            <div class="sub-nav-btn" id="st-nav-p2p" onclick="switchStartupSub('p2p', this)">🌐 P2P-Биржа</div>
+        </div>
+
+        <div id="startup-sub-port"></div>
+        <div id="startup-sub-storage" style="display:none;"></div>
+        <div id="startup-sub-p2p" style="display:none;"></div>
+    </section>
+
+    <!-- ==================== ВКЛАДКА 5: АРЕНА И КОНТРАКТЫ СПОНСОРОВ ==================== -->
+    <section id="tab-empire" class="tab-section">
+        <div class="section-title">🏟 Домашний Матчдэй и Контракты</div>
+        <div class="card" id="current-stadium-card"></div>
 
         <div class="card" id="secret-bet-card" style="border-color:var(--accent-ice);"></div>
 
@@ -1382,7 +634,7 @@
         <div id="stadiums-list-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, АРХИВ С ЧЕКОМ ПОБЕДЫ И ТОП-10 ==================== -->
+    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, АРХИВ И ТОП-10 ==================== -->
     <section id="tab-profile" class="tab-section">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -1431,15 +683,12 @@
             </div>
         </div>
 
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <div style="font-weight:800; font-size:13px;">🤝 Пригласи друга (+500 FC)</div>
                 <div style="font-size:11px; color:var(--text-muted);">Приглашено друзей: <b id="p-refs" style="color:#fff;">0</b></div>
             </div>
-            <div style="display:flex; gap:6px;">
-                <button class="btn-main gold" style="padding:8px 10px; font-size:11px;" onclick="openShareAppCheck()">📸 Мой статус</button>
-                <button class="btn-main" style="padding:8px 12px; font-size:11px;" onclick="shareReferralLink()">📤 Ссылка</button>
-            </div>
+            <button class="btn-main" style="padding:8px 12px; font-size:12px;" onclick="shareReferralLink()">📤 Пригласить</button>
         </div>
 
         <div class="sub-nav" style="grid-template-columns:repeat(4, 1fr);">
@@ -1466,7 +715,7 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 1: МАТЧ-ЦЕНТР ==================== -->
+    <!-- ==================== ШТОРКИ И МОДАЛЬНЫЕ ОКНА ==================== -->
     <div class="drawer-overlay" id="match-detail-modal" onclick="handleOverlayClick(event, 'match-detail-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1477,7 +726,6 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 2: КУПОН СТАВОК ==================== -->
     <div class="drawer-overlay" id="slip-drawer" onclick="handleOverlayClick(event, 'slip-drawer')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1485,19 +733,15 @@
                 <span style="color:var(--accent-red); font-size:12px; font-weight:800; cursor:pointer;" onclick="clearSlip()">🗑 Очистить</span>
             </div>
             <div id="slip-items-list"></div>
-
             <div id="drawer-exp-boost-box" style="background:rgba(255,202,40,0.1); border:1px solid rgba(255,202,40,0.35); border-radius:11px; padding:7px 11px; margin:8px 0; font-size:11px;"></div>
-
             <div style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.35); border-radius:11px; padding:8px 12px; margin:8px 0 6px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:12px; color:#cbd5e1;">💰 Твой доступный баланс:</span>
                 <b style="font-size:14px; color:var(--accent-green);" id="drawer-user-balance">0 FC</b>
             </div>
-
             <div style="display:flex; justify-content:space-between; margin:6px 0 4px; font-size:13px;">
                 <span style="color:var(--text-muted);">Итоговый коэффициент (с баффами):</span>
                 <b style="color:var(--accent-green); font-size:16px;" id="drawer-total-odd">1.00</b>
             </div>
-
             <input type="number" id="slip-stake-input" class="stake-input" value="250" min="10" oninput="updatePotentialWin()">
             <div class="preset-chips">
                 <button class="chip-btn" onclick="setSlipStake(100)">100</button>
@@ -1506,18 +750,15 @@
                 <button class="chip-btn" onclick="setSlipStake(1000)">1000</button>
                 <button class="chip-btn" style="color:var(--accent-gold); border-color:rgba(255,202,40,0.4);" onclick="setSlipAllIn()">Ва-банк</button>
             </div>
-
             <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:13px;">
                 <span style="color:var(--text-muted);">Возможная выплата:</span>
                 <b style="color:var(--accent-gold); font-size:16px;" id="drawer-payout">0 FC</b>
             </div>
-
             <button class="btn-main btn-block" id="btn-submit-slip" onclick="submitSlip()">✅ Заключить пари</button>
             <button class="btn-main ghost btn-block" onclick="closeSlipDrawer()">Свернуть купон</button>
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 3: МОЯ КОЛЛЕКЦИЯ КАРТОЧЕК ==================== -->
     <div class="drawer-overlay" id="collection-modal" onclick="handleOverlayClick(event, 'collection-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1530,7 +771,6 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 4: ИНТЕРАКТИВНЫЙ LIVE-ЦЕНТР ==================== -->
     <div class="drawer-overlay" id="live-widget-modal" onclick="handleOverlayClick(event, 'live-widget-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-red);">
             <div class="sheet-header">
@@ -1541,7 +781,6 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 5: СУПЕРЭКСПРЕСС НЕДЕЛИ ==================== -->
     <div class="drawer-overlay" id="se-modal" onclick="handleOverlayClick(event, 'se-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1552,7 +791,6 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 6: ОТКРЫТИЕ ПАКА FUT ==================== -->
     <div class="drawer-overlay" id="pack-modal" style="align-items:center; padding:18px;" onclick="handleOverlayClick(event, 'pack-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:22px; text-align:center; border:2px solid var(--accent-gold);">
             <div id="pack-modal-card-preview" style="display:flex; justify-content:center; margin:0 auto 12px;"></div>
@@ -1561,50 +799,45 @@
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 7: 7-ДНЕВНЫЙ КАЛЕНДАРЬ ЕЖЕДНЕВНОГО БОНУСА ПРИ ВХОДЕ ==================== -->
-    <div class="drawer-overlay" id="streak-modal" style="align-items:center; padding:16px;" onclick="handleOverlayClick(event, 'streak-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:24px; border:2px solid var(--accent-gold); text-align:center;">
-            <div style="font-size:34px; margin-bottom:4px;">🎁</div>
-            <div style="font-size:17px; font-weight:900; color:var(--accent-gold);">Ежедневная серия входов</div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Заходи каждый день без пропусков, чтобы забрать суперприз 7-го дня!</div>
-            <div class="streak-grid" id="streak-calendar-grid"></div>
-            <button class="btn-main gold btn-block" id="streak-claim-btn" onclick="claimDailyBonus()">🔥 Забрать награду дня!</button>
-            <button class="btn-main ghost btn-block" onclick="document.getElementById('streak-modal').classList.remove('show')">Закрыть</button>
+    <div class="drawer-overlay" id="streak-modal" onclick="handleOverlayClick(event, 'streak-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
+            <div class="sheet-header">
+                <b style="font-size:15px; color:var(--accent-gold);">🎁 Серия ежедневных входов (7 дней)</b>
+                <button class="close-x" onclick="document.getElementById('streak-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="streak-modal-body"></div>
         </div>
     </div>
 
-    <!-- ==================== ШТОРКА 8: ВИЗУАЛЬНЫЙ ЧЕК ПОБЕДЫ / ПОДЕЛИТЬСЯ ИНТЕРФЕЙСОМ ==================== -->
-    <div class="drawer-overlay" id="share-win-modal" style="align-items:center; padding:16px;" onclick="handleOverlayClick(event, 'share-win-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:24px; border:2px solid var(--accent-green); text-align:center;">
-            <div id="share-check-body"></div>
+    <div class="drawer-overlay" id="share-receipt-modal" onclick="handleOverlayClick(event, 'share-receipt-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-header">
+                <b style="font-size:15px;">📸 Карточка каппера / Поделиться</b>
+                <button class="close-x" onclick="document.getElementById('share-receipt-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="share-receipt-body"></div>
         </div>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ (6 РАЗДЕЛОВ) -->
+    <!-- НИЖНЕЕ МЕНЮ (6 ЧИСТЫХ ВКЛАДОК БЕЗ ДУБЛЕЙ) -->
     <nav class="bottom-nav">
         <div class="nav-item active" onclick="switchTab('matches', this)">
-            <span class="ico">⚽</span>
-            <span>Афиша</span>
-        </div>
-        <div class="nav-item" onclick="switchTab('startup', this)">
-            <span class="ico">📦</span>
-            <span>Стартап</span>
+            <span class="ico">⚽</span><span>Афиша</span>
         </div>
         <div class="nav-item" onclick="switchTab('games', this)">
-            <span class="ico">⚔️</span>
-            <span>Игры</span>
+            <span class="ico">⚔️</span><span>Игры</span>
         </div>
         <div class="nav-item" onclick="switchTab('fut', this)">
-            <span class="ico">👕</span>
-            <span>FUT</span>
+            <span class="ico">👕</span><span>FUT</span>
+        </div>
+        <div class="nav-item" id="nav-btn-startup" onclick="switchTab('startup', this)">
+            <span class="ico">📦</span><span>Контейнеры</span>
         </div>
         <div class="nav-item" onclick="switchTab('empire', this)">
-            <span class="ico">🏟</span>
-            <span>Арена</span>
+            <span class="ico">🏟</span><span>Арена</span>
         </div>
         <div class="nav-item" onclick="switchTab('profile', this)">
-            <span class="ico">👤</span>
-            <span>Профиль</span>
+            <span class="ico">👤</span><span>Профиль</span>
         </div>
     </nav>
     <script>
@@ -1618,7 +851,7 @@
             } catch (e) {}
         }
 
-        // Автоматическое скрытие клавиатуры при касании свободной области экрана
+        // Автоматическое скрытие мобильной клавиатуры при касании свободной области экрана
         document.addEventListener('touchstart', function(e) {
             const active = document.activeElement;
             if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
@@ -1643,6 +876,34 @@
             : (parseInt(urlParams.get('uid') || '0', 10));
         const INITIAL_VIEW = urlParams.get('view') || '';
 
+        // Встроенный резервный каталог 6 контейнеров (гарантирует 100% отрисовку витрины в любой ситуации)
+        const DEFAULT_CONTAINERS_CATALOG = {
+            c_detroit: { id: 'c_detroit', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, винтажный инструмент и забытые заначки', max_win: '3 800 FC' },
+            c_rotterdam: { id: 'c_rotterdam', name: '⚓ Таможня Роттердама', price: 5000, ico: '🚢', desc: 'Конфискат портовой таможни: техника, часы и бренды', max_win: '18 000 FC' },
+            c_monaco: { id: 'c_monaco', name: '🏎 Паддок Монако Гран-При', price: 15000, ico: '🏁', desc: 'Гоночные болиды, карбоновые узлы и трофеи пилотов F1', max_win: '52 000 FC' },
+            c_silicon: { id: 'c_silicon', name: '💻 Бункер Кремниевой Долины', price: 35000, ico: '🛰️', desc: 'Забытые крипто-хранилища, квантовые чипы и прототипы ИИ', max_win: '125 000 FC' },
+            c_dubai: { id: 'c_dubai', name: '👑 Золотой Борт Шейха (Дубай)', price: 65000, ico: '🛩️', desc: 'Суперкары из пустыни, бриллиантовые часы и слитки', max_win: '235 000 FC' },
+            c_area51: { id: 'c_area51', name: '🛸 Секретный Сектор «Зона-51»', price: 100000, ico: '🌌', desc: 'Самый дорогой груз в мире: гиперкары, шедевры и артефакты', max_win: '380 000 FC' }
+        };
+
+        const DEFAULT_STREAK_CALENDAR = [
+            { day: 1, coins: 250, booster: '', label: '+250 FC' },
+            { day: 2, coins: 400, booster: '', label: '+400 FC' },
+            { day: 3, coins: 650, booster: '', label: '+650 FC' },
+            { day: 4, coins: 1000, booster: '', label: '+1 000 FC' },
+            { day: 5, coins: 1500, booster: 'boost035', label: '+1 500 FC + ⚡ Буст' },
+            { day: 6, coins: 2200, booster: '', label: '+2 200 FC' },
+            { day: 7, coins: 4000, booster: 'insure50', label: '🎁 +4 000 FC + 🛡 Страховка 50%' }
+        ];
+
+        const DEFAULT_SPONSORS = [
+            { id: 'sp_1', name: '🟢 Winter Cup Energy', min_lvl: 1, deposit: 0, bonus: 350, task: 'Сделать минимум 1 любую ставку сегодня (Без риска)' },
+            { id: 'sp_2', name: '🔵 Gazprom Media Sport', min_lvl: 2, deposit: 150, bonus: 850, task: 'Активная ставка от 500 FC ИЛИ победа в PvP (Залог 150 FC)' },
+            { id: 'sp_3', name: '🟡 CyberBet Syndicate', min_lvl: 4, deposit: 400, bonus: 1900, task: 'Иметь в игре Экспресс минимум из 2 матчей (Залог 400 FC)' },
+            { id: 'sp_4', name: '🟣 Qatar Airways VIP', min_lvl: 6, deposit: 1000, bonus: 4500, task: 'Серия от 1 победы ИЛИ собранный состав FUT (Залог 1 000 FC)' },
+            { id: 'sp_5', name: '👑 Rolex Champions Club', min_lvl: 8, deposit: 2500, bonus: 9800, task: 'Активная ставка + минимум 1 экспонат в Шоуруме Контейнеров (Залог 2 500 FC)' }
+        ];
+
         let APP_STATE = null;
         let SELECTED_LEAGUE = 'top';
         let SEARCH_QUERY = '';
@@ -1652,179 +913,14 @@
         let MATCH_AI_CACHE = {};
         let CURRENT_OPEN_MATCH = null;
         let COLLECTION_FILTER = 'ALL';
-        let STARTUP_SUB = 'port'; // 'port' | 'storage' | 'p2p'
+        let STARTUP_SUB = 'port';
         let WHEEL_ROTATION = 0;
         let IS_SPINNING = false;
+        let IS_OPENING_BOX = false;
         let IS_SECRET_BET = false;
         let FIRST_LOAD_DONE = false;
         let STREAK_POPUP_SHOWN = false;
         let IS_LOADING_STATE = false;
-
-        /* АВТО-ИНЪЕКЦИЯ ДОПОЛНИТЕЛЬНЫХ ОКОН (СТАРТАП, 7-ДНЕВНЫЙ БОНУС, ЧЕК ПОБЕДЫ, АНИМАЦИЯ ВАЛЮТЫ) */
-        function injectStartupAndModalsDOM() {
-            if (document.getElementById('startup-extra-styles')) return;
-
-            const styleEl = document.createElement('style');
-            styleEl.id = 'startup-extra-styles';
-            styleEl.textContent = `
-                .balance-pill { position: relative; transition: transform 0.18s ease; }
-                .balance-pill.pulse { transform: scale(1.09); }
-                .coin-float {
-                    position: absolute; right: 8px; bottom: -20px; font-size: 13px; font-weight: 900;
-                    pointer-events: none; z-index: 200; animation: coinFly 1.15s ease-out forwards;
-                    text-shadow: 0 2px 8px rgba(0,0,0,0.85);
-                }
-                @keyframes coinFly {
-                    0% { opacity: 1; transform: translateY(0) scale(0.9); }
-                    100% { opacity: 0; transform: translateY(-34px) scale(1.15); }
-                }
-                .bottom-nav { grid-template-columns: repeat(6, 1fr) !important; }
-                .container-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-                .container-box {
-                    background: linear-gradient(155deg, rgba(22, 36, 62, 0.96), rgba(10, 17, 30, 0.98));
-                    border: 1px solid var(--border-frost); border-radius: 16px; padding: 12px 10px;
-                    display: flex; flex-direction: column; justify-content: space-between;
-                    position: relative; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-                }
-                .container-box.tier-high { border-color: rgba(255, 202, 40, 0.55); }
-                .container-box.tier-ultra {
-                    border-color: rgba(213, 0, 249, 0.65);
-                    background: linear-gradient(155deg, rgba(42, 16, 68, 0.95), rgba(11, 20, 38, 0.98));
-                }
-                .rarity-pill {
-                    font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 6px;
-                    text-transform: uppercase; display: inline-block;
-                }
-                .rarity-1 { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
-                .rarity-2 { background: rgba(0, 176, 255, 0.2); color: #80d8ff; }
-                .rarity-3 { background: rgba(213, 0, 249, 0.22); color: #ea80fc; }
-                .rarity-4 { background: rgba(255, 202, 40, 0.25); color: #ffca28; border: 1px solid rgba(255,202,40,0.5); }
-                .streak-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
-                .streak-day-box {
-                    background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass);
-                    border-radius: 12px; padding: 9px 5px; text-align: center;
-                }
-                .streak-day-box.active {
-                    background: linear-gradient(145deg, rgba(0,230,118,0.22), rgba(0,176,255,0.18));
-                    border: 1.5px solid var(--accent-green); box-shadow: 0 0 15px rgba(0,230,118,0.3);
-                }
-                .streak-day-box.done { opacity: 0.5; border-color: rgba(0,230,118,0.3); }
-                .sponsor-card {
-                    background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass);
-                    border-radius: 13px; padding: 10px 12px; margin-bottom: 7px; cursor: pointer;
-                    transition: border-color 0.15s;
-                }
-                .sponsor-card.active {
-                    border: 1.5px solid var(--accent-green); background: rgba(0,230,118,0.08);
-                }
-                .sponsor-card.locked { opacity: 0.55; cursor: not-allowed; }
-                .receipt-card {
-                    background: radial-gradient(circle at 50% 0%, #172d52 0%, #091224 100%);
-                    border: 2px solid var(--accent-gold); border-radius: 20px; padding: 18px 14px;
-                    text-align: center; box-shadow: 0 0 30px rgba(255,202,40,0.25); margin-bottom: 12px;
-                }
-            `;
-            document.head.appendChild(styleEl);
-
-            // Добавляем кнопку «📸 Поделиться» в шапку
-            const nameRow = document.querySelector('.user-name-row');
-            if (nameRow && !document.getElementById('hdr-share-btn')) {
-                const shBtn = document.createElement('span');
-                shBtn.id = 'hdr-share-btn';
-                shBtn.className = 'id-badge';
-                shBtn.style.background = 'rgba(255,202,40,0.18)';
-                shBtn.style.borderColor = 'rgba(255,202,40,0.45)';
-                shBtn.style.color = 'var(--accent-gold)';
-                shBtn.textContent = '📸 Чек';
-                shBtn.onclick = () => openShareReceiptModal();
-                nameRow.appendChild(shBtn);
-            }
-
-            // Добавляем секцию вкладки «📦 Стартап»
-            if (!document.getElementById('tab-startup')) {
-                const startupSec = document.createElement('section');
-                startupSec.id = 'tab-startup';
-                startupSec.className = 'tab-section';
-                startupSec.innerHTML = `
-                    <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.16), rgba(14,22,38,0.96)); border-color:rgba(255,202,40,0.4); padding:12px 14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <div style="font-size:15px; font-weight:900; color:var(--accent-gold);">📦 Портовый Магнат • Storage Wars</div>
-                                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Вскрывай контейнеры до 100к FC, реставрируй и торгуйся!</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <span style="font-size:10px; color:var(--text-muted); display:block;">Профит стартапа</span>
-                                <b style="font-size:14px; color:var(--accent-green);" id="st-total-profit">0 FC</b>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="sub-nav">
-                        <div class="sub-nav-btn active" id="st-nav-port" onclick="switchStartupSub('port', this)">🚢 Контейнеры</div>
-                        <div class="sub-nav-btn" id="st-nav-storage" onclick="switchStartupSub('storage', this)">🔧 Склад и Музей</div>
-                        <div class="sub-nav-btn" id="st-nav-p2p" onclick="switchStartupSub('p2p', this)">🌐 P2P-Биржа</div>
-                    </div>
-
-                    <div id="startup-sub-port"></div>
-                    <div id="startup-sub-storage" style="display:none;"></div>
-                    <div id="startup-sub-p2p" style="display:none;"></div>
-                `;
-                const profileSec = document.getElementById('tab-profile');
-                if (profileSec && profileSec.parentNode) {
-                    profileSec.parentNode.insertBefore(startupSec, profileSec);
-                } else {
-                    document.body.appendChild(startupSec);
-                }
-            }
-
-            // Добавляем иконку «📦 Стартап» в нижнюю навигацию
-            const bottomNav = document.querySelector('.bottom-nav');
-            if (bottomNav && !document.getElementById('nav-btn-startup')) {
-                const navItem = document.createElement('div');
-                navItem.id = 'nav-btn-startup';
-                navItem.className = 'nav-item';
-                navItem.onclick = function() { switchTab('startup', this); };
-                navItem.innerHTML = `<span class="ico">📦</span><span>Стартап</span>`;
-                // Вставляем перед Профилем
-                bottomNav.insertBefore(navItem, bottomNav.lastElementChild);
-            }
-
-            // Модальное окно 7-дневного календаря бонусов при входе
-            if (!document.getElementById('streak-modal')) {
-                const stModal = document.createElement('div');
-                stModal.id = 'streak-modal';
-                stModal.className = 'drawer-overlay';
-                stModal.onclick = (ev) => handleOverlayClick(ev, 'streak-modal');
-                stModal.innerHTML = `
-                    <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
-                        <div class="sheet-header">
-                            <b style="font-size:15px; color:var(--accent-gold);">🎁 Серия ежедневных входов (7 дней)</b>
-                            <button class="close-x" onclick="document.getElementById('streak-modal').classList.remove('show')">✕</button>
-                        </div>
-                        <div id="streak-modal-body"></div>
-                    </div>
-                `;
-                document.body.appendChild(stModal);
-            }
-
-            // Модальное окно Чека победы и шеринга
-            if (!document.getElementById('share-receipt-modal')) {
-                const shModal = document.createElement('div');
-                shModal.id = 'share-receipt-modal';
-                shModal.className = 'drawer-overlay';
-                shModal.onclick = (ev) => handleOverlayClick(ev, 'share-receipt-modal');
-                shModal.innerHTML = `
-                    <div class="drawer-sheet" onclick="event.stopPropagation()">
-                        <div class="sheet-header">
-                            <b style="font-size:15px;">📸 Карточка каппера / Поделиться</b>
-                            <button class="close-x" onclick="document.getElementById('share-receipt-modal').classList.remove('show')">✕</button>
-                        </div>
-                        <div id="share-receipt-body"></div>
-                    </div>
-                `;
-                document.body.appendChild(shModal);
-            }
-        }
 
         function haptic(type = 'light') {
             if (!tg || !tg.HapticFeedback) return;
@@ -1845,11 +941,11 @@
             window._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2800);
         }
 
-        /* ПЛАВНАЯ ИНДИКАЦИЯ НАЧИСЛЕНИЯ / СПИСАНИЯ ВАЛЮТЫ В ШАПКЕ */
+        /* АНИМАЦИЯ ВЗЛЕТАЮЩИХ МОНЕТ (+FC / -FC) В ШАПКЕ */
         function triggerCoinFloat(delta) {
             const num = Math.round(Number(delta || 0));
             if (!num) return;
-            const pill = document.querySelector('.balance-pill');
+            const pill = document.getElementById('header-balance-pill') || document.querySelector('.balance-pill');
             if (!pill) return;
 
             pill.classList.remove('pulse');
@@ -1895,7 +991,13 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             const target = document.getElementById('tab-' + tabName);
             if (target) target.classList.add('active');
-            if (navEl) navEl.classList.add('active');
+            if (navEl) {
+                navEl.classList.add('active');
+            } else {
+                const mapIdx = { matches: 0, games: 1, fut: 2, startup: 3, empire: 4, profile: 5 };
+                const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+                if (navItems[mapIdx[tabName]]) navItems[mapIdx[tabName]].classList.add('active');
+            }
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1905,8 +1007,10 @@
             ['pvp', 'market', 'roulette'].forEach(k => {
                 document.getElementById('game-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
             });
-            btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
-            btnEl.classList.add('active');
+            if (btnEl && btnEl.parentElement) {
+                btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            }
         }
 
         function switchStartupSub(subName, btnEl) {
@@ -1929,11 +1033,13 @@
             ['active', 'archive', 'top', 'trophies'].forEach(k => {
                 document.getElementById('prof-sub-' + k).style.display = (k === subName) ? 'block' : 'none';
             });
-            btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
-            btnEl.classList.add('active');
+            if (btnEl && btnEl.parentElement) {
+                btnEl.parentElement.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            }
         }
 
-        /* СВЕРХБЫСТРЫЙ DELTA-SYNC ЗАПРОС (БЕЗ ПОВТОРНОЙ ПЕРЕКАЧКИ БАЗЫ) */
+        /* СВЕРХБЫСТРЫЙ DELTA-SYNC ЗАПРОС (БЕЗ ПОВТОРНОЙ ПЕРЕКАЧКИ 150 КБ) */
         async function apiAction(payload, skipAutoRender = false) {
             for (let attempt = 0; attempt < 2; attempt++) {
                 const controller = new AbortController();
@@ -1951,6 +1057,7 @@
                         if (data.ok && APP_STATE) {
                             if (data.state) APP_STATE = data.state;
                             if (data.user) APP_STATE.user = data.user;
+                            if (data.live_ticker) APP_STATE.live_ticker = data.live_ticker;
                             if (data.p2p_market) APP_STATE.p2p_market = data.p2p_market;
                             if (data.active_bets) APP_STATE.active_bets = data.active_bets;
                             if (data.archive_bets) APP_STATE.archive_bets = data.archive_bets;
@@ -1982,6 +1089,7 @@
         async function loadAppState(silent = false) {
             if (!CURRENT_UID) {
                 document.getElementById('ui-username').textContent = 'Открой через бота';
+                renderStartupTab({});
                 return;
             }
             if (IS_LOADING_STATE) return;
@@ -2025,21 +1133,23 @@
             }
         }
 
-        /* МГНОВЕННОЕ ОБНОВЛЕНИЕ ТОЛЬКО ПОЛЬЗОВАТЕЛЬСКИХ ПАНЕЛЕЙ (БЕЗ ПЕРЕРИСОВКИ 45 МАТЧЕЙ) */
+        /* МГНОВЕННОЕ ОБНОВЛЕНИЕ ДАННЫХ ИГРОКА */
         function renderFastDelta() {
             if (!APP_STATE) return;
-            const u = APP_STATE.user;
+            const u = APP_STATE.user || {};
 
-            document.getElementById('ui-username').textContent = u.username;
-            document.getElementById('ui-user-id').textContent = u.user_id;
-            document.getElementById('ui-rank').textContent = u.rank + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
+            document.getElementById('ui-username').textContent = u.username || 'Каппер';
+            document.getElementById('ui-user-id').textContent = u.user_id || CURRENT_UID;
+            document.getElementById('ui-rank').textContent = (u.rank || 'Новичок') + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
             document.getElementById('ui-balance').textContent = formatFC(u.balance);
+
+            renderLiveTickerBar();
+            renderRookieQuestCard(u);
 
             const bonusBanner = document.getElementById('bonus-banner');
             if (u.can_claim_bonus) {
                 bonusBanner.style.display = 'flex';
                 document.getElementById('ui-bonus-desc').textContent = `День ${u.streak_day || 1}/7 • Нажми, чтобы забрать награду!`;
-                bonusBanner.onclick = () => openStreakCalendarModal();
             } else {
                 bonusBanner.style.display = 'none';
             }
@@ -2047,7 +1157,7 @@
             renderGamesTab();
             renderFutTab(u, APP_STATE.fut_catalog || {});
             renderStartupTab(u);
-            renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.secret_bet_offer, APP_STATE.stadium_sponsors || []);
+            renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.secret_bet_offer, APP_STATE.stadium_sponsors || DEFAULT_SPONSORS);
             renderProfileTab(u);
             renderSlipUI();
         }
@@ -2079,12 +1189,82 @@
             }
         }
 
-        /* ==================== ВСПЛЫВАЮЩИЙ 7-ДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ ПРИ ВХОДЕ ==================== */
+        /* ==================== ЖИВАЯ ЛЕНТА ЗАНОСОВ И КВЕСТ НОВИЧКА ==================== */
+        function renderLiveTickerBar() {
+            const bar = document.getElementById('live-ticker-bar');
+            if (!bar || !APP_STATE) return;
+            const list = (APP_STATE.live_ticker && APP_STATE.live_ticker.length)
+                ? APP_STATE.live_ticker
+                : [
+                    '🔥 Вскрывай портовые контейнеры до 100 000 FC и торгуйся со скупщиками до +65%!',
+                    '⚡ Собирай экспрессы от 3 до 6 матчей и получай автоматический Экспресс-Буст до +25%!',
+                    '🎁 Заходи в игру 7 дней подряд и забирай сундук на +4 000 FC и Страховку 50%!'
+                ];
+            bar.innerHTML = list.map(t => `<span class="ticker-item">${t}</span>`).join('');
+        }
+
+        function renderRookieQuestCard(u) {
+            const box = document.getElementById('rookie-quest-card');
+            if (!box) return;
+            const rq = u.rookie_quest;
+            if (!rq || rq.claimed === 1) {
+                box.style.display = 'none';
+                return;
+            }
+            box.style.display = 'block';
+            const doneCnt = rq.done_count || 0;
+            const claimBtn = doneCnt >= 3
+                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimRookieQuestReward()">🎁 Забрать +2 500 FC + Золотую карту FUT!</button>`
+                : `<div style="font-size:10.5px; color:var(--text-muted); text-align:center;">Нажми на любой невыполненный шаг, чтобы перейти к нему и забрать <b>+2 500 FC + Золотую карту FUT</b>!</div>`;
+
+            box.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:13px; color:var(--accent-green);">🚀 Стартовый квест новичка (${doneCnt}/3)</b>
+                    <span style="font-size:11px; font-weight:800; color:var(--accent-gold);">Награда: +2 500 FC + 🥇 FUT</span>
+                </div>
+                <div class="rookie-steps">
+                    <div class="rk-step ${rq.bet ? 'done' : ''}" onclick="window.scrollTo({top:280, behavior:'smooth'})">
+                        ${rq.bet ? '✅' : '1️⃣'} Ставка на матч
+                    </div>
+                    <div class="rk-step ${rq.box ? 'done' : ''}" onclick="switchTab('startup')">
+                        ${rq.box ? '✅' : '2️⃣'} Вскрыть контейнер
+                    </div>
+                    <div class="rk-step ${rq.spin ? 'done' : ''}" onclick="switchTab('games'); switchGameSub('roulette', document.querySelectorAll('#tab-games .sub-nav-btn')[2])">
+                        ${rq.spin ? '✅' : '3️⃣'} Спин рулетки
+                    </div>
+                </div>
+                ${claimBtn}
+            `;
+        }
+
+        async function claimRookieQuestReward() {
+            haptic('medium');
+            const res = await apiAction({ action: 'claim_rookie_quest' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            if (res.card) {
+                const c = res.card;
+                document.getElementById('pack-modal-card-preview').innerHTML = `
+                    <div class="fut-shield tier-2 reveal-pop" style="width:145px;">
+                        <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 91}</span></div>
+                        <div class="shield-avatar" style="font-size:32px;">${c.nation || '⭐'}</div>
+                        <div class="shield-name" style="font-size:12px;">${c.name}</div>
+                        <div class="shield-buff" style="font-size:10px;">${c.desc}</div>
+                    </div>
+                `;
+                document.getElementById('pack-modal-note').textContent = res.message;
+                document.getElementById('pack-modal').classList.add('show');
+            }
+        }
+
+        /* ==================== ВСПЛЫВАЮЩИЙ 7-ДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ ==================== */
         function openStreakCalendarModal() {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
             const u = APP_STATE.user;
-            const cal = APP_STATE.streak_calendar || [];
+            const cal = (APP_STATE.streak_calendar && APP_STATE.streak_calendar.length)
+                ? APP_STATE.streak_calendar
+                : DEFAULT_STREAK_CALENDAR;
             const curDay = u.streak_day || 1;
             const canClaim = u.can_claim_bonus;
 
@@ -2129,11 +1309,13 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== СТАРТАП «ПОРТОВЫЙ МАГНАТ: КОНТЕЙНЕРЫ, ТОРГ И P2P-БИРЖА» ==================== */
+        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (АНИМАЦИЯ, РЕСТАВРАЦИЯ, ТОРГ И P2P) ==================== */
         function renderStartupTab(u) {
-            const st = u.startup || { storage: [], showroom: [], profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
-            const catalog = APP_STATE.containers_catalog || {};
-            const p2pList = APP_STATE.p2p_market || [];
+            const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
+            const rawCat = (APP_STATE && APP_STATE.containers_catalog && Object.keys(APP_STATE.containers_catalog).length)
+                ? APP_STATE.containers_catalog
+                : DEFAULT_CONTAINERS_CATALOG;
+            const p2pList = (APP_STATE && APP_STATE.p2p_market) ? APP_STATE.p2p_market : [];
 
             const profEl = document.getElementById('st-total-profit');
             if (profEl) {
@@ -2146,35 +1328,32 @@
             const p2pNav = document.getElementById('st-nav-p2p');
             if (p2pNav) p2pNav.textContent = `🌐 P2P-Биржа (${p2pList.length})`;
 
-            // 1. Вкладка Порт (6 контейнеров до 100 000 FC)
+            // 1. Витрина 6 контейнеров в Порту
             const portBox = document.getElementById('startup-sub-port');
             if (portBox) {
-                const cardsHtml = Object.values(catalog).map(c => {
+                const cardsHtml = Object.values(rawCat).map(c => {
                     const tierClass = c.price >= 65000 ? 'tier-ultra' : (c.price >= 15000 ? 'tier-high' : '');
                     const btnCls = c.price >= 35000 ? 'btn-main gold' : 'btn-main';
                     return `
                         <div class="container-box ${tierClass}">
                             <div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-size:26px;">${c.ico}</span>
-                                    <span style="font-size:10px; font-weight:800; color:var(--accent-gold); background:rgba(255,202,40,0.14); padding:2px 6px; border-radius:6px;">Куш до ${c.max_win}</span>
+                                    <span style="font-size:28px;">${c.ico}</span>
+                                    <span style="font-size:9.5px; font-weight:800; color:var(--accent-gold); background:rgba(255,202,40,0.14); padding:2px 6px; border-radius:6px;">Куш до ${c.max_win}</span>
                                 </div>
                                 <div style="font-size:13px; font-weight:900; margin-bottom:4px; line-height:1.2;">${c.name}</div>
                                 <div style="font-size:10px; color:var(--text-muted); margin-bottom:10px; line-height:1.3;">${c.desc}</div>
                             </div>
-                            <button class="${btnCls}" style="width:100%; padding:8px 6px; font-size:11px;" onclick="openContainerBox('${c.id}')">
-                                Вскрыть • ${formatFC(c.price)}
+                            <button class="${btnCls}" style="width:100%; padding:9px 6px; font-size:11px;" onclick="openContainerBox('${c.id}', '${escQuotes(c.name)}', '${c.ico}')">
+                                🔓 Вскрыть • ${formatFC(c.price)}
                             </button>
                         </div>
                     `;
                 }).join('');
-
-                portBox.innerHTML = `
-                    <div class="container-grid">${cardsHtml}</div>
-                `;
+                portBox.innerHTML = `<div class="container-grid">${cardsHtml}</div>`;
             }
 
-            // 2. Вкладка Склад, Реставрация, Торг и Личный Шоурум
+            // 2. Склад, Прозрачная математика реставрации, Торг и Личный Шоурум
             const storBox = document.getElementById('startup-sub-storage');
             if (storBox) {
                 const showroomSlots = [0, 1, 2].map(idx => {
@@ -2199,11 +1378,12 @@
                     `;
                 }).join('');
 
-                const rarNames = { 1: 'Обычный', 2: 'Редкий', 3: 'Эпический', 4: 'Легендарный Артефакт' };
+                const rarNames = { 1: 'Обычный груз', 2: 'Редкая находка', 3: 'Эпический лот', 4: 'Легендарный Артефакт' };
                 const storageHtml = st.storage.length === 0
-                    ? `<div class="card" style="text-align:center; padding:22px; color:var(--text-muted); font-size:12px;">Твой склад пуст. Вскрой любой контейнер в Порту или купи находку у других игроков на P2P-Бирже!</div>`
+                    ? `<div class="card" style="text-align:center; padding:22px; color:var(--text-muted); font-size:12px;">Твой склад пуст. Вскрой любой контейнер во вкладке «🚢 Порт» или купи находку у других игроков на P2P-Бирже!</div>`
                     : st.storage.map(it => {
                         const canRestore = (it.restored_count || 0) < 2 && it.condition < 100;
+                        const expVal = it.expected_restore || Math.round(it.value * 2.0);
                         return `
                             <div class="card" style="padding:12px; border-color:rgba(128,216,255,0.28);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
@@ -2211,10 +1391,10 @@
                                     <div style="flex:1;">
                                         <span class="rarity-pill rarity-${it.rarity || 1}">${rarNames[it.rarity || 1]}</span>
                                         <div style="font-size:14px; font-weight:900; margin-top:3px;">${it.name}</div>
-                                        <div style="font-size:11px; color:var(--text-muted);">Состояние: <b style="color:#fff;">${it.condition}%</b> • Бафф музея: <b style="color:var(--accent-ice);">+${it.show_inc} FC/д, +${it.show_odd} кэф</b></div>
+                                        <div style="font-size:11px; color:var(--text-muted);">Состояние: <b style="color:#fff;">${it.condition}%</b> • Музей: <b style="color:var(--accent-ice);">+${it.show_inc} FC/д, +${it.show_odd} кэф</b></div>
                                     </div>
                                     <div style="text-align:right;">
-                                        <span style="font-size:10px; color:var(--text-muted); display:block;">Оценка скупщика</span>
+                                        <span style="font-size:10px; color:var(--text-muted); display:block;">Оценка сейчас</span>
                                         <b style="font-size:15px; color:var(--accent-green);">${formatFC(it.value)}</b>
                                     </div>
                                 </div>
@@ -2223,19 +1403,19 @@
                                     <div style="width:${it.condition}%; background:linear-gradient(90deg, #ffca28, #00e676);"></div>
                                 </div>
 
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+                                <div style="display:grid; grid-template-columns:1.25fr 0.95fr; gap:6px; margin-bottom:8px;">
                                     ${canRestore
-                                        ? `<button class="btn-main" style="padding:8px; font-size:11px;" onclick="restoreStartupItem('${it.uid}')">🔧 Реставрация (${formatFC(it.restore_cost)})</button>`
-                                        : `<button class="btn-main disabled" style="padding:8px; font-size:11px;">✅ Макс. состояние</button>`
+                                        ? `<button class="btn-main" style="padding:7px 6px; font-size:10.5px; line-height:1.2;" onclick="restoreStartupItem('${it.uid}')">🔧 Реставрация (${formatFC(it.restore_cost)})<br><span style="font-size:9px; opacity:0.85;">Шанс 72% ➔ ~${formatFC(expVal)}</span></button>`
+                                        : `<button class="btn-main disabled" style="padding:8px; font-size:11px;">✅ Макс. реставрация</button>`
                                     }
-                                    <button class="btn-main ghost" style="padding:8px; font-size:11px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="toShowroomItem('${it.uid}')">🏛 Выставить в Шоурум</button>
+                                    <button class="btn-main ghost" style="padding:7px 6px; font-size:11px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="toShowroomItem('${it.uid}')">🏛 В Шоурум<br><span style="font-size:9px;">+${it.show_inc} FC/день</span></button>
                                 </div>
 
                                 <div style="background:rgba(255,255,255,0.04); padding:8px; border-radius:11px; margin-bottom:8px;">
                                     <div style="font-size:10px; font-weight:800; color:var(--text-muted); margin-bottom:5px;">🤝 ЖИВОЙ ТОРГ СО СКУПЩИКОМ:</div>
                                     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
                                         <button class="chip-btn" style="padding:7px 2px; font-size:10px; border-color:var(--accent-green); color:var(--accent-green);" onclick="sellStartupItemNpc('${it.uid}','base')">
-                                            Забрать 100%<br><b>${formatFC(it.value)}</b>
+                                            Без риска (100%)<br><b>${formatFC(it.value)}</b>
                                         </button>
                                         <button class="chip-btn" style="padding:7px 2px; font-size:10px; border-color:var(--accent-blue); color:var(--accent-ice);" onclick="sellStartupItemNpc('${it.uid}','push25')">
                                             Торг +25% (65%)<br><b>${formatFC(Math.round(it.value*1.25))}</b>
@@ -2248,7 +1428,7 @@
 
                                 <div style="display:flex; gap:6px; align-items:center;">
                                     <input type="number" id="p2p-price-${it.uid}" class="stake-input" style="margin:0; padding:7px; font-size:12px; flex:1;" value="${Math.round(it.value * 1.15)}" placeholder="Цена на P2P-Бирже">
-                                    <button class="btn-main gold" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="listStartupItemP2P('${it.uid}')">🌐 Продать игрокам</button>
+                                    <button class="btn-main gold" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="listStartupItemP2P('${it.uid}')">🌐 На P2P-Биржу</button>
                                 </div>
                             </div>
                         `;
@@ -2257,7 +1437,7 @@
                 storBox.innerHTML = `
                     <div class="card" style="padding:11px 12px; margin-bottom:12px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <b style="font-size:13px;">🏛 Личный Шоурум (Музей стартапа)</b>
+                            <b style="font-size:13px;">🏛 Личный Шоурум (Музей баффов)</b>
                             <span style="font-size:11px; color:var(--accent-green); font-weight:800;">+${st.showroom_daily_fc} FC/д • +${st.showroom_odd_boost} к кэфам</span>
                         </div>
                         <div class="collection-grid">${showroomSlots}</div>
@@ -2267,7 +1447,7 @@
                 `;
             }
 
-            // 3. Вкладка P2P-Биржа между реальными игроками
+            // 3. P2P-Биржа между реальными игроками
             const p2pBox = document.getElementById('startup-sub-p2p');
             if (p2pBox) {
                 if (!p2pList.length) {
@@ -2303,28 +1483,52 @@
             }
         }
 
-        async function openContainerBox(containerId) {
+        /* 1.4-СЕКУНДНАЯ АНИМАЦИЯ ВСКРЫТИЯ КОНТЕЙНЕРА С ИНТРИГОЙ */
+        async function openContainerBox(containerId, boxName = 'Контейнер', boxIco = '📦') {
+            if (IS_OPENING_BOX) return;
+            IS_OPENING_BOX = true;
             haptic('medium');
-            const res = await apiAction({ action: 'startup_open_container', container_id: containerId });
-            if (!res.ok) return showToast(res.error, true);
 
-            const it = res.found_item;
-            if (it) {
-                document.getElementById('pack-modal-card-preview').innerHTML = `
-                    <div class="fut-shield tier-${it.rarity || 2}" style="width:155px; padding:12px 8px;">
-                        <div class="shield-top"><span>СОСТ. ${it.condition}%</span><span class="shield-ovr">📦</span></div>
-                        <div class="shield-avatar" style="font-size:36px; margin:6px 0;">${it.ico}</div>
-                        <div class="shield-name" style="font-size:12px;">${it.name}</div>
-                        <div class="shield-buff" style="font-size:11px; margin-top:4px;">Оценка: ${formatFC(it.value)}</div>
-                    </div>
-                `;
-                document.getElementById('pack-modal-note').innerHTML = `
-                    <b>${res.message}</b><br>
-                    <span style="font-size:11px; color:var(--accent-ice);">Перейди на вкладку «🔧 Склад и Музей», чтобы отреставрировать находку или поторговаться со скупщиком!</span>
-                `;
-                document.getElementById('pack-modal').classList.add('show');
-                switchStartupSub('storage', document.getElementById('st-nav-storage'));
-            }
+            // Показываем анимацию взлома замков сразу при клике
+            document.getElementById('pack-modal-card-preview').innerHTML = `
+                <div class="crate-shake-box">${boxIco}</div>
+            `;
+            document.getElementById('pack-modal-note').innerHTML = `
+                <b style="color:var(--accent-gold); font-size:14px;">🔓 Срезаем портовые пломбы «${boxName}»...</b><br>
+                <span style="font-size:11px; color:var(--text-muted);">Оценщик осматривает содержимое контейнера</span>
+            `;
+            document.getElementById('pack-modal').classList.add('show');
+
+            const tStart = Date.now();
+            const res = await apiAction({ action: 'startup_open_container', container_id: containerId }, true);
+            const elapsed = Date.now() - tStart;
+            const waitLeft = Math.max(0, 1250 - elapsed);
+
+            setTimeout(() => {
+                IS_OPENING_BOX = false;
+                if (!res.ok) {
+                    document.getElementById('pack-modal').classList.remove('show');
+                    return showToast(res.error, true);
+                }
+                renderFastDelta();
+                const it = res.found_item;
+                if (it) {
+                    haptic('success');
+                    document.getElementById('pack-modal-card-preview').innerHTML = `
+                        <div class="fut-shield tier-${it.rarity || 2} reveal-pop" style="width:165px; padding:12px 8px;">
+                            <div class="shield-top"><span>СОСТ. ${it.condition}%</span><span class="shield-ovr">📦</span></div>
+                            <div class="shield-avatar" style="font-size:38px; margin:6px 0;">${it.ico}</div>
+                            <div class="shield-name" style="font-size:12px;">${it.name}</div>
+                            <div class="shield-buff" style="font-size:11px; margin-top:4px;">Оценка: ${formatFC(it.value)}</div>
+                        </div>
+                    `;
+                    document.getElementById('pack-modal-note').innerHTML = `
+                        <b>${res.message}</b><br>
+                        <span style="font-size:11px; color:var(--accent-ice);">Находка доставлена на твой «🔧 Склад» — отреставрируй её в ~2 раза дороже или торгуйся со скупщиком!</span>
+                    `;
+                    switchStartupSub('storage', document.getElementById('st-nav-storage'));
+                }
+            }, waitLeft);
         }
 
         async function restoreStartupItem(itemUid) {
@@ -2379,7 +1583,7 @@
             showToast(res.message);
         }
 
-        /* ==================== ПОИСК КОМАНДЫ И ТОЧНАЯ ЛЕНТА ЛИГ ==================== */
+        /* ==================== ПОИСК КОМАНДЫ, ТАЙМЕР СТАРТА И ТОЧНАЯ ЛЕНТА ЛИГ ==================== */
         function onSearchTeamInput() {
             const inp = document.getElementById('team-search-input');
             SEARCH_QUERY = (inp.value || '').trim().toLowerCase();
@@ -2481,15 +1685,21 @@
             }
 
             const favClub = (APP_STATE.user && APP_STATE.user.favorite_club) ? APP_STATE.user.favorite_club : '';
+            const nowSec = Math.floor(Date.now() / 1000);
 
             box.innerHTML = list.map(m => {
                 const isFav = favClub && m.teams.includes(favClub);
                 const topBadge = m.is_top ? `<span class="badge-top">🔥 ТОП</span>` : '';
                 const favBadge = isFav ? `<span class="badge-top" style="color:var(--accent-green); border-color:var(--accent-green);">⭐ +10%</span>` : '';
 
-                const rightStatus = m.is_live
-                    ? `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`
-                    : `<span>🕒 ${m.short_date}</span>`;
+                // Таймер обратного отсчета для матчей в ближайшие 2 часа
+                let rightStatus = `<span>🕒 ${m.short_date}</span>`;
+                if (m.is_live) {
+                    rightStatus = `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`;
+                } else if (m.start_ts && (m.start_ts - nowSec > 0) && (m.start_ts - nowSec <= 7200)) {
+                    const minsLeft = Math.max(1, Math.round((m.start_ts - nowSec) / 60));
+                    rightStatus = `<span class="soon-badge">⏳ Через ${minsLeft} мин</span>`;
+                }
 
                 const scoreCenter = m.is_live
                     ? `<div class="score-pill">${m.live_score}</div>`
@@ -3196,7 +2406,7 @@
             const c = res.card;
             const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
             document.getElementById('pack-modal-card-preview').innerHTML = `
-                <div class="fut-shield ${tierCls}" style="width:140px;">
+                <div class="fut-shield ${tierCls} reveal-pop" style="width:140px;">
                     <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 91}</span></div>
                     <div class="shield-avatar" style="font-size:32px;">${c.nation || '⭐'}</div>
                     <div class="shield-name" style="font-size:12px;">${c.name}</div>
@@ -3216,7 +2426,7 @@
             const c = res.card;
             const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
             document.getElementById('pack-modal-card-preview').innerHTML = `
-                <div class="fut-shield ${tierCls}" style="width:140px;">
+                <div class="fut-shield ${tierCls} reveal-pop" style="width:140px;">
                     <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 90}</span></div>
                     <div class="shield-avatar" style="font-size:32px;">${c.nation || '⭐'}</div>
                     <div class="shield-name" style="font-size:12px;">${c.name}</div>
@@ -3230,16 +2440,17 @@
 
         /* ==================== АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ С ЗАЛОГАМИ ==================== */
         function renderEmpireTab(u, catalog, secretOffer, sponsorsList) {
-            const st = u.stadium_info || {};
+            const st = u.stadium_info || { name: 'Дворовая Коробка', cap: '500 зрителей', income: 100 };
             const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_1', deposit_paid: false, quest_done: false };
             const showroomInc = (u.startup && u.startup.showroom_daily_fc) ? u.startup.showroom_daily_fc : 0;
+            const spArray = (sponsorsList && sponsorsList.length) ? sponsorsList : DEFAULT_SPONSORS;
 
             const claimBtn = u.can_claim_stadium
                 ? `<button class="btn-main btn-block" onclick="claimStadiumRevenue()">💰 Провести Матчдэй и собрать кассу</button>`
                 : `<button class="btn-main btn-block disabled">⏳ Матчдэй уже проведен сегодня</button>`;
 
-            const sponsorsCardsHtml = sponsorsList.map(sp => {
-                const isLocked = u.stadium_level < sp.min_lvl;
+            const sponsorsCardsHtml = spArray.map(sp => {
+                const isLocked = (u.stadium_level || 1) < (sp.min_lvl || 1);
                 const isSelected = (prefs.sponsor === sp.id);
                 const depTxt = sp.deposit > 0 ? `Залог: ${formatFC(sp.deposit)}` : 'Без залога';
                 let statusBadge = '';
@@ -3259,7 +2470,7 @@
                             <b style="font-size:12px;">${isSelected ? '✅ ' : ''}${sp.name}</b>
                             <b style="font-size:12px; color:var(--accent-green);">+${formatFC(sp.bonus)}</b>
                         </div>
-                        <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:4px;">📋 ${sp.task}</div>
+                        <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:4px;">📋 ${sp.task || 'Активность в игре'}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-size:10px; color:#cbd5e1;">💼 ${depTxt}</span>
                             ${statusBadge}
@@ -3270,7 +2481,7 @@
 
             document.getElementById('current-stadium-card').innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:14px;">✅ ${st.name} (Ур. ${u.stadium_level}/10)</b>
+                    <b style="font-size:14px;">✅ ${st.name} (Ур. ${u.stadium_level || 1}/10)</b>
                     <b style="color:var(--accent-green); font-size:13px;">База: +${st.income} FC</b>
                 </div>
                 <div style="font-size:11px; color:var(--text-muted); margin:3px 0 10px;">
@@ -3302,14 +2513,14 @@
                 secBox.style.display = 'none';
             }
 
-            const lab = u.lab_info || {};
+            const lab = u.lab_info || { name: 'Блокнот скаута', odd_bonus: 0, desc: '' };
             const labBtn = u.next_lab
                 ? `<button class="btn-main btn-block" onclick="upgradeBuilding('lab')">🧠 Улучшить до Ур.${u.lab_level + 1} (${formatFC(u.next_lab.price)})</button>`
                 : `<button class="btn-main btn-block disabled">✅ Максимальный уровень ИИ</button>`;
 
             document.getElementById('current-lab-card').innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:14px;">🧠 ${lab.name} (Ур. ${u.lab_level}/5)</b>
+                    <b style="font-size:14px;">🧠 ${lab.name} (Ур. ${u.lab_level || 1}/5)</b>
                     <b style="color:var(--accent-blue); font-size:13px;">+${lab.odd_bonus} к кэфам</b>
                 </div>
                 <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">${lab.desc || ''}</div>
@@ -3655,7 +2866,7 @@
             let diffAngle = targetCenterMod - currentMod;
             if (diffAngle < 0) diffAngle += 360;
 
-            // Делаем ровно 5 полных оборотов (1800°) + точная доводка на центр выпавшего сектора
+            // 5 полных оборотов (1800°) + точная доводка на центр выпавшего сектора
             WHEEL_ROTATION += 1800 + diffAngle;
             wheel.style.transform = `rotate(${WHEEL_ROTATION}deg)`;
             document.getElementById('wheel-status-txt').textContent = '🎰 Барабан вращается...';
@@ -3784,11 +2995,11 @@
         }
 
         function shareReferralLink() {
-            shareCustomText('🎄 Залетай в новогодний AI_BET_BOT! Реальная линия, Стартап контейнеров до 100к FC, 5-слотовый FUT и +1 500 FC на старт по моей ссылке:');
+            shareCustomText('🎄 Залетай в новогодний AI_BET_BOT! Реальная линия, Контейнеры до 100к FC, 5-слотовый FUT и +1 500 FC на старт по моей ссылке:');
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            injectStartupAndModalsDOM();
+            renderStartupTab({});
             loadAppState();
             setInterval(() => loadAppState(true), 60000);
         });
