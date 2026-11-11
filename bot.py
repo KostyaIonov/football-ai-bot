@@ -4169,7 +4169,7 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + СВЕРХБЫСТРОЕ ЯДРО WEBAPP, СТАРТАП КОНТЕЙНЕРОВ И P2P-БИРЖА =================
+# ================= ВЕБ-СЕРВЕР + СВЕРХБЫСТРОЕ ЯДРО WEBAPP, КОНТЕЙНЕРЫ И P2P-БИРЖА =================
 from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -4197,7 +4197,6 @@ def minimalist_chat_menu_kb(user_id: int = 0) -> InlineKeyboardMarkup:
         builder.adjust(1, 2)
     return builder.as_markup()
 
-# Переопределяем главное меню чата, чтобы убрать старые загроможденные кнопки
 globals()["main_menu_kb"] = minimalist_chat_menu_kb
 
 @dp.callback_query(F.data == "chat_only_profile")
@@ -4397,7 +4396,7 @@ def translate_team_ru(name: str) -> str:
     for k in _SORTED_DICT_KEYS:
         if len(k) >= 4 and k.lower() in raw_low:
             _TRANSLATE_MEMO[raw] = TEAM_TRANSLATIONS[k]
-            return _TRANSLATE_MEMO[k]
+            return _TRANSLATE_MEMO[raw]
 
     res = cleaned if cleaned else raw
     _TRANSLATE_MEMO[raw] = res
@@ -4441,7 +4440,7 @@ db_manager.fetchrow = lambda q, *a: _safe_db_call(_orig_db_fetchrow, q, *a)
 db_manager.fetch = lambda q, *a: _safe_db_call(_orig_db_fetch, q, *a)
 db_manager.fetchval = lambda q, *a: _safe_db_call(_orig_db_fetchval, q, *a)
 
-# 4. СТАРТАП «ПОРТОВЫЙ МАГНАТ: КОНТЕЙНЕРЫ, РЕСТАВРАЦИЯ И P2P-БИРЖА» (ДО 100 000 FC)
+# 4. РАЗДЕЛ «КОНТЕЙНЕРЫ, РЕСТАВРАЦИЯ И P2P-БИРЖА» (ДО 100 000 FC)
 CONTAINERS_CATALOG = {
     "c_detroit": {
         "id": "c_detroit", "name": "📦 Гараж в Детройте", "price": 1000, "ico": "🏚️",
@@ -4505,6 +4504,20 @@ CONTAINERS_CATALOG = {
     }
 }
 
+# Живая лента крупных заносов для мотивации новых игроков
+LIVE_TICKER_FEED = [
+    "🔥 Каппер Alex_Bet выбил «🏎️ Шасси болида F1» за 27 000 FC в контейнере Монако!",
+    "⚡ Игрок Маэстро_99 собрал Экспресс с кэфом 6.45 и забрал +16 125 FC!",
+    "💎 На P2P-Бирже продан «🔑 Зашифрованный Ledger» за 48 500 FC!",
+    "🎰 Каппер LuckyStrike сорвал ДЖЕКПОТ +2 000 FC в бесплатной рулетке!",
+    "👑 Игрок KaperPro отреставрировал «🟡 Lamborghini Aventador» до 165 000 FC!"
+]
+
+def push_live_ticker(event_text: str):
+    LIVE_TICKER_FEED.insert(0, event_text)
+    if len(LIVE_TICKER_FEED) > 12:
+        LIVE_TICKER_FEED.pop()
+
 # 5. ПРОДВИНУТАЯ СИСТЕМА КОНТРАКТОВ СПОНСОРОВ (УРОВНИ ДОСТУПА, ЗАЛОГИ И КВЕСТЫ)
 STADIUM_SPONSORS = [
     {
@@ -4525,7 +4538,7 @@ STADIUM_SPONSORS = [
     },
     {
         "id": "sp_5", "name": "👑 Rolex Champions Club", "min_lvl": 8, "deposit": 2500, "bonus": 9800,
-        "task_code": "showroom_and_bet", "task": "Активная ставка + минимум 1 экспонат в Шоуруме Стартапа (Залог 2 500 FC)"
+        "task_code": "showroom_and_bet", "task": "Активная ставка + минимум 1 экспонат в Шоуруме Контейнеров (Залог 2 500 FC)"
     }
 ]
 
@@ -4586,13 +4599,10 @@ FUT_CARDS.update({
 })
 
 FUT_ROLES = ["FW", "MID", "DEF", "GK", "COACH"]
-
-# 8. СВЕРХБЫСТРОЕ ХРАНИЛИЩЕ DАННЫХ ИГРОКА И P2P-БИРЖИ НАХОДОК (RAM + BACKGROUND DB SYNC)
-P2P_CONTAINER_MARKET = []  # [{"lot_id": int, "seller_id": int, "seller_name": str, "item": dict, "price": int}]
+P2P_CONTAINER_MARKET = []
 _P2P_LOT_SEQ = 100
 
 def parse_user_fut_state(user: dict) -> dict:
-    """Хранит состав FUT, коллекцию, 7-дневный стрик, спонсоров и инвентарь Стартапа внутри единого JSON-поля без лишних таблиц!"""
     try:
         raw = json.loads(user.get("fut_cards") or "{}")
         if not isinstance(raw, dict):
@@ -4615,6 +4625,9 @@ def parse_user_fut_state(user: dict) -> dict:
     if captain not in FUT_ROLES:
         captain = "FW"
 
+    has_bets_before = (int(user.get("wins") or 0) + int(user.get("losses") or 0)) > 0
+    has_spun_before = bool(user.get("last_spin"))
+
     return {
         "squad": squad,
         "owned": owned,
@@ -4624,9 +4637,13 @@ def parse_user_fut_state(user: dict) -> dict:
         "ticket_mode": str(raw.get("_ticket_mode") or "optimal"),
         "sponsor_id": str(raw.get("_sponsor_id") or "sp_1"),
         "sponsor_paid_date": str(raw.get("_sponsor_paid_date") or ""),
-        "startup_storage": list(raw.get("_startup_storage") or []),   # Склад найденных предметов (до 8 шт)
-        "startup_showroom": list(raw.get("_startup_showroom") or []), # Витрина музея (до 3 шт)
-        "startup_profit": int(raw.get("_startup_profit") or 0)
+        "startup_storage": list(raw.get("_startup_storage") or []),
+        "startup_showroom": list(raw.get("_startup_showroom") or []),
+        "startup_profit": int(raw.get("_startup_profit") or 0),
+        "rookie_bet": 1 if (int(raw.get("_rk_bet") or 0) == 1 or has_bets_before) else 0,
+        "rookie_box": int(raw.get("_rk_box") or 0),
+        "rookie_spin": 1 if (int(raw.get("_rk_spin") or 0) == 1 or has_spun_before) else 0,
+        "rookie_claimed": int(raw.get("_rk_claimed") or 0)
     }
 
 def dump_user_fut_state(st: dict) -> str:
@@ -4641,7 +4658,11 @@ def dump_user_fut_state(st: dict) -> str:
         "_sponsor_paid_date": st.get("sponsor_paid_date", ""),
         "_startup_storage": st.get("startup_storage", [])[:8],
         "_startup_showroom": st.get("startup_showroom", [])[:3],
-        "_startup_profit": st.get("startup_profit", 0)
+        "_startup_profit": st.get("startup_profit", 0),
+        "_rk_bet": st.get("rookie_bet", 0),
+        "_rk_box": st.get("rookie_box", 0),
+        "_rk_spin": st.get("rookie_spin", 0),
+        "_rk_claimed": st.get("rookie_claimed", 0)
     }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -4665,7 +4686,6 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
     lab_lvl = int(user.get("lab_level") or 1)
     lab_bonus = LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["odd_bonus"]
 
-    # Бонусы от Личного Шоурума Стартапа
     showroom_items = st.get("startup_showroom") or []
     showroom_daily_fc = sum(int(it.get("show_inc") or 0) for it in showroom_items)
     showroom_odd_boost = round(sum(float(it.get("show_odd") or 0.0) for it in showroom_items), 2)
@@ -4761,6 +4781,9 @@ async def fast_create_pending_bet(
         parsed_legs = []
 
     buffs = get_user_fut_buffs_v2(user)
+    st = buffs["full_state"]
+    st["rookie_bet"] = 1
+
     exp_mult, exp_pct = get_express_boost_multiplier(len(parsed_legs) if bet_type == "express" else 1)
 
     boosted_base = round(odds * exp_mult, 2)
@@ -4779,7 +4802,10 @@ async def fast_create_pending_bet(
     new_balance = round(user["balance"] - amount, 1)
     created_str = now_msk().strftime("%d.%m %H:%M")
 
-    await db_manager.exec("UPDATE users SET balance = $1, active_booster = '' WHERE user_id = $2", new_balance, user_id)
+    await db_manager.exec(
+        "UPDATE users SET balance = $1, active_booster = '', fut_cards = $2 WHERE user_id = $3",
+        new_balance, dump_user_fut_state(st), user_id
+    )
 
     if db_manager.use_pg:
         bet_id = await db_manager.fetchval("""
@@ -4802,6 +4828,7 @@ async def fast_create_pending_bet(
     asyncio.create_task(db_manager.unlock_achievement(user_id, "first_bet"))
     if bet_type == "express":
         asyncio.create_task(db_manager.unlock_achievement(user_id, "first_express"))
+        push_live_ticker(f"⚡ Каппер {username} зарядил Экспресс с кэфом {final_odds} на выплату {round(amount * final_odds)} FC!")
 
     return {
         "ok": True, "bet_id": bet_id, "final_odds": final_odds, "exp_boost_pct": exp_pct,
@@ -4818,7 +4845,7 @@ ACHIEVEMENTS_CONFIG.update({
     "secret_agent": {"title": "🕵️‍♂️ Секретный агент ИИ", "desc": "Заключить пари по Секретной ставке дня", "reward": 450},
     "fut_full_squad": {"title": "👕 Полная сыгранность (100%)", "desc": "Заполнить все 5 позиций в составе FUT", "reward": 1500},
     "sbc_master": {"title": "🔄 Мастер СПК (Крафт)", "desc": "Обменять 3 резервные карточки на Золотой пак", "reward": 750},
-    "container_hunter": {"title": "📦 Портовый Охотник", "desc": "Вскрыть свой первый контейнер в Стартапе", "reward": 500},
+    "container_hunter": {"title": "📦 Портовый Охотник", "desc": "Вскрыть свой первый контейнер в Порту", "reward": 500},
     "area51_legend": {"title": "🛸 Магнат Зоны-51", "desc": "Вскрыть секретный контейнер за 100 000 FC", "reward": 5000},
     "p2p_merchant": {"title": "🌐 Купец P2P-Биржи", "desc": "Выставить или купить находку на P2P-рынке", "reward": 800},
     "stadium_lvl_5": {"title": "🏟 Архитектор Колизея", "desc": "Построить стадион 5-го уровня", "reward": 2500},
@@ -5162,7 +5189,6 @@ async def get_precomputed_webapp_line() -> dict:
 
 # ================= ПРОВЕРКА УСЛОВИЙ КОНТРАКТА СПОНСОРА И СТРИКА ВХОДОВ =================
 def compute_login_streak_info(st: dict) -> tuple[int, bool]:
-    """Возвращает (текущий день 1..7, можно ли забрать сегодня)"""
     today_dt = now_msk().date()
     today_str = today_dt.strftime("%Y-%m-%d")
     yesterday_str = (today_dt - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -5305,7 +5331,6 @@ def format_archive_bet_legs(b: dict) -> list[dict]:
     return result_legs
 
 def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
-    """Мгновенная сборка пользовательского объекта без тяжелых запросов (для Дельта-ответов за 0.005 сек)"""
     buffs = get_user_fut_buffs_v2(user)
     st = buffs["full_state"]
     st_lvl = int(user.get("stadium_level") or 1)
@@ -5323,6 +5348,19 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
 
     sp_id = st.get("sponsor_id", "sp_1")
     quest_ok = check_sponsor_quest_done(sp_id, user, st, active_bets or [])
+
+    # Стартовый квест новичка (3 шага)
+    rk_bet = 1 if (st.get("rookie_bet") or len(active_bets or []) > 0) else 0
+    rk_box = 1 if (st.get("rookie_box") or len(st.get("startup_storage", [])) > 0 or len(st.get("startup_showroom", [])) > 0) else 0
+    rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
+    rk_done_count = rk_bet + rk_box + rk_spin
+
+    # Дополняем предметы склада прозрачным прогнозом цены реставрации
+    storage_enriched = []
+    for it in st.get("startup_storage", []):
+        it_copy = dict(it)
+        it_copy["expected_restore"] = int(round(it_copy.get("value", 1000) * 2.0, -1))
+        storage_enriched.append(it_copy)
 
     return {
         "user_id": user["user_id"],
@@ -5357,11 +5395,18 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
             "quest_done": quest_ok
         },
         "startup": {
-            "storage": st.get("startup_storage", []),
+            "storage": storage_enriched,
             "showroom": st.get("startup_showroom", []),
             "profit": st.get("startup_profit", 0),
             "showroom_daily_fc": buffs["showroom_daily_fc"],
             "showroom_odd_boost": buffs["showroom_odd_boost"]
+        },
+        "rookie_quest": {
+            "bet": rk_bet,
+            "box": rk_box,
+            "spin": rk_spin,
+            "done_count": rk_done_count,
+            "claimed": int(st.get("rookie_claimed") or 0)
         },
         "lab_level": lab_lvl,
         "lab_info": LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1]),
@@ -5373,7 +5418,6 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
     }
 
 async def build_user_state_payload(uid: int) -> dict:
-    """Полная инициализация при открытии приложения"""
     now_ts = int(now_msk().timestamp())
     line_cache = await get_precomputed_webapp_line()
     user = await db_manager.get_user(uid)
@@ -5432,6 +5476,7 @@ async def build_user_state_payload(uid: int) -> dict:
         "ok": True,
         "bot_username": BOT_USERNAME,
         "user": fast_u,
+        "live_ticker": LIVE_TICKER_FEED[:8],
         "streak_calendar": STREAK_CALENDAR,
         "containers_catalog": CONTAINERS_CATALOG,
         "p2p_market": P2P_CONTAINER_MARKET[:30],
@@ -5510,16 +5555,13 @@ async def api_get_state(request):
     return web.json_response(payload, headers=CORS_HEADERS)
 
 async def _fast_delta_response(uid: int, extra: dict = None, include_bets: bool = False, include_pvp: bool = False):
-    """
-    СВЕРХБЫСТРЫЙ ОТВЕТ СЕРВЕРА (0.008 сек):
-    Читает только 1 строку пользователя без повторного пересчета матчей и всех таблиц!
-    """
     u = await db_manager.get_user(uid)
     act_raw = await db_manager.get_user_bets(uid, active_only=True) if include_bets else []
     fast_u = build_fast_user_dict(u, act_raw)
     resp = {
         "ok": True,
         "user": fast_u,
+        "live_ticker": LIVE_TICKER_FEED[:8],
         "p2p_market": P2P_CONTAINER_MARKET[:30],
         **(extra or {})
     }
@@ -5589,25 +5631,61 @@ async def api_handle_action(request):
             "UPDATE users SET balance = balance + $1, last_bonus = $2, active_booster = $3, fut_cards = $4 WHERE user_id = $5",
             float(total_reward), today_str, new_booster, dump_user_fut_state(st), uid
         )
-        b_note = f" + Бустер!" if cal_item["booster"] else ""
+        b_note = " + Бустер!" if cal_item["booster"] else ""
         return await _fast_delta_response(uid, {
             "message": f"🔥 День {streak_day}/7! Получено +{total_reward} FC{b_note}",
             "coin_delta": total_reward
         })
 
-    # 2. СТАРТАП: ПОКУПКА И ВСКРЫТИЕ КОНТЕЙНЕРА (ДО 100 000 FC)
+    # 2. СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +2 500 FC + ЗОЛОТАЯ КАРТА FUT)
+    elif action == "claim_rookie_quest":
+        if st.get("rookie_claimed") == 1:
+            return web.json_response({"ok": False, "error": "Награда стартового квеста уже получена!"}, headers=CORS_HEADERS)
+        act_bets = await db_manager.get_user_bets(uid, active_only=True)
+        rk_bet = 1 if (st.get("rookie_bet") or len(act_bets) > 0) else 0
+        rk_box = 1 if (st.get("rookie_box") or len(st.get("startup_storage", [])) > 0 or len(st.get("startup_showroom", [])) > 0) else 0
+        rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
+
+        if (rk_bet + rk_box + rk_spin) < 3:
+            return web.json_response({"ok": False, "error": "Выполни все 3 простых шага (1 ставка, 1 контейнер и 1 спин рулетки)!"}, headers=CORS_HEADERS)
+
+        st["rookie_claimed"] = 1
+        st["rookie_bet"] = 1
+        st["rookie_box"] = 1
+        st["rookie_spin"] = 1
+
+        tier2_pool = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+        bonus_card_id = random.choice(tier2_pool)
+        bonus_card = FUT_CARDS[bonus_card_id]
+        if bonus_card_id not in st["owned"]:
+            st["owned"].append(bonus_card_id)
+            role = bonus_card["role"]
+            if not st["squad"].get(role):
+                st["squad"][role] = bonus_card_id
+
+        await db_manager.exec(
+            "UPDATE users SET balance = balance + 2500, fut_cards = $1 WHERE user_id = $2",
+            dump_user_fut_state(st), uid
+        )
+        push_live_ticker(f"🎁 Игрок {user['username']} выполнил Квест Новичка и получил +2 500 FC + карту {bonus_card['name']}!")
+        return await _fast_delta_response(uid, {
+            "message": f"🎉 Квест выполнен! Получено +2 500 FC и золотая карта «{bonus_card['name']}»!",
+            "card": bonus_card,
+            "coin_delta": 2500
+        })
+
+    # 3. КОНТЕЙНЕРЫ: ПОКУПКА И ВСКРЫТИЕ (ДО 100 000 FC)
     elif action == "startup_open_container":
         cid = str(body.get("container_id") or "c_detroit")
         box = CONTAINERS_CATALOG.get(cid)
         if not box:
             return web.json_response({"ok": False, "error": "Контейнер не найден"}, headers=CORS_HEADERS)
         if len(st["startup_storage"]) >= 8:
-            return web.json_response({"ok": False, "error": "Склад стартапа переполнен (макс. 8 находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
+            return web.json_response({"ok": False, "error": "Склад переполнен (макс. 8 находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
         price = box["price"]
         if user["balance"] < price:
             return web.json_response({"ok": False, "error": f"Недостаточно средств! Нужно {price} FC."}, headers=CORS_HEADERS)
 
-        # Выбираем предмет из пула контейнера с весами редкости
         pool = box["items"]
         weights = [40, 30, 20, 10][:len(pool)]
         chosen_tpl = random.choices(pool, weights=weights, k=1)[0]
@@ -5626,12 +5704,14 @@ async def api_handle_action(request):
             "condition": condition,
             "restored_count": 0,
             "value": market_val,
+            "expected_restore": int(round(market_val * 2.0, -1)),
             "restore_cost": max(150, int(round(market_val * 0.22, -1))),
             "show_inc": chosen_tpl["show_inc"],
             "show_odd": chosen_tpl["show_odd"],
             "container_price": price
         }
         st["startup_storage"].insert(0, found_item)
+        st["rookie_box"] = 1
         new_bal = round(user["balance"] - price, 1)
 
         await db_manager.exec(
@@ -5642,13 +5722,16 @@ async def api_handle_action(request):
         if cid == "c_area51":
             asyncio.create_task(db_manager.unlock_achievement(uid, "area51_legend"))
 
+        if market_val >= 4500 or chosen_tpl["rarity"] >= 3:
+            push_live_ticker(f"📦 {user['username']} вскрыл «{box['name']}» и нашёл {found_item['name']} ({market_val} FC)!")
+
         return await _fast_delta_response(uid, {
             "message": f"📦 Вскрыт «{box['name']}»! Найдено: {found_item['name']} (Оценка: {found_item['value']} FC)",
             "found_item": found_item,
             "coin_delta": -price
         })
 
-    # 3. СТАРТАП: РЕСТАВРАЦИЯ / ВЗЛОМ НАХОДКИ
+    # 4. КОНТЕЙНЕРЫ: РЕСТАВРАЦИЯ / ВЗЛОМ НАХОДКИ
     elif action == "startup_restore_item":
         item_uid = str(body.get("item_uid") or "")
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
@@ -5666,11 +5749,13 @@ async def api_handle_action(request):
         it["restored_count"] = int(it.get("restored_count") or 0) + 1
         success = random.random() < 0.72
         if success:
-            boost_mult = random.uniform(1.65, 2.35)
+            boost_mult = random.uniform(1.68, 2.35)
             it["value"] = int(round(it["value"] * boost_mult, -1))
             it["condition"] = min(100, it["condition"] + random.randint(25, 45))
             it["restore_cost"] = int(round(it["value"] * 0.25, -1))
             msg = f"✨ Успешная реставрация! Ценность «{it['name']}» выросла до {it['value']} FC!"
+            if it["value"] >= 15000:
+                push_live_ticker(f"🔧 {user['username']} отреставрировал «{it['name']}» до {it['value']} FC!")
         else:
             it["value"] = max(100, int(round(it["value"] * 0.76, -1)))
             it["condition"] = max(20, it["condition"] - 12)
@@ -5683,10 +5768,10 @@ async def api_handle_action(request):
         )
         return await _fast_delta_response(uid, {"message": msg, "coin_delta": -r_cost})
 
-    # 4. СТАРТАП: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
+    # 5. КОНТЕЙНЕРЫ: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
     elif action == "startup_sell_npc":
         item_uid = str(body.get("item_uid") or "")
-        tactic = str(body.get("tactic") or "base")  # base | push25 | bluff65
+        tactic = str(body.get("tactic") or "base")
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
         if idx == -1:
             return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
@@ -5708,6 +5793,7 @@ async def api_handle_action(request):
             if random.random() < 0.38:
                 final_price = int(round(base_val * 1.65, -1))
                 msg = f"💎 ДЖЕКПОТ ТОРГА (+65%)! Коллекционер забрал «{it['name']}» за +{final_price} FC!"
+                push_live_ticker(f"💎 {user['username']} выторговал +65% и продал «{it['name']}» за {final_price} FC!")
             else:
                 final_price = int(round(base_val * 0.78, -1))
                 msg = f"📉 Блеф не прошел! Пришлось отдать перекупщикам за +{final_price} FC."
@@ -5722,7 +5808,7 @@ async def api_handle_action(request):
         )
         return await _fast_delta_response(uid, {"message": msg, "coin_delta": final_price})
 
-    # 5. СТАРТАП: ПЕРЕМЕЩЕНИЕ В ЛИЧНЫЙ ШОУРУМ (МУЗЕЙ БАФФОВ) И ОБРАТНО
+    # 6. КОНТЕЙНЕРЫ: ЛИЧНЫЙ ШОУРУМ (МУЗЕЙ БАФФОВ)
     elif action == "startup_to_showroom":
         item_uid = str(body.get("item_uid") or "")
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
@@ -5749,9 +5835,9 @@ async def api_handle_action(request):
         it = st["startup_showroom"].pop(idx)
         st["startup_storage"].append(it)
         await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
-        return await _fast_delta_response(uid, {"message": f"📦 «{it['name']}» возвращен на склад стартапа."})
+        return await _fast_delta_response(uid, {"message": f"📦 «{it['name']}» возвращен на склад."})
 
-    # 6. СТАРТАП: P2P-БИРЖА НАХОДОК МЕЖДУ РЕАЛЬНЫМИ ИГРОКАМИ
+    # 7. КОНТЕЙНЕРЫ: P2P-БИРЖА МЕЖДУ РЕАЛЬНЫМИ ИГРОКАМИ
     elif action == "p2p_list_item":
         item_uid = str(body.get("item_uid") or "")
         ask_price = int(body.get("price") or 0)
@@ -5773,6 +5859,7 @@ async def api_handle_action(request):
         P2P_CONTAINER_MARKET.insert(0, lot_obj)
         await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
         asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
+        push_live_ticker(f"🌐 {user['username']} выставил на P2P-Биржу «{it['name']}» за {ask_price} FC!")
         return await _fast_delta_response(uid, {
             "message": f"🌐 Лот #{lot_obj['lot_id']} «{it['name']}» выставлен на P2P-Биржу за {ask_price} FC!"
         })
@@ -5810,7 +5897,7 @@ async def api_handle_action(request):
         bought_item["container_price"] = price
         st["startup_storage"].insert(0, bought_item)
 
-        seller_payout = int(round(price * 0.95))  # 5% комиссия биржи
+        seller_payout = int(round(price * 0.95))
         await db_manager.exec(
             "UPDATE users SET balance = balance - $1, fut_cards = $2 WHERE user_id = $3",
             float(price), dump_user_fut_state(st), uid
@@ -5820,6 +5907,7 @@ async def api_handle_action(request):
             float(seller_payout), lot_obj["seller_id"]
         )
         asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
+        push_live_ticker(f"🛍 {user['username']} купил «{bought_item['name']}» у игрока {lot_obj['seller_name']} за {price} FC!")
 
         try:
             await bot.send_message(
@@ -5838,7 +5926,7 @@ async def api_handle_action(request):
             "coin_delta": -price
         })
 
-    # 7. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
+    # 8. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
     elif action == "equip_fut_card":
         card_id = str(body.get("card_id") or "")
         if card_id not in FUT_CARDS or card_id not in st["owned"]:
@@ -5879,7 +5967,7 @@ async def api_handle_action(request):
             "status_note": f"🔄 СПК выполнен! Обменено 3 резервные карты. {res['status_note']}"
         })
 
-    # 8. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ С ЗАЛОГОМ
+    # 9. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ С ЗАЛОГОМ
     elif action == "set_stadium_prefs":
         ticket = str(body.get("ticket") or st.get("ticket_mode", "optimal"))
         sponsor_id = str(body.get("sponsor") or st.get("sponsor_id", "sp_1"))
@@ -5893,7 +5981,6 @@ async def api_handle_action(request):
             }, headers=CORS_HEADERS)
 
         coin_delta = 0
-        # Если меняется спонсор и у него есть страховой залог
         if sponsor_id != st.get("sponsor_id") and sp_obj["deposit"] > 0 and st.get("sponsor_paid_date") != today_str:
             dep = sp_obj["deposit"]
             if user["balance"] < dep:
@@ -5908,7 +5995,7 @@ async def api_handle_action(request):
         if ticket == "vip":
             asyncio.create_task(db_manager.unlock_achievement(uid, "matchday_vip"))
 
-        dep_msg = f" (Внесен залог -{ abs(coin_delta) } FC)" if coin_delta < 0 else ""
+        dep_msg = f" (Внесен залог -{abs(coin_delta)} FC)" if coin_delta < 0 else ""
         return await _fast_delta_response(uid, {
             "message": f"🏟 Контракт и тариф арены сохранены!{dep_msg}",
             "coin_delta": coin_delta
@@ -5948,7 +6035,7 @@ async def api_handle_action(request):
             "UPDATE users SET balance = balance + $1, last_stadium_claim = $2 WHERE user_id = $3",
             float(total_inc), today_str, uid
         )
-        sp_txt = f" + Спонсор +{sp_bonus} FC" if quest_ok else f" (Условие спонсора не выполнено: 0 FC)"
+        sp_txt = f" + Спонсор +{sp_bonus} FC" if quest_ok else " (Условие спонсора не выполнено: 0 FC)"
         sh_txt = f" + Шоурум +{showroom_inc} FC" if showroom_inc > 0 else ""
         return await _fast_delta_response(uid, {
             "message": f"🏟 Касса «{st_cfg['name']}»: +{total_inc} FC ({t_note}{sp_txt}{sh_txt})!",
@@ -5994,7 +6081,7 @@ async def api_handle_action(request):
             "coin_delta": -cost
         })
 
-    # 9. РУЛЕТКА С ТОЧНЫМ ИНДЕКСОМ СЕКТОРА (0..6)
+    # 10. РУЛЕТКА С ТОЧНЫМ ИНДЕКСОМ СЕКТОРА (0..6) И ОТМЕТКОЙ КВЕСТА НОВИЧКА
     elif action == "spin_roulette":
         if user.get("last_spin") == today_str:
             return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
@@ -6010,6 +6097,12 @@ async def api_handle_action(request):
         ]
         chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
         await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
+
+        st["rookie_spin"] = 1
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        if chosen["coins"] >= 750:
+            push_live_ticker(f"🎰 {user['username']} выбил {chosen['name']} в ежедневной рулетке!")
+
         return await _fast_delta_response(uid, {
             "sector": chosen,
             "coin_delta": chosen["coins"]
@@ -6172,6 +6265,8 @@ async def api_handle_action(request):
                 if int(user.get("pvp_wins") or 0) + 1 >= 5:
                     asyncio.create_task(db_manager.unlock_achievement(uid, "pvp_gladiator"))
                 res_msg = f"🎉 ПОБЕДА ({g1}:{g2})! Выигрыш: +{win_profit} FC!"
+                if stake >= 500:
+                    push_live_ticker(f"⚽ {user['username']} обыграл Кипера Лиги в пенальти и забрал +{win_profit} FC!")
             elif g2 > g1:
                 c_delta = -stake
                 await db_manager.exec("UPDATE users SET balance = balance - $1, profit = profit - $1 WHERE user_id = $2", float(stake), uid)
@@ -6235,10 +6330,12 @@ async def api_handle_action(request):
             c_delta = -stake
             await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, d["creator_id"])
             res_headline = f"🏆 Победил {d['creator_name']} (+{bank} FC)!"
+            push_live_ticker(f"⚔️ {d['creator_name']} победил в PvP-дуэли и забрал банк {bank} FC!")
         elif g2 > g1:
             c_delta = round(bank - stake, 1)
             await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, uid)
             res_headline = f"🏆 Ты победил (+{bank} FC)!"
+            push_live_ticker(f"⚔️ {user['username']} победил в PvP-дуэли и забрал банк {bank} FC!")
         else:
             await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), d["creator_id"])
             await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), uid)
