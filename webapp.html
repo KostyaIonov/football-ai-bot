@@ -47,18 +47,25 @@
             100% { transform: translate3d(-8px, 105vh, 0) rotate(360deg); opacity: 0.1; }
         }
 
-        /* ВЕРХНЯЯ ШАПКА + АНИМАЦИЯ ВАЛЮТЫ */
+        /* ВЕРХНЯЯ ШАПКА + КНОПКА VIP + АНИМАЦИЯ ВАЛЮТЫ */
         .top-header {
             position: sticky; top: 0; z-index: 90; height: 58px;
             background: rgba(6, 12, 24, 0.95); backdrop-filter: blur(14px);
-            padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 11px; display: flex; align-items: center; justify-content: space-between;
         }
-        .user-meta { display: flex; flex-direction: column; gap: 2px; }
-        .user-name-row { display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 13.5px; flex-wrap: nowrap; }
+        .user-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .user-name-row { display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 13px; flex-wrap: nowrap; }
         .id-badge {
             font-size: 10px; font-weight: 700; color: var(--accent-ice);
             background: rgba(0, 176, 255, 0.14); border: 1px solid rgba(128, 216, 255, 0.35);
             padding: 2px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+        }
+        .vip-hub-btn {
+            font-size: 10px; font-weight: 900; color: #041019;
+            background: linear-gradient(135deg, #ffca28, #ff9100);
+            padding: 2px 7px; border-radius: 99px; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 3px;
+            box-shadow: 0 0 12px rgba(255, 202, 40, 0.45); white-space: nowrap;
         }
         .live-hub-btn {
             font-size: 10px; font-weight: 800; color: #fff;
@@ -67,18 +74,18 @@
             display: inline-flex; align-items: center; gap: 3px;
             box-shadow: 0 0 10px rgba(255, 82, 82, 0.45); white-space: nowrap;
         }
-        .user-rank { font-size: 11px; color: var(--text-muted); }
+        .user-rank { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .balance-pill {
             position: relative;
             background: linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(0, 176, 255, 0.16));
-            border: 1px solid rgba(0, 230, 118, 0.45); padding: 6px 11px; border-radius: 13px;
+            border: 1px solid rgba(0, 230, 118, 0.45); padding: 6px 10px; border-radius: 13px;
             text-align: right; box-shadow: 0 4px 14px rgba(0, 230, 118, 0.14);
-            transition: transform 0.18s ease; flex-shrink: 0;
+            transition: transform 0.16s ease; flex-shrink: 0; cursor: pointer;
         }
         .balance-pill.pulse { transform: scale(1.09); }
         .balance-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-ice); display: block; }
-        .balance-val { font-size: 14.5px; font-weight: 900; color: var(--accent-green); }
+        .balance-val { font-size: 14px; font-weight: 900; color: var(--accent-green); }
 
         .coin-float {
             position: absolute; right: 8px; bottom: -20px; font-size: 13px; font-weight: 900;
@@ -134,8 +141,7 @@
         .rookie-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
         .rk-step {
             background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass);
-            border-radius: 10px; padding: 7px 5px; text-align: center; font-size: 10px; font-weight: 700;
-            cursor: pointer;
+            border-radius: 10px; padding: 7px 5px; text-align: center; font-size: 10px; font-weight: 700; cursor: pointer;
         }
         .rk-step.done { border-color: var(--accent-green); background: rgba(0, 230, 118, 0.14); color: var(--accent-green); }
 
@@ -200,7 +206,8 @@
         .odds-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
         .odds-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
         .odds-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
-        .odd-btn { background: rgba(255, 255, 255, 0.055); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 11px; padding: 8px 4px; text-align: center; color: var(--text-main); cursor: pointer; }
+        .odd-btn { background: rgba(255, 255, 255, 0.055); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 11px; padding: 8px 4px; text-align: center; color: var(--text-main); cursor: pointer; transition: transform 0.08s; }
+        .odd-btn:active { transform: scale(0.95); }
         .odd-btn.selected { background: var(--accent-green) !important; border-color: var(--accent-green) !important; color: #041019 !important; }
         .odd-btn.selected .mkt, .odd-btn.selected .k { color: #041019 !important; }
         .odd-btn .mkt { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -212,8 +219,8 @@
         .radar-bar-track { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; display: flex; margin: 6px 0 10px; }
 
         /* КНОПКИ И ПОДВКЛАДКИ */
-        .btn-main { background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019; border: none; border-radius: 12px; padding: 11px 14px; font-weight: 800; font-size: 13px; cursor: pointer; text-align: center; }
-        .btn-main:active { transform: scale(0.97); }
+        .btn-main { background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019; border: none; border-radius: 12px; padding: 11px 14px; font-weight: 800; font-size: 13px; cursor: pointer; text-align: center; transition: transform 0.08s; }
+        .btn-main:active { transform: scale(0.96); }
         .btn-main.gold { background: linear-gradient(135deg, #ffca28, #ff9100); }
         .btn-main.ghost { background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-glass); }
         .btn-main.disabled { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); pointer-events: none; opacity: 0.6; }
@@ -257,7 +264,12 @@
         .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .collection-grid .fut-shield { width: 100%; }
 
-        /* ВКЛАДКА «📦 КОНТЕЙНЕРЫ» + АНИМАЦИЯ ВСКРЫТИЯ */
+        /* ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (12 КОНТЕЙНЕРОВ + СПРОС ДНЯ +15%) */
+        .demand-banner {
+            background: linear-gradient(135deg, rgba(0, 230, 118, 0.16), rgba(0, 176, 255, 0.14));
+            border: 1px solid rgba(0, 230, 118, 0.45); border-radius: 14px;
+            padding: 9px 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+        }
         .container-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
         .container-box {
             background: linear-gradient(155deg, rgba(22, 36, 62, 0.96), rgba(10, 17, 30, 0.98));
@@ -282,10 +294,15 @@
         .reveal-pop { animation: popReveal 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
         @keyframes popReveal { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
 
-        /* СПОНСОРЫ, 7-ДНЕВНЫЙ КАЛЕНДАРЬ И ЧЕК ПОБЕДЫ */
+        /* СПОНСОРЫ, VIP-КАРТОЧКИ, 7-ДНЕВНЫЙ КАЛЕНДАРЬ И ЧЕК ПОБЕДЫ */
         .sponsor-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 13px; padding: 10px 12px; margin-bottom: 7px; cursor: pointer; }
         .sponsor-card.active { border: 1.5px solid var(--accent-green); background: rgba(0,230,118,0.08); }
         .sponsor-card.locked { opacity: 0.55; }
+        .vip-plan-card {
+            background: linear-gradient(135deg, rgba(255, 202, 40, 0.14), rgba(19, 32, 56, 0.96));
+            border: 1.5px solid rgba(255, 202, 40, 0.45); border-radius: 15px;
+            padding: 12px; margin-bottom: 9px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+        }
         .streak-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
         .streak-day-box { background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 12px; padding: 9px 5px; text-align: center; }
         .streak-day-box.active { background: linear-gradient(145deg, rgba(0,230,118,0.22), rgba(0,176,255,0.18)); border: 1.5px solid var(--accent-green); box-shadow: 0 0 15px rgba(0,230,118,0.3); }
@@ -303,6 +320,16 @@
 
         .stadium-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 12px; border-radius: 13px; background: var(--bg-glass); border: 1px solid var(--border-glass); margin-bottom: 8px; }
         .stadium-row.owned { border-color: rgba(0, 230, 118, 0.38); background: rgba(0, 230, 118, 0.06); }
+
+        /* ПЕРЕКЛЮЧАТЕЛЬ СТРАХОВКИ КУПОНА (+10%) */
+        .insure-toggle-row {
+            background: rgba(0, 176, 255, 0.09); border: 1px solid rgba(128, 216, 255, 0.3);
+            border-radius: 11px; padding: 9px 12px; margin: 8px 0;
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+        }
+        .insure-toggle-row.active {
+            background: rgba(0, 230, 118, 0.14); border-color: var(--accent-green);
+        }
 
         /* КУПОН, МОДАЛЬНЫЕ ШТОРКИ И НИЖНЕЕ МЕНЮ (6 ВКЛАДОК) */
         .floating-slip-bar {
@@ -351,19 +378,19 @@
 
     <div id="toast"></div>
 
-    <!-- ВЕРХНЯЯ ШАПКА -->
+    <!-- ВЕРХНЯЯ ШАПКА С ЗОЛОТОЙ КНОПКОЙ VIP -->
     <header class="top-header">
         <div class="user-meta">
             <div class="user-name-row">
-                <span>🎄</span>
+                <span id="ui-vip-crown">🎄</span>
                 <span id="ui-username">Загрузка...</span>
                 <span class="id-badge" onclick="copyUserId()">ID: <span id="ui-user-id">...</span></span>
-                <span class="id-badge" style="background:rgba(255,202,40,0.18); border-color:rgba(255,202,40,0.45); color:var(--accent-gold);" onclick="openShareReceiptModal()">📸 Чек</span>
+                <span class="vip-hub-btn" onclick="openVipClubModal()">👑 VIP</span>
                 <span class="live-hub-btn" onclick="openLiveCenterWidget()">🔴 LIVE</span>
             </div>
             <div class="user-rank" id="ui-rank">🏅 Синхронизация...</div>
         </div>
-        <div class="balance-pill" id="header-balance-pill">
+        <div class="balance-pill" id="header-balance-pill" onclick="openVipClubModal()">
             <span class="balance-label">❄️ Банк каппера</span>
             <span class="balance-val" id="ui-balance">0 FC</span>
         </div>
@@ -379,7 +406,7 @@
     <!-- БЕГУЩАЯ СТРОКА ПРЯМОГО ЭФИРА ПОБЕД И НАХОДОК -->
     <div class="ticker-wrap">
         <div class="ticker-move" id="live-ticker-bar">
-            <span class="ticker-item">🔥 Добро пожаловать в новогоднее обновление AI_BET_BOT! Вскрывай контейнеры до 100 000 FC и забирай +25% к экспрессам!</span>
+            <span class="ticker-item">🔥 Добро пожаловать в AI_BET_BOT! 12 контейнеров до 300 000 FC, Спрос дня +15% и VIP-Клуб привилегий!</span>
         </div>
     </div>
 
@@ -388,12 +415,12 @@
         <div class="card" id="bonus-banner" style="display:none; align-items:center; justify-content:space-between; padding:11px 14px; border-color:var(--accent-gold); cursor:pointer;" onclick="openStreakCalendarModal()">
             <div>
                 <div style="font-weight:800; font-size:13px;">🎁 Серия ежедневных входов (7 дней)</div>
-                <div style="font-size:11px; color:var(--text-muted);" id="ui-bonus-desc">Нажми, чтобы открыть календарь наград</div>
+                <div style="font-size:11px; color:var(--text-muted);" id="ui-bonus-desc">От +200 до +3 500 FC • Нажми, чтобы забрать</div>
             </div>
-            <button class="btn-main gold" style="padding:8px 13px;">Открыть</button>
+            <button class="btn-main gold" style="padding:8px 13px;">Забрать</button>
         </div>
 
-        <!-- СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +2 500 FC + КАРТА FUT) -->
+        <!-- СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +1 000 FC + КАРТА FUT) -->
         <div class="rookie-card" id="rookie-quest-card" style="display:none;"></div>
 
         <div class="promo-row">
@@ -444,7 +471,7 @@
                     <b style="font-size:15px;">⚽ Зимняя серия пенальти</b>
                     <span style="font-size:12px; color:var(--accent-gold); font-weight:800;">Побед: <span id="ui-pvp-wins">0</span></span>
                 </div>
-                <div style="font-size:11px; color:var(--text-muted);">Твоя ставка (от 50 FC):</div>
+                <div style="font-size:11px; color:var(--text-muted);">Твоя ставка (от 50 FC • Комиссия 5%):</div>
                 <input type="number" id="pvp-stake-input" class="stake-input" value="250" min="50">
                 <div class="preset-chips" style="grid-template-columns:repeat(4,1fr);">
                     <button class="chip-btn" onclick="document.getElementById('pvp-stake-input').value=100">100</button>
@@ -594,13 +621,13 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 4: КОНТЕЙНЕРЫ, РЕСТАВРАЦИЯ И P2P-БИРЖА (СТАТИЧЕСКАЯ ВЕРСТКА) ==================== -->
+    <!-- ==================== ВКЛАДКА 4: 12 КОНТЕЙНЕРОВ (84 ПРЕДМЕТА), СПРОС ДНЯ +15% И P2P-БИРЖА ==================== -->
     <section id="tab-startup" class="tab-section">
-        <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.16), rgba(14,22,38,0.96)); border-color:rgba(255,202,40,0.4); padding:12px 14px;">
+        <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.16), rgba(14,22,38,0.96)); border-color:rgba(255,202,40,0.4); padding:12px 14px; margin-bottom:9px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <div style="font-size:15px; font-weight:900; color:var(--accent-gold);">📦 Портовый Аукцион & Склад</div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Вскрывай контейнеры до 100 000 FC, реставрируй и торгуйся!</div>
+                    <div style="font-size:15px; font-weight:900; color:var(--accent-gold);">📦 Портовый Аукцион (12 тиров)</div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">84 редких предмета от 1 000 до 300 000 FC!</div>
                 </div>
                 <div style="text-align:right;">
                     <span style="font-size:10px; color:var(--text-muted); display:block;">Чистый профит</span>
@@ -609,8 +636,17 @@
             </div>
         </div>
 
+        <!-- БАННЕР ПОВЫШЕННОГО СПРОСА ДНЯ В ПОРТУ (+15% К ОЦЕНКЕ) -->
+        <div class="demand-banner" id="port-demand-banner">
+            <div style="font-size:11.5px;">
+                <span style="color:var(--accent-green); font-weight:900;">📈 СПРОС ДНЯ (+15%):</span>
+                <b id="demand-cat-title" style="color:#fff; margin-left:4px;">💻 Электроника и ИИ</b>
+            </div>
+            <span style="font-size:10px; background:rgba(0,230,118,0.2); color:var(--accent-green); padding:2px 7px; border-radius:6px; font-weight:800;">+15% к оценке</span>
+        </div>
+
         <div class="sub-nav">
-            <div class="sub-nav-btn active" id="st-nav-port" onclick="switchStartupSub('port', this)">🚢 Порт (6)</div>
+            <div class="sub-nav-btn active" id="st-nav-port" onclick="switchStartupSub('port', this)">🚢 Порт (12)</div>
             <div class="sub-nav-btn" id="st-nav-storage" onclick="switchStartupSub('storage', this)">🔧 Склад (0/8)</div>
             <div class="sub-nav-btn" id="st-nav-p2p" onclick="switchStartupSub('p2p', this)">🌐 P2P-Биржа</div>
         </div>
@@ -634,19 +670,20 @@
         <div id="stadiums-list-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, АРХИВ И ТОП-10 ==================== -->
+    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, КАПИТАЛ ФОРБС, АРХИВ И ТОП-10 ==================== -->
     <section id="tab-profile" class="tab-section">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                 <div>
                     <div style="font-size:17px; font-weight:900;" id="p-username">Каппер</div>
                     <div style="font-size:12px; color:var(--accent-ice); cursor:pointer; margin-top:2px;" onclick="copyUserId()">
-                        📋 ID: <b id="p-id-val">...</b> (нажми для копирования)
+                        📋 ID: <b id="p-id-val">...</b> • <span style="color:var(--accent-gold);" onclick="event.stopPropagation(); openShareReceiptModal()">📸 Чек</span>
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:11px; color:var(--text-muted);">Ранг</div>
-                    <div style="font-size:12px; font-weight:800; color:var(--accent-gold);" id="p-rank">Новичок</div>
+                    <div style="font-size:10px; color:var(--text-muted);">💎 Капитал Форбс</div>
+                    <div style="font-size:13px; font-weight:900; color:var(--accent-gold);" id="p-forbes-val">0 FC</div>
+                    <div style="font-size:10.5px; color:var(--accent-ice); font-weight:700;" id="p-rank">Новичок</div>
                 </div>
             </div>
 
@@ -671,6 +708,10 @@
 
             <div id="p-booster-line" style="font-size:11px; color:var(--accent-green); margin-bottom:8px; display:none;"></div>
 
+            <button class="btn-main gold btn-block" style="margin-bottom:10px; padding:9px;" onclick="openVipClubModal()">
+                👑 Открыть VIP-Клуб Привилегий
+            </button>
+
             <div style="display:flex; gap:6px; margin-bottom:8px;">
                 <input type="text" id="nick-input" class="stake-input" style="margin:0; font-size:12px; padding:8px;" placeholder="Новый ник (3-16 симв.)">
                 <button class="btn-main" style="padding:8px 11px; font-size:11px;" onclick="saveNickname('custom')">Сохранить</button>
@@ -685,7 +726,7 @@
 
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-weight:800; font-size:13px;">🤝 Пригласи друга (+500 FC)</div>
+                <div style="font-weight:800; font-size:13px;">🤝 Пригласи друга (+500 FC после 1-й ставки)</div>
                 <div style="font-size:11px; color:var(--text-muted);">Приглашено друзей: <b id="p-refs" style="color:#fff;">0</b></div>
             </div>
             <button class="btn-main" style="padding:8px 12px; font-size:12px;" onclick="shareReferralLink()">📤 Пригласить</button>
@@ -726,6 +767,7 @@
         </div>
     </div>
 
+    <!-- КУПОН СТАВОК С ПЕРЕКЛЮЧАТЕЛЕМ СТРАХОВКИ (+10%) -->
     <div class="drawer-overlay" id="slip-drawer" onclick="handleOverlayClick(event, 'slip-drawer')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -734,6 +776,16 @@
             </div>
             <div id="slip-items-list"></div>
             <div id="drawer-exp-boost-box" style="background:rgba(255,202,40,0.1); border:1px solid rgba(255,202,40,0.35); border-radius:11px; padding:7px 11px; margin:8px 0; font-size:11px;"></div>
+
+            <!-- Переключатель платной страховки купона (+10% к сумме ставки) -->
+            <div class="insure-toggle-row" id="slip-insure-box" onclick="toggleSlipInsurance()">
+                <div>
+                    <div style="font-size:12px; font-weight:800;" id="slip-insure-title">🛡 Застраховать купон (Возврат 50% при проигрыше)</div>
+                    <div style="font-size:10.5px; color:var(--text-muted);">Стоимость страховки (+10%): <b style="color:var(--accent-ice);" id="slip-insure-cost">+25 FC</b></div>
+                </div>
+                <div style="font-size:16px; font-weight:900;" id="slip-insure-check">⬜</div>
+            </div>
+
             <div style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.35); border-radius:11px; padding:8px 12px; margin:8px 0 6px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:12px; color:#cbd5e1;">💰 Твой доступный баланс:</span>
                 <b style="font-size:14px; color:var(--accent-green);" id="drawer-user-balance">0 FC</b>
@@ -756,6 +808,17 @@
             </div>
             <button class="btn-main btn-block" id="btn-submit-slip" onclick="submitSlip()">✅ Заключить пари</button>
             <button class="btn-main ghost btn-block" onclick="closeSlipDrawer()">Свернуть купон</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: VIP-КЛУБ ПРИВИЛЕГИЙ (ПОКУПКА ЗА FC ОТ 20 000 FC) -->
+    <div class="drawer-overlay" id="vip-modal" onclick="handleOverlayClick(event, 'vip-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
+            <div class="sheet-header">
+                <b style="font-size:16px; color:var(--accent-gold);">👑 VIP-Клуб Привилегий</b>
+                <button class="close-x" onclick="document.getElementById('vip-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="vip-modal-body"></div>
         </div>
     </div>
 
@@ -876,24 +939,45 @@
             : (parseInt(urlParams.get('uid') || '0', 10));
         const INITIAL_VIEW = urlParams.get('view') || '';
 
-        // Встроенный резервный каталог 6 контейнеров (гарантирует 100% отрисовку витрины в любой ситуации)
+        // Резервный каталог всех 12 контейнеров (от 1 000 до 300 000 FC) для мгновенной отрисовки
         const DEFAULT_CONTAINERS_CATALOG = {
-            c_detroit: { id: 'c_detroit', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, винтажный инструмент и забытые заначки', max_win: '3 800 FC' },
-            c_rotterdam: { id: 'c_rotterdam', name: '⚓ Таможня Роттердама', price: 5000, ico: '🚢', desc: 'Конфискат портовой таможни: техника, часы и бренды', max_win: '18 000 FC' },
-            c_monaco: { id: 'c_monaco', name: '🏎 Паддок Монако Гран-При', price: 15000, ico: '🏁', desc: 'Гоночные болиды, карбоновые узлы и трофеи пилотов F1', max_win: '52 000 FC' },
-            c_silicon: { id: 'c_silicon', name: '💻 Бункер Кремниевой Долины', price: 35000, ico: '🛰️', desc: 'Забытые крипто-хранилища, квантовые чипы и прототипы ИИ', max_win: '125 000 FC' },
-            c_dubai: { id: 'c_dubai', name: '👑 Золотой Борт Шейха (Дубай)', price: 65000, ico: '🛩️', desc: 'Суперкары из пустыни, бриллиантовые часы и слитки', max_win: '235 000 FC' },
-            c_area51: { id: 'c_area51', name: '🛸 Секретный Сектор «Зона-51»', price: 100000, ico: '🌌', desc: 'Самый дорогой груз в мире: гиперкары, шедевры и артефакты', max_win: '380 000 FC' }
+            c_1: { id: 'c_1', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, винтажный инструмент и забытые заначки', max_win: '3 600 FC' },
+            c_2: { id: 'c_2', name: '🧳 Карго-Бокс Аэропорта', price: 2500, ico: '✈️', desc: 'Невостребованный VIP-багаж международных авиарейсов', max_win: '9 000 FC' },
+            c_3: { id: 'c_3', name: '⚓ Таможня Роттердама', price: 5000, ico: '🚢', desc: 'Конфискат европейского порта: техника, байки и бренды', max_win: '18 000 FC' },
+            c_4: { id: 'c_4', name: '🎸 Студия Abbey Road (Лондон)', price: 10000, ico: '🎙️', desc: 'Музыкальные реликвии, редкий винил и коллекционные гитары', max_win: '36 000 FC' },
+            c_5: { id: 'c_5', name: '⚽ Раздевалка Легенд Футбола', price: 20000, ico: '🏟️', desc: 'Музейные реликвии Чемпионатов Мира и финалов Лиги Чемпионов', max_win: '72 000 FC' },
+            c_6: { id: 'c_6', name: '🏎 Паддок Монако Гран-При', price: 35000, ico: '🏁', desc: 'Гоночные болиды, карбоновые узлы и трофеи пилотов Формулы-1', max_win: '125 000 FC' },
+            c_7: { id: 'c_7', name: '💻 Бункер Кремниевой Долины', price: 60000, ico: '🛰️', desc: 'Квантовые серверы, нейрочипы и забытые крипто-кошельки', max_win: '215 000 FC' },
+            c_8: { id: 'c_8', name: '🖼️ Закрытый Аукцион Сотбис', price: 95000, ico: '🏛️', desc: 'Музейные шедевры, яйца Фаберже и королевские драгоценности', max_win: '340 000 FC' },
+            c_9: { id: 'c_9', name: '👑 Золотой Борт Шейха (Дубай)', price: 135000, ico: '🛩️', desc: 'Гиперкары из пустыни, слитки 999 пробы и люксовые яхты', max_win: '480 000 FC' },
+            c_10: { id: 'c_10', name: '🏦 Швейцарское Крипто-Хранилище', price: 180000, ico: '🔐', desc: 'Альпийский бункер с холодными кошельками и банковскими резервами', max_win: '640 000 FC' },
+            c_11: { id: 'c_11', name: '🛸 Секретный Сектор «Зона-51»', price: 240000, ico: '👽', desc: 'Засекреченные военные разработки и внеземные артефакты', max_win: '860 000 FC' },
+            c_12: { id: 'c_12', name: '🌌 Орбитальный Ковчег Миллиардеров', price: 300000, ico: '🚀', desc: 'Финальный контейнер игры: космические станции, острова и сверхразум', max_win: '1 100 000 FC' }
         };
 
         const DEFAULT_STREAK_CALENDAR = [
-            { day: 1, coins: 250, booster: '', label: '+250 FC' },
-            { day: 2, coins: 400, booster: '', label: '+400 FC' },
-            { day: 3, coins: 650, booster: '', label: '+650 FC' },
-            { day: 4, coins: 1000, booster: '', label: '+1 000 FC' },
-            { day: 5, coins: 1500, booster: 'boost035', label: '+1 500 FC + ⚡ Буст' },
-            { day: 6, coins: 2200, booster: '', label: '+2 200 FC' },
-            { day: 7, coins: 4000, booster: 'insure50', label: '🎁 +4 000 FC + 🛡 Страховка 50%' }
+            { day: 1, coins: 200, booster: '', label: '+200 FC' },
+            { day: 2, coins: 350, booster: '', label: '+350 FC' },
+            { day: 3, coins: 550, booster: '', label: '+550 FC' },
+            { day: 4, coins: 850, booster: '', label: '+850 FC' },
+            { day: 5, coins: 1300, booster: 'boost035', label: '+1 300 FC + ⚡ Буст +0.35' },
+            { day: 6, coins: 2000, booster: '', label: '+2 000 FC' },
+            { day: 7, coins: 3500, booster: 'insure50', label: '🎁 +3 500 FC + 🛡 Страховка 50%' }
+        ];
+
+        const DEFAULT_VIP_PLANS = {
+            vip_3d: { id: 'vip_3d', days: 3, price: 20000, title: '👑 VIP-Статус на 3 дня', sub: 'Идеально на тур еврокубков' },
+            vip_14d: { id: 'vip_14d', days: 14, price: 65000, title: '👑 VIP-Статус на 14 дней', sub: 'Выгода 30% • 2 недели привилегий' },
+            vip_30d: { id: 'vip_30d', days: 30, price: 120000, title: '👑 VIP-Магнат на 30 дней', sub: 'Максимальная выгода на весь месяц' }
+        };
+
+        const DEFAULT_VIP_BENEFITS = [
+            '⚡ <b>+0.15 к коэффициенту</b> каждого Ординара и Экспресса автоматически',
+            '📦 <b>Скидка 10% на покупку всех 12 Контейнеров</b> в Портовом Аукционе',
+            '🔧 <b>Шанс успешной реставрации 84%</b> (вместо 72%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>',
+            '🌐 <b>0% комиссии на P2P-Бирже</b> при продаже находок другим игрокам',
+            '🏟 <b>Подписание любых спонсоров без залога</b> + удвоенный бонус ранга',
+            '👑 <b>Золотая корона VIP</b> рядом с твоим ником в Топ-10 и прямой трансляции'
         ];
 
         const DEFAULT_SPONSORS = [
@@ -918,6 +1002,7 @@
         let IS_SPINNING = false;
         let IS_OPENING_BOX = false;
         let IS_SECRET_BET = false;
+        let IS_INSURE_PAID = false;
         let FIRST_LOAD_DONE = false;
         let STREAK_POPUP_SHOWN = false;
         let IS_LOADING_STATE = false;
@@ -941,7 +1026,6 @@
             window._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2800);
         }
 
-        /* АНИМАЦИЯ ВЗЛЕТАЮЩИХ МОНЕТ (+FC / -FC) В ШАПКЕ */
         function triggerCoinFloat(delta) {
             const num = Math.round(Number(delta || 0));
             if (!num) return;
@@ -1039,11 +1123,11 @@
             }
         }
 
-        /* СВЕРХБЫСТРЫЙ DELTA-SYNC ЗАПРОС (БЕЗ ПОВТОРНОЙ ПЕРЕКАЧКИ 150 КБ) */
+        /* МГНОВЕННЫЙ ЗАПРОС СЕРВЕРА (DELTA-SYNC ЗА 1 ПАКЕТ) */
         async function apiAction(payload, skipAutoRender = false) {
             for (let attempt = 0; attempt < 2; attempt++) {
                 const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 14000);
+                const timer = setTimeout(() => controller.abort(), 12000);
                 try {
                     const res = await fetch('/api/action', {
                         method: 'POST',
@@ -1057,6 +1141,7 @@
                         if (data.ok && APP_STATE) {
                             if (data.state) APP_STATE = data.state;
                             if (data.user) APP_STATE.user = data.user;
+                            if (data.daily_demand) APP_STATE.daily_demand = data.daily_demand;
                             if (data.live_ticker) APP_STATE.live_ticker = data.live_ticker;
                             if (data.p2p_market) APP_STATE.p2p_market = data.p2p_market;
                             if (data.active_bets) APP_STATE.active_bets = data.active_bets;
@@ -1078,7 +1163,7 @@
                 } catch (e) {
                     clearTimeout(timer);
                     if (attempt === 0) {
-                        await new Promise(r => setTimeout(r, 150));
+                        await new Promise(r => setTimeout(r, 120));
                         continue;
                     }
                 }
@@ -1098,7 +1183,7 @@
             try {
                 for (let attempt = 0; attempt < 2; attempt++) {
                     const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 14000);
+                    const timer = setTimeout(() => controller.abort(), 12000);
                     try {
                         const resp = await fetch('/api/state/' + CURRENT_UID, { signal: controller.signal });
                         clearTimeout(timer);
@@ -1122,7 +1207,7 @@
                     } catch (e) {
                         clearTimeout(timer);
                         if (attempt === 0) {
-                            await new Promise(r => setTimeout(r, 180));
+                            await new Promise(r => setTimeout(r, 140));
                             continue;
                         }
                         if (!silent) showToast('Синхронизация с сервером...', true);
@@ -1133,11 +1218,12 @@
             }
         }
 
-        /* МГНОВЕННОЕ ОБНОВЛЕНИЕ ДАННЫХ ИГРОКА */
         function renderFastDelta() {
             if (!APP_STATE) return;
             const u = APP_STATE.user || {};
 
+            const crownEl = document.getElementById('ui-vip-crown');
+            if (crownEl) crownEl.textContent = u.is_vip ? '👑' : '🎄';
             document.getElementById('ui-username').textContent = u.username || 'Каппер';
             document.getElementById('ui-user-id').textContent = u.user_id || CURRENT_UID;
             document.getElementById('ui-rank').textContent = (u.rank || 'Новичок') + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
@@ -1149,7 +1235,7 @@
             const bonusBanner = document.getElementById('bonus-banner');
             if (u.can_claim_bonus) {
                 bonusBanner.style.display = 'flex';
-                document.getElementById('ui-bonus-desc').textContent = `День ${u.streak_day || 1}/7 • Нажми, чтобы забрать награду!`;
+                document.getElementById('ui-bonus-desc').textContent = `День ${u.streak_day || 1}/7 • От +200 до +3 500 FC!`;
             } else {
                 bonusBanner.style.display = 'none';
             }
@@ -1160,6 +1246,10 @@
             renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.secret_bet_offer, APP_STATE.stadium_sponsors || DEFAULT_SPONSORS);
             renderProfileTab(u);
             renderSlipUI();
+
+            if (document.getElementById('vip-modal').classList.contains('show')) {
+                renderVipClubModalBody();
+            }
         }
 
         function renderAll() {
@@ -1189,16 +1279,76 @@
             }
         }
 
-        /* ==================== ЖИВАЯ ЛЕНТА ЗАНОСОВ И КВЕСТ НОВИЧКА ==================== */
+        /* ==================== ОКНО VIP-КЛУБА ПРИВИЛЕГИЙ (ОТ 20 000 FC) ==================== */
+        function openVipClubModal() {
+            haptic('medium');
+            renderVipClubModalBody();
+            document.getElementById('vip-modal').classList.add('show');
+        }
+
+        function renderVipClubModalBody() {
+            const box = document.getElementById('vip-modal-body');
+            if (!box) return;
+            const u = (APP_STATE && APP_STATE.user) ? APP_STATE.user : {};
+            const plans = (APP_STATE && APP_STATE.vip_plans) ? APP_STATE.vip_plans : DEFAULT_VIP_PLANS;
+            const benefits = (APP_STATE && APP_STATE.vip_benefits) ? APP_STATE.vip_benefits : DEFAULT_VIP_BENEFITS;
+
+            const statusBanner = u.is_vip
+                ? `<div class="card" style="background:rgba(0,230,118,0.12); border-color:var(--accent-green); text-align:center; padding:10px;">
+                     <b style="color:var(--accent-green); font-size:13px;">👑 У тебя активен VIP-Статус!</b><br>
+                     <span style="font-size:11px; color:#cbd5e1;">Осталось дней: <b>${u.vip_days_left > 500 ? 'Безлимит' : u.vip_days_left + ' дн.'}</b> (При покупке дни суммируются)</span>
+                   </div>`
+                : `<div class="card" style="background:rgba(255,202,40,0.08); border-color:rgba(255,202,40,0.35); text-align:center; padding:10px;">
+                     <span style="font-size:12px; color:#e2e8f0;">Твой статус: <b>Обычный каппер</b> • Доступный банк: <b style="color:var(--accent-green);">${formatFC(u.balance)}</b></span>
+                   </div>`;
+
+            const benefitsHtml = benefits.map(b => `
+                <div style="font-size:11.5px; color:#f1f5f9; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.06); line-height:1.35;">
+                    ${b}
+                </div>
+            `).join('');
+
+            const plansHtml = Object.values(plans).map(p => `
+                <div class="vip-plan-card">
+                    <div>
+                        <div style="font-size:13.5px; font-weight:900; color:var(--accent-gold);">${p.title}</div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${p.sub}</div>
+                    </div>
+                    <button class="btn-main gold" style="padding:9px 13px; font-size:12px; white-space:nowrap;" onclick="buyVipPlanFC('${p.id}')">
+                        Купить<br>${formatFC(p.price)}
+                    </button>
+                </div>
+            `).join('');
+
+            box.innerHTML = `
+                ${statusBanner}
+                <div class="card" style="padding:11px 13px; margin-bottom:12px;">
+                    <div style="font-size:12px; font-weight:900; color:var(--accent-gold); margin-bottom:6px;">✨ ПОЛНЫЙ СПИСОК ПРИВИЛЕГИЙ VIP-КЛУБА:</div>
+                    ${benefitsHtml}
+                </div>
+                <div class="section-title" style="font-size:13px; margin-top:4px;">💳 Выбери тариф активации за FC:</div>
+                ${plansHtml}
+            `;
+        }
+
+        async function buyVipPlanFC(planId) {
+            haptic('medium');
+            const res = await apiAction({ action: 'buy_vip_fc', plan_id: planId });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            renderVipClubModalBody();
+        }
+
+        /* ==================== ЖИВАЯ ЛЕНТА ЗАНОСОВ И КВЕСТ НОВИЧКА (+1 000 FC + КАРТА) ==================== */
         function renderLiveTickerBar() {
             const bar = document.getElementById('live-ticker-bar');
             if (!bar || !APP_STATE) return;
             const list = (APP_STATE.live_ticker && APP_STATE.live_ticker.length)
                 ? APP_STATE.live_ticker
                 : [
-                    '🔥 Вскрывай портовые контейнеры до 100 000 FC и торгуйся со скупщиками до +65%!',
-                    '⚡ Собирай экспрессы от 3 до 6 матчей и получай автоматический Экспресс-Буст до +25%!',
-                    '🎁 Заходи в игру 7 дней подряд и забирай сундук на +4 000 FC и Страховку 50%!'
+                    '🔥 Вскрывай 12 портовых контейнеров до 300 000 FC и лови Спрос дня +15%!',
+                    '👑 Активируй VIP-Статус за FC: +0.15 к кэфам, скидка 10% на контейнеры и 84% реставрация!',
+                    '🎁 Заходи в игру 7 дней подряд и забирай от +200 до +3 500 FC!'
                 ];
             bar.innerHTML = list.map(t => `<span class="ticker-item">${t}</span>`).join('');
         }
@@ -1214,13 +1364,13 @@
             box.style.display = 'block';
             const doneCnt = rq.done_count || 0;
             const claimBtn = doneCnt >= 3
-                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimRookieQuestReward()">🎁 Забрать +2 500 FC + Золотую карту FUT!</button>`
-                : `<div style="font-size:10.5px; color:var(--text-muted); text-align:center;">Нажми на любой невыполненный шаг, чтобы перейти к нему и забрать <b>+2 500 FC + Золотую карту FUT</b>!</div>`;
+                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimRookieQuestReward()">🎁 Забрать +1 000 FC + Карточку FUT!</button>`
+                : `<div style="font-size:10.5px; color:var(--text-muted); text-align:center;">Выполни 3 быстрых шага, чтобы забрать стартовый приз <b>+1 000 FC + Карточку FUT</b>!</div>`;
 
             box.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <b style="font-size:13px; color:var(--accent-green);">🚀 Стартовый квест новичка (${doneCnt}/3)</b>
-                    <span style="font-size:11px; font-weight:800; color:var(--accent-gold);">Награда: +2 500 FC + 🥇 FUT</span>
+                    <span style="font-size:11px; font-weight:800; color:var(--accent-gold);">Приз: +1 000 FC + 🃏 FUT</span>
                 </div>
                 <div class="rookie-steps">
                     <div class="rk-step ${rq.bet ? 'done' : ''}" onclick="window.scrollTo({top:280, behavior:'smooth'})">
@@ -1246,7 +1396,7 @@
                 const c = res.card;
                 document.getElementById('pack-modal-card-preview').innerHTML = `
                     <div class="fut-shield tier-2 reveal-pop" style="width:145px;">
-                        <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 91}</span></div>
+                        <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 90}</span></div>
                         <div class="shield-avatar" style="font-size:32px;">${c.nation || '⭐'}</div>
                         <div class="shield-name" style="font-size:12px;">${c.name}</div>
                         <div class="shield-buff" style="font-size:10px;">${c.desc}</div>
@@ -1257,7 +1407,7 @@
             }
         }
 
-        /* ==================== ВСПЛЫВАЮЩИЙ 7-ДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ ==================== */
+        /* ==================== 7-ДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ (200 ➔ 3 500 FC) ==================== */
         function openStreakCalendarModal() {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
@@ -1280,7 +1430,7 @@
                 `;
             }).join('');
 
-            const d7 = cal[6] || { day: 7, label: '🎁 +4 000 FC + 🛡 Страховка 50%' };
+            const d7 = cal[6] || { day: 7, label: '🎁 +3 500 FC + 🛡 Страховка 50%' };
             const isD7Cur = (curDay === 7 && canClaim);
             const isD7Done = (curDay === 7 && !canClaim);
 
@@ -1290,7 +1440,7 @@
 
             document.getElementById('streak-modal-body').innerHTML = `
                 <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px; text-align:center;">
-                    Заходи в игру каждый день без пропусков — награда растёт вплоть до супер-сундука 7-го дня!
+                    Заходи в игру каждый день без пропусков — награда растёт от +200 до +3 500 FC!
                 </div>
                 <div class="streak-grid">${daysHtml}</div>
                 <div class="streak-day-box ${isD7Cur ? 'active' : (isD7Done ? 'done' : '')}" style="padding:12px; border-color:var(--accent-gold); margin-bottom:12px;">
@@ -1309,13 +1459,22 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (АНИМАЦИЯ, РЕСТАВРАЦИЯ, ТОРГ И P2P) ==================== */
+        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (12 КОНТЕЙНЕРОВ, 84 ПРЕДМЕТА, СПРОС ДНЯ +15%) ==================== */
         function renderStartupTab(u) {
+            const isVip = Boolean(u && u.is_vip);
+            const maxStorage = isVip ? 12 : 8;
+            const maxShowroom = isVip ? 4 : 3;
+            const restoreChance = isVip ? 84 : 72;
+
             const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
             const rawCat = (APP_STATE && APP_STATE.containers_catalog && Object.keys(APP_STATE.containers_catalog).length)
                 ? APP_STATE.containers_catalog
                 : DEFAULT_CONTAINERS_CATALOG;
             const p2pList = (APP_STATE && APP_STATE.p2p_market) ? APP_STATE.p2p_market : [];
+            const demand = (APP_STATE && APP_STATE.daily_demand) ? APP_STATE.daily_demand : { title: '💻 Электроника и ИИ', bonus_pct: 15 };
+
+            const demandTitleEl = document.getElementById('demand-cat-title');
+            if (demandTitleEl) demandTitleEl.textContent = demand.title;
 
             const profEl = document.getElementById('st-total-profit');
             if (profEl) {
@@ -1324,28 +1483,30 @@
             }
 
             const storageNav = document.getElementById('st-nav-storage');
-            if (storageNav) storageNav.textContent = `🔧 Склад (${st.storage.length}/8)`;
+            if (storageNav) storageNav.textContent = `🔧 Склад (${st.storage.length}/${maxStorage})`;
             const p2pNav = document.getElementById('st-nav-p2p');
             if (p2pNav) p2pNav.textContent = `🌐 P2P-Биржа (${p2pList.length})`;
 
-            // 1. Витрина 6 контейнеров в Порту
+            // 1. Витрина всех 12 контейнеров (от 1 000 до 300 000 FC)
             const portBox = document.getElementById('startup-sub-port');
             if (portBox) {
                 const cardsHtml = Object.values(rawCat).map(c => {
-                    const tierClass = c.price >= 65000 ? 'tier-ultra' : (c.price >= 15000 ? 'tier-high' : '');
-                    const btnCls = c.price >= 35000 ? 'btn-main gold' : 'btn-main';
+                    const tierClass = c.price >= 135000 ? 'tier-ultra' : (c.price >= 20000 ? 'tier-high' : '');
+                    const btnCls = c.price >= 60000 ? 'btn-main gold' : 'btn-main';
+                    const finalPrice = isVip ? Math.round(c.price * 0.90) : c.price;
+                    const priceLabel = isVip ? `${formatFC(finalPrice)} (-10%)` : formatFC(c.price);
                     return `
                         <div class="container-box ${tierClass}">
                             <div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-size:28px;">${c.ico}</span>
-                                    <span style="font-size:9.5px; font-weight:800; color:var(--accent-gold); background:rgba(255,202,40,0.14); padding:2px 6px; border-radius:6px;">Куш до ${c.max_win}</span>
+                                    <span style="font-size:27px;">${c.ico}</span>
+                                    <span style="font-size:9px; font-weight:800; color:var(--accent-gold); background:rgba(255,202,40,0.14); padding:2px 5px; border-radius:6px;">До ${c.max_win}</span>
                                 </div>
-                                <div style="font-size:13px; font-weight:900; margin-bottom:4px; line-height:1.2;">${c.name}</div>
+                                <div style="font-size:12.5px; font-weight:900; margin-bottom:4px; line-height:1.2;">${c.name}</div>
                                 <div style="font-size:10px; color:var(--text-muted); margin-bottom:10px; line-height:1.3;">${c.desc}</div>
                             </div>
-                            <button class="${btnCls}" style="width:100%; padding:9px 6px; font-size:11px;" onclick="openContainerBox('${c.id}', '${escQuotes(c.name)}', '${c.ico}')">
-                                🔓 Вскрыть • ${formatFC(c.price)}
+                            <button class="${btnCls}" style="width:100%; padding:9px 5px; font-size:10.5px;" onclick="openContainerBox('${c.id}', '${escQuotes(c.name)}', '${c.ico}')">
+                                🔓 ${priceLabel}
                             </button>
                         </div>
                     `;
@@ -1353,17 +1514,18 @@
                 portBox.innerHTML = `<div class="container-grid">${cardsHtml}</div>`;
             }
 
-            // 2. Склад, Прозрачная математика реставрации, Торг и Личный Шоурум
+            // 2. Склад, Реставрация, Живой торг и Личный Шоурум
             const storBox = document.getElementById('startup-sub-storage');
             if (storBox) {
-                const showroomSlots = [0, 1, 2].map(idx => {
+                const slotIndices = isVip ? [0, 1, 2, 3] : [0, 1, 2];
+                const showroomSlots = slotIndices.map(idx => {
                     const item = st.showroom[idx];
                     if (!item) {
                         return `
                             <div class="fut-shield locked" style="width:100%; padding:10px 6px;">
-                                <div style="font-size:10px; color:var(--text-muted); font-weight:800;">ВИТРИНА #${idx + 1}</div>
+                                <div style="font-size:9.5px; color:var(--text-muted); font-weight:800;">ВИТРИНА #${idx + 1}</div>
                                 <div style="font-size:22px; margin:6px 0;">🏛</div>
-                                <div style="font-size:9px; color:var(--text-muted);">Пустой слот</div>
+                                <div style="font-size:9px; color:var(--text-muted);">Свободный слот</div>
                             </div>
                         `;
                     }
@@ -1380,16 +1542,19 @@
 
                 const rarNames = { 1: 'Обычный груз', 2: 'Редкая находка', 3: 'Эпический лот', 4: 'Легендарный Артефакт' };
                 const storageHtml = st.storage.length === 0
-                    ? `<div class="card" style="text-align:center; padding:22px; color:var(--text-muted); font-size:12px;">Твой склад пуст. Вскрой любой контейнер во вкладке «🚢 Порт» или купи находку у других игроков на P2P-Бирже!</div>`
+                    ? `<div class="card" style="text-align:center; padding:22px; color:var(--text-muted); font-size:12px;">Твой склад пуст. Вскрой любой из 12 контейнеров во вкладке «🚢 Порт» или купи находку на P2P-Бирже!</div>`
                     : st.storage.map(it => {
                         const canRestore = (it.restored_count || 0) < 2 && it.condition < 100;
                         const expVal = it.expected_restore || Math.round(it.value * 2.0);
+                        const demandBadge = it.is_in_demand
+                            ? `<span class="rarity-pill" style="background:rgba(0,230,118,0.2); color:var(--accent-green); margin-left:4px;">🔥 Спрос +15%</span>`
+                            : '';
                         return `
                             <div class="card" style="padding:12px; border-color:rgba(128,216,255,0.28);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
                                     <div style="font-size:30px;">${it.ico}</div>
                                     <div style="flex:1;">
-                                        <span class="rarity-pill rarity-${it.rarity || 1}">${rarNames[it.rarity || 1]}</span>
+                                        <span class="rarity-pill rarity-${it.rarity || 1}">${rarNames[it.rarity || 1]}</span>${demandBadge}
                                         <div style="font-size:14px; font-weight:900; margin-top:3px;">${it.name}</div>
                                         <div style="font-size:11px; color:var(--text-muted);">Состояние: <b style="color:#fff;">${it.condition}%</b> • Музей: <b style="color:var(--accent-ice);">+${it.show_inc} FC/д, +${it.show_odd} кэф</b></div>
                                     </div>
@@ -1405,7 +1570,7 @@
 
                                 <div style="display:grid; grid-template-columns:1.25fr 0.95fr; gap:6px; margin-bottom:8px;">
                                     ${canRestore
-                                        ? `<button class="btn-main" style="padding:7px 6px; font-size:10.5px; line-height:1.2;" onclick="restoreStartupItem('${it.uid}')">🔧 Реставрация (${formatFC(it.restore_cost)})<br><span style="font-size:9px; opacity:0.85;">Шанс 72% ➔ ~${formatFC(expVal)}</span></button>`
+                                        ? `<button class="btn-main" style="padding:7px 6px; font-size:10.5px; line-height:1.2;" onclick="restoreStartupItem('${it.uid}')">🔧 Реставрация (${formatFC(it.restore_cost)})<br><span style="font-size:9px; opacity:0.85;">Шанс ${restoreChance}% ➔ ~${formatFC(expVal)}</span></button>`
                                         : `<button class="btn-main disabled" style="padding:8px; font-size:11px;">✅ Макс. реставрация</button>`
                                     }
                                     <button class="btn-main ghost" style="padding:7px 6px; font-size:11px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="toShowroomItem('${it.uid}')">🏛 В Шоурум<br><span style="font-size:9px;">+${it.show_inc} FC/день</span></button>
@@ -1437,17 +1602,17 @@
                 storBox.innerHTML = `
                     <div class="card" style="padding:11px 12px; margin-bottom:12px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <b style="font-size:13px;">🏛 Личный Шоурум (Музей баффов)</b>
+                            <b style="font-size:13px;">🏛 Личный Шоурум (${st.showroom.length}/${maxShowroom})</b>
                             <span style="font-size:11px; color:var(--accent-green); font-weight:800;">+${st.showroom_daily_fc} FC/д • +${st.showroom_odd_boost} к кэфам</span>
                         </div>
-                        <div class="collection-grid">${showroomSlots}</div>
+                        <div class="collection-grid" style="grid-template-columns:repeat(${maxShowroom}, 1fr);">${showroomSlots}</div>
                     </div>
-                    <div class="section-title" style="font-size:13px;">🔧 Находки на складе (${st.storage.length}/8)</div>
+                    <div class="section-title" style="font-size:13px;">🔧 Находки на складе (${st.storage.length}/${maxStorage})</div>
                     ${storageHtml}
                 `;
             }
 
-            // 3. P2P-Биржа между реальными игроками
+            // 3. P2P-Биржа между реальными игроками (Комиссия 5% или 0% для VIP)
             const p2pBox = document.getElementById('startup-sub-p2p');
             if (p2pBox) {
                 if (!p2pList.length) {
@@ -1467,7 +1632,7 @@
                                 <div style="font-size:28px;">${it.ico}</div>
                                 <div style="flex:1;">
                                     <div style="font-size:13px; font-weight:900;">${it.name} <span style="font-size:10px; color:var(--accent-ice);">(${it.condition}%)</span></div>
-                                    <div style="font-size:11px; color:var(--text-muted);">Продавец: <b style="color:#fff;">${lot.seller_name}</b> • Оценка: ${formatFC(it.value)}</div>
+                                    <div style="font-size:11px; color:var(--text-muted);">Продавец: <b style="color:#fff;">${lot.seller_vip ? '👑 ' : ''}${lot.seller_name}</b> • Оценка: ${formatFC(it.value)}</div>
                                     <div style="font-size:10px; color:var(--accent-green);">🏛 Бафф в Шоуруме: +${it.show_inc} FC/д, +${it.show_odd} к кэфам</div>
                                 </div>
                                 <div>
@@ -1483,13 +1648,11 @@
             }
         }
 
-        /* 1.4-СЕКУНДНАЯ АНИМАЦИЯ ВСКРЫТИЯ КОНТЕЙНЕРА С ИНТРИГОЙ */
         async function openContainerBox(containerId, boxName = 'Контейнер', boxIco = '📦') {
             if (IS_OPENING_BOX) return;
             IS_OPENING_BOX = true;
             haptic('medium');
 
-            // Показываем анимацию взлома замков сразу при клике
             document.getElementById('pack-modal-card-preview').innerHTML = `
                 <div class="crate-shake-box">${boxIco}</div>
             `;
@@ -1502,7 +1665,7 @@
             const tStart = Date.now();
             const res = await apiAction({ action: 'startup_open_container', container_id: containerId }, true);
             const elapsed = Date.now() - tStart;
-            const waitLeft = Math.max(0, 1250 - elapsed);
+            const waitLeft = Math.max(0, 1150 - elapsed);
 
             setTimeout(() => {
                 IS_OPENING_BOX = false;
@@ -1524,7 +1687,7 @@
                     `;
                     document.getElementById('pack-modal-note').innerHTML = `
                         <b>${res.message}</b><br>
-                        <span style="font-size:11px; color:var(--accent-ice);">Находка доставлена на твой «🔧 Склад» — отреставрируй её в ~2 раза дороже или торгуйся со скупщиком!</span>
+                        <span style="font-size:11px; color:var(--accent-ice);">Находка доставлена на твой «🔧 Склад» — отреставрируй её или торгуйся со скупщиком!</span>
                     `;
                     switchStartupSub('storage', document.getElementById('st-nav-storage'));
                 }
@@ -1692,7 +1855,6 @@
                 const topBadge = m.is_top ? `<span class="badge-top">🔥 ТОП</span>` : '';
                 const favBadge = isFav ? `<span class="badge-top" style="color:var(--accent-green); border-color:var(--accent-green);">⭐ +10%</span>` : '';
 
-                // Таймер обратного отсчета для матчей в ближайшие 2 часа
                 let rightStatus = `<span>🕒 ${m.short_date}</span>`;
                 if (m.is_live) {
                     rightStatus = `<span class="live-badge"><span class="live-dot"></span>LIVE • ${m.live_detail}</span>`;
@@ -2021,7 +2183,7 @@
             document.getElementById('match-detail-modal').classList.remove('show');
         }
 
-        /* ==================== КУПОН СТАВОК С ПРОГРЕССИВНЫМ ЭКСПРЕСС-БУСТОМ ==================== */
+        /* ==================== КУПОН СТАВОК С ЭКСПРЕСС-БУСТОМ И ПЕРЕКЛЮЧАТЕЛЕМ СТРАХОВКИ (+10%) ==================== */
         function getClientExpressBoost(count) {
             if (count >= 6) return { mult: 1.25, pct: 25, nextTxt: '🔥 Максимальный Экспресс-Буст +25% активирован!' };
             if (count === 5) return { mult: 1.15, pct: 15, nextTxt: '🚀 Активен буст +15% (добавь ещё 1 матч для +25%!)' };
@@ -2095,6 +2257,12 @@
             document.getElementById('slip-mode-label').textContent = SLIP_ITEMS.length > 1 ? `• ⚡ Экспресс${boostBadge}` : '• ⚽ Ординар';
         }
 
+        function toggleSlipInsurance() {
+            haptic('light');
+            IS_INSURE_PAID = !IS_INSURE_PAID;
+            updatePotentialWin();
+        }
+
         function openSlipDrawer() {
             haptic('light');
             const isExp = SLIP_ITEMS.length > 1;
@@ -2140,6 +2308,7 @@
         function clearSlip() {
             SLIP_ITEMS = [];
             IS_SECRET_BET = false;
+            IS_INSURE_PAID = false;
             closeSlipDrawer();
             renderMatchesFeed();
             renderSlipUI();
@@ -2154,7 +2323,8 @@
         function setSlipAllIn() {
             haptic('medium');
             const uBal = (APP_STATE && APP_STATE.user) ? Math.floor(APP_STATE.user.balance) : 0;
-            document.getElementById('slip-stake-input').value = Math.max(10, uBal);
+            const maxStake = IS_INSURE_PAID ? Math.floor(uBal / 1.1) : uBal;
+            document.getElementById('slip-stake-input').value = Math.max(10, maxStake);
             updatePotentialWin();
         }
 
@@ -2162,6 +2332,17 @@
             const stake = parseInt(document.getElementById('slip-stake-input').value || '0', 10);
             const odd = calculateSlipOdd();
             document.getElementById('drawer-payout').textContent = formatFC(Math.round(stake * odd));
+
+            const insCost = Math.round(stake * 0.10);
+            const insBox = document.getElementById('slip-insure-box');
+            const insCheck = document.getElementById('slip-insure-check');
+            const insCostEl = document.getElementById('slip-insure-cost');
+            if (insCostEl) insCostEl.textContent = `+${insCost} FC (Итого к списанию: ${stake + (IS_INSURE_PAID ? insCost : 0)} FC)`;
+            if (insBox) {
+                if (IS_INSURE_PAID) insBox.classList.add('active');
+                else insBox.classList.remove('active');
+            }
+            if (insCheck) insCheck.textContent = IS_INSURE_PAID ? '✅' : '⬜';
         }
 
         async function submitSlip() {
@@ -2178,7 +2359,8 @@
                     action: 'submit_slip',
                     items: SLIP_ITEMS,
                     stake: stake,
-                    is_secret: IS_SECRET_BET
+                    is_secret: IS_SECRET_BET,
+                    insure_paid: IS_INSURE_PAID
                 });
                 if (!res.ok) return showToast(res.error, true);
                 clearSlip();
@@ -2438,12 +2620,13 @@
             haptic('success');
         }
 
-        /* ==================== АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ С ЗАЛОГАМИ ==================== */
+        /* ==================== АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ ==================== */
         function renderEmpireTab(u, catalog, secretOffer, sponsorsList) {
             const st = u.stadium_info || { name: 'Дворовая Коробка', cap: '500 зрителей', income: 100 };
             const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_1', deposit_paid: false, quest_done: false };
             const showroomInc = (u.startup && u.startup.showroom_daily_fc) ? u.startup.showroom_daily_fc : 0;
             const spArray = (sponsorsList && sponsorsList.length) ? sponsorsList : DEFAULT_SPONSORS;
+            const isVip = Boolean(u.is_vip);
 
             const claimBtn = u.can_claim_stadium
                 ? `<button class="btn-main btn-block" onclick="claimStadiumRevenue()">💰 Провести Матчдэй и собрать кассу</button>`
@@ -2452,7 +2635,7 @@
             const sponsorsCardsHtml = spArray.map(sp => {
                 const isLocked = (u.stadium_level || 1) < (sp.min_lvl || 1);
                 const isSelected = (prefs.sponsor === sp.id);
-                const depTxt = sp.deposit > 0 ? `Залог: ${formatFC(sp.deposit)}` : 'Без залога';
+                const depTxt = (sp.deposit > 0 && !isVip) ? `Залог: ${formatFC(sp.deposit)}` : 'Без залога';
                 let statusBadge = '';
                 if (isLocked) {
                     statusBadge = `<span style="font-size:10px; color:var(--text-muted);">🔒 С ${sp.min_lvl}-го ур. Арены</span>`;
@@ -2552,7 +2735,7 @@
             }).join('');
         }
 
-        /* ==================== ПРОФИЛЬ, АРХИВ И ЧЕК ПОБЕДЫ «📸 ПОДЕЛИТЬСЯ» ==================== */
+        /* ==================== ПРОФИЛЬ, КАПИТАЛ ФОРБС, АРХИВ И ЧЕК ПОБЕДЫ ==================== */
         function openShareReceiptModal(betId = 0) {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
@@ -2561,7 +2744,7 @@
             const wr = total > 0 ? Math.round((u.wins / total) * 100) : 0;
 
             let betBlock = '';
-            let shareCaption = `🎄 Мой статус в AI_BET_BOT: ${u.rank} | Банк: ${formatFC(u.balance)} | Винрейт: ${wr}%! Забирай +1 500 FC на старт:`;
+            let shareCaption = `🎄 Мой статус в AI_BET_BOT: ${u.rank} | Капитал Форбс: ${formatFC(u.forbes_capital || u.balance)} | Винрейт: ${wr}%! Забирай бонус на старт:`;
 
             if (betId) {
                 const b = (APP_STATE.archive_bets || []).find(x => x.bet_id === betId);
@@ -2573,23 +2756,23 @@
                             <div style="font-size:16px; font-weight:900; color:var(--accent-gold);">Выплата: +${formatFC(b.payout)}</div>
                         </div>
                     `;
-                    shareCaption = `🔥 Зашел купон #${b.bet_id} с кэфом ${b.odds} (+${formatFC(b.payout)}) в AI_BET_BOT! Залетай и забирай +1 500 FC на старт:`;
+                    shareCaption = `🔥 Зашел купон #${b.bet_id} с кэфом ${b.odds} (+${formatFC(b.payout)}) в AI_BET_BOT! Залетай в игру:`;
                 }
             }
 
             document.getElementById('share-receipt-body').innerHTML = `
                 <div class="receipt-card">
                     <div style="font-size:11px; color:var(--accent-ice); font-weight:800; letter-spacing:0.6px;">AI_BET_BOT • ОФИЦИАЛЬНАЯ КАРТОЧКА</div>
-                    <div style="font-size:20px; font-weight:900; margin:6px 0 2px;">${u.username}</div>
+                    <div style="font-size:20px; font-weight:900; margin:6px 0 2px;">${u.is_vip ? '👑 ' : ''}${u.username}</div>
                     <div style="font-size:12px; color:var(--accent-gold); font-weight:800; margin-bottom:10px;">${u.rank} ${u.favorite_club ? '• ⭐ ' + u.favorite_club : ''}</div>
                     ${betBlock}
                     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:rgba(0,0,0,0.3); padding:10px; border-radius:12px;">
-                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Банк</span><b style="color:var(--accent-green); font-size:13px;">${formatFC(u.balance)}</b></div>
-                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Винрейт</span><b style="color:#fff; font-size:13px;">${wr}% (${u.wins}В)</b></div>
-                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Сыгранность</span><b style="color:var(--accent-gold); font-size:13px;">${u.chemistry || 0}% FUT</b></div>
+                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Капитал Форбс</span><b style="color:var(--accent-gold); font-size:12.5px;">${formatFC(u.forbes_capital || u.balance)}</b></div>
+                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Винрейт</span><b style="color:#fff; font-size:12.5px;">${wr}% (${u.wins}В)</b></div>
+                        <div><span style="font-size:10px; color:var(--text-muted); display:block;">Сыгранность</span><b style="color:var(--accent-green); font-size:12.5px;">${u.chemistry || 0}% FUT</b></div>
                     </div>
                 </div>
-                <button class="btn-main gold btn-block" onclick="shareCustomText('${escQuotes(shareCaption)}')">📤 Отправить друзьям в Telegram (+500 FC за друга)</button>
+                <button class="btn-main gold btn-block" onclick="shareCustomText('${escQuotes(shareCaption)}')">📤 Отправить друзьям в Telegram</button>
             `;
             document.getElementById('share-receipt-modal').classList.add('show');
         }
@@ -2603,9 +2786,12 @@
         }
 
         function renderProfileTab(u) {
-            document.getElementById('p-username').textContent = u.username;
+            document.getElementById('p-username').textContent = (u.is_vip ? '👑 ' : '') + u.username;
             document.getElementById('p-id-val').textContent = u.user_id;
             document.getElementById('p-rank').textContent = u.rank;
+            const forbesEl = document.getElementById('p-forbes-val');
+            if (forbesEl) forbesEl.textContent = formatFC(u.forbes_capital || u.balance);
+
             const total = u.wins + u.losses;
             document.getElementById('p-winrate').textContent = total > 0 ? Math.round((u.wins / total) * 100) + '%' : '0%';
             document.getElementById('p-wins').textContent = u.wins;
@@ -2698,8 +2884,11 @@
                     <div style="font-size:12px;">
                         ${item.place <= 3 ? medals[item.place - 1] : `<b>${item.place}.</b>`}
                         <b>${item.name}</b> ${item.club ? `<span style="font-size:10px; color:var(--text-muted);">• ${item.club}</span>` : ''}
+                        <div style="font-size:10px; color:var(--accent-gold);">💎 Капитал Форбс: ${formatFC(item.forbes || item.balance)}</div>
                     </div>
-                    <div style="font-size:12px; font-weight:800; color:var(--accent-green);">${formatFC(item.balance)}</div>
+                    <div style="font-size:12px; font-weight:800; color:var(--accent-green); text-align:right;">
+                        ${formatFC(item.balance)}
+                    </div>
                 </div>
             `).join('');
             topBox.innerHTML = `<button class="btn-main ghost btn-block" style="margin-bottom:10px;" onclick="toggleIncognito()">${incogLabel}</button>${topRows}`;
@@ -2860,13 +3049,12 @@
 
             const wheel = document.getElementById('roulette-wheel');
             const sectorIdx = Number(res.sector && res.sector.idx !== undefined ? res.sector.idx : 0);
-            const sectorAngle = 360 / 7; // 51.42857° на каждый из 7 секторов
+            const sectorAngle = 360 / 7;
             const targetCenterMod = (360 - (sectorIdx * sectorAngle + sectorAngle / 2)) % 360;
             const currentMod = ((WHEEL_ROTATION % 360) + 360) % 360;
             let diffAngle = targetCenterMod - currentMod;
             if (diffAngle < 0) diffAngle += 360;
 
-            // 5 полных оборотов (1800°) + точная доводка на центр выпавшего сектора
             WHEEL_ROTATION += 1800 + diffAngle;
             wheel.style.transform = `rotate(${WHEEL_ROTATION}deg)`;
             document.getElementById('wheel-status-txt').textContent = '🎰 Барабан вращается...';
@@ -2995,11 +3183,13 @@
         }
 
         function shareReferralLink() {
-            shareCustomText('🎄 Залетай в новогодний AI_BET_BOT! Реальная линия, Контейнеры до 100к FC, 5-слотовый FUT и +1 500 FC на старт по моей ссылке:');
+            shareCustomText('🎄 Залетай в новогодний AI_BET_BOT! Реальная линия, 12 Контейнеров до 300к FC, 5-слотовый FUT и бонус за 1-ю ставку по моей ссылке:');
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Мгновенная отрисовка 12 контейнеров и разогрев сокета при старте
             renderStartupTab({});
+            fetch('/', { method: 'GET', cache: 'no-store' }).catch(() => {});
             loadAppState();
             setInterval(() => loadAppState(true), 60000);
         });
