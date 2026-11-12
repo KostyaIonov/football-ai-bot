@@ -4169,7 +4169,7 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + СВЕРХБЫСТРОЕ ЯДРО WEBAPP, КОНТЕЙНЕРЫ И P2P-БИРЖА =================
+# ================= ВЕБ-СЕРВЕР + СВЕРХБЫСТРОЕ ЯДРО WEBAPP, 12 КОНТЕЙНЕРОВ (84 ПРЕДМЕТА) И VIP-КЛУБ =================
 from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -4203,18 +4203,20 @@ globals()["main_menu_kb"] = minimalist_chat_menu_kb
 async def process_chat_only_profile(callback: CallbackQuery):
     uid = callback.from_user.id
     u = await db_manager.get_user(uid, callback.from_user.username)
-    rank_name, _ = get_user_rank_info(u["balance"], u["is_vip"])
+    st = parse_user_fut_state(u)
+    is_vip_now = is_user_vip_active(u, st)
+    rank_name, _ = get_user_rank_info(u["balance"], 1 if is_vip_now else 0)
     total = u["wins"] + u["losses"]
     wr = round((u["wins"] / total) * 100, 1) if total > 0 else 0.0
     text = (
         f"👤 <b>ЛИЧНЫЙ КАБИНЕТ КАППЕРА</b>\n\n"
-        f"<blockquote>🏷 Никнейм: <b>{u['username']}</b>\n"
+        f"<blockquote>🏷 Никнейм: <b>{'👑 ' if is_vip_now else ''}{u['username']}</b>\n"
         f"🆔 Твой ID: <code>{uid}</code> <i>(нажми для копирования)</i>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"💰 Баланс: <b><code>{round(u['balance'], 1)} FC</code></b>\n"
         f"📊 Статистика: <b>{u['wins']}В / {u['losses']}П ({wr}%)</b>\n"
         f"📈 Чистый профит: <b><code>{round(u['profit'], 1)} FC</code></b></blockquote>\n\n"
-        f"📱 <i>Все ставки, контейнеры, FUT-состав и арена доступны в Web-App по кнопке ниже!</i>"
+        f"📱 <i>Все ставки, 12 контейнеров, VIP-Клуб и арена доступны в Web-App по кнопке ниже!</i>"
     )
     await callback.message.edit_text(text, reply_markup=minimalist_chat_menu_kb(uid), parse_mode="HTML")
     await callback.answer()
@@ -4228,8 +4230,9 @@ async def process_chat_only_active_bets(callback: CallbackQuery):
     else:
         lines = []
         for b in bets[:8]:
+            ins_tag = " 🛡[Застрахован 50%]" if b.get("booster_used") == "insure50" else ""
             lines.append(
-                f"🎫 <b>Купон #{b['bet_id']}</b> (Кэф <code>{b['odds']}</code>)\n"
+                f"🎫 <b>Купон #{b['bet_id']}</b> (Кэф <code>{b['odds']}</code>){ins_tag}\n"
                 f"⚽ {b['match_title']}\n"
                 f"🎯 Исход: <code>{b['pick']}</code>\n"
                 f"💵 Ставка: <code>{b['amount']} FC</code> ➔ Выплата: <b><code>{round(b['amount']*b['odds'], 1)} FC</code></b>"
@@ -4404,12 +4407,14 @@ def translate_team_ru(name: str) -> str:
 
 globals()["translate_team"] = translate_team_ru
 
-# 3. БЕЗОПАСНЫЙ ПУЛ БАЗЫ ДАННЫХ
+# 3. УСТРАНЕНИЕ ЗАДЕРЖКИ ПЕРВОГО КЛИКА: RAM-КЭШ ПРОФИЛЯ + DB KEEP-ALIVE ПУЛ
 _orig_db_exec = db_manager.exec
 _orig_db_fetchrow = db_manager.fetchrow
 _orig_db_fetch = db_manager.fetch
 _orig_db_fetchval = db_manager.fetchval
+_orig_get_user = db_manager.get_user
 _DB_RECONNECT_LOCK = asyncio.Lock()
+RAM_USER_CACHE = {}  # {user_id: {"data": dict, "ts": float}}
 
 async def _safe_db_call(func, *args):
     for attempt in range(2):
@@ -4422,95 +4427,241 @@ async def _safe_db_call(func, *args):
                         import asyncpg
                         if db_manager.pg_pool:
                             try:
-                                await asyncio.wait_for(db_manager.pg_pool.close(), timeout=2.0)
+                                await asyncio.wait_for(db_manager.pg_pool.close(), timeout=1.5)
                             except Exception:
                                 pass
                         db_manager.pg_pool = await asyncpg.create_pool(
-                            DATABASE_URL, min_size=1, max_size=6,
-                            max_inactive_connection_lifetime=45.0, command_timeout=8.0, statement_cache_size=0
+                            DATABASE_URL, min_size=2, max_size=8,
+                            max_inactive_connection_lifetime=120.0, command_timeout=8.0, statement_cache_size=0
                         )
                     except Exception:
                         pass
-                await asyncio.sleep(0.04)
+                await asyncio.sleep(0.02)
             else:
                 raise e
 
-db_manager.exec = lambda q, *a: _safe_db_call(_orig_db_exec, q, *a)
+async def _cached_exec(query: str, *args):
+    res = await _safe_db_call(_orig_db_exec, query, *args)
+    if "users" in query.lower():
+        for a in args:
+            if isinstance(a, int) and a in RAM_USER_CACHE:
+                RAM_USER_CACHE.pop(a, None)
+    return res
+
+async def _fast_get_user(user_id: int, username: str = None, referrer_id: int = 0) -> dict:
+    now_f = now_msk().timestamp()
+    cached = RAM_USER_CACHE.get(user_id)
+    if cached and (now_f - cached["ts"] < 25.0):
+        return dict(cached["data"])
+    u = await _orig_get_user(user_id, username, referrer_id)
+    if u:
+        RAM_USER_CACHE[user_id] = {"data": dict(u), "ts": now_f}
+    return u
+
+db_manager.exec = _cached_exec
 db_manager.fetchrow = lambda q, *a: _safe_db_call(_orig_db_fetchrow, q, *a)
 db_manager.fetch = lambda q, *a: _safe_db_call(_orig_db_fetch, q, *a)
 db_manager.fetchval = lambda q, *a: _safe_db_call(_orig_db_fetchval, q, *a)
+db_manager.get_user = _fast_get_user
 
-# 4. РАЗДЕЛ «КОНТЕЙНЕРЫ, РЕСТАВРАЦИЯ И P2P-БИРЖА» (ДО 100 000 FC)
+# 4. 12 КОНТЕЙНЕРОВ (ОТ 1 000 ДО 300 000 FC) И 84 УНИКАЛЬНЫХ ПРЕДМЕТА + СПРОС ДНЯ (+15%)
+DEMAND_CATEGORIES = {
+    "tech": {"key": "tech", "title": "💻 Электроника и ИИ", "ico": "💻"},
+    "auto": {"key": "auto", "title": "🏎 Авто и Болиды", "ico": "🏎"},
+    "sport": {"key": "sport", "title": "⚽ Спорт и Трофеи", "ico": "⚽"},
+    "art": {"key": "art", "title": "💎 Искусство и Люкс", "ico": "💎"},
+    "crypto": {"key": "crypto", "title": "₿ Крипто и Финансы", "ico": "₿"},
+    "space": {"key": "space", "title": "🛸 Секретные Технологии", "ico": "🛸"}
+}
+
+def get_daily_port_demand() -> dict:
+    """Каждый день выбирает 1 категорию повышенного спроса (+15% к оценке и продаже)"""
+    day_seed = now_msk().timetuple().tm_yday
+    keys = list(DEMAND_CATEGORIES.keys())
+    chosen_k = keys[day_seed % len(keys)]
+    return {**DEMAND_CATEGORIES[chosen_k], "bonus_pct": 15, "mult": 1.15}
+
 CONTAINERS_CATALOG = {
-    "c_detroit": {
-        "id": "c_detroit", "name": "📦 Гараж в Детройте", "price": 1000, "ico": "🏚️",
-        "desc": "Старая электроника, винтажный инструмент и забытые заначки", "max_win": "3 800 FC",
+    "c_1": {
+        "id": "c_1", "name": "📦 Гараж в Детройте", "price": 1000, "ico": "🏚️",
+        "desc": "Старая электроника, винтажный инструмент и забытые заначки", "max_win": "3 600 FC",
         "items": [
-            {"id": "it_drill", "name": "🧰 Набор DeWalt Pro", "ico": "🧰", "base": 650, "rarity": 1, "show_inc": 40, "show_odd": 0.01},
-            {"id": "it_ps2", "name": "🎮 Консоль PS2 (Лимитка)", "ico": "🎮", "base": 950, "rarity": 1, "show_inc": 60, "show_odd": 0.01},
-            {"id": "it_jukebox", "name": "📻 Ретро-Джукбокс 1970", "ico": "📻", "base": 1350, "rarity": 2, "show_inc": 90, "show_odd": 0.02},
-            {"id": "it_safe1", "name": "🔐 Ржавый сейф инкассатора", "ico": "🔐", "base": 1850, "rarity": 2, "show_inc": 120, "show_odd": 0.02}
+            {"id": "c1_1", "name": "🧰 Перфоратор DeWalt Pro", "ico": "🧰", "cat": "tech", "base": 650, "rarity": 1, "show_inc": 35, "show_odd": 0.01},
+            {"id": "c1_2", "name": "🎮 Приставка PS2 Slim Limited", "ico": "🎮", "cat": "tech", "base": 850, "rarity": 1, "show_inc": 45, "show_odd": 0.01},
+            {"id": "c1_3", "name": "🛞 Литые диски BBS (Комплект)", "ico": "🛞", "cat": "auto", "base": 1050, "rarity": 1, "show_inc": 55, "show_odd": 0.01},
+            {"id": "c1_4", "name": "🥊 Автограф Майка Тайсона на перчатке", "ico": "🥊", "cat": "sport", "base": 1250, "rarity": 2, "show_inc": 70, "show_odd": 0.01},
+            {"id": "c1_5", "name": "📻 Ретро-Джукбокс 1972 года", "ico": "📻", "cat": "art", "base": 1500, "rarity": 2, "show_inc": 85, "show_odd": 0.02},
+            {"id": "c1_6", "name": "⚙️ Карбюратор V8 Ford Mustang", "ico": "⚙️", "cat": "auto", "base": 1750, "rarity": 2, "show_inc": 100, "show_odd": 0.02},
+            {"id": "c1_7", "name": "🔐 Ржавый сейф инкассатора", "ico": "🔐", "cat": "crypto", "base": 2100, "rarity": 3, "show_inc": 120, "show_odd": 0.02}
         ]
     },
-    "c_rotterdam": {
-        "id": "c_rotterdam", "name": "⚓ Таможня Роттердама", "price": 5000, "ico": "🚢",
-        "desc": "Конфискат портовой таможни: техника, часы и бренды", "max_win": "18 000 FC",
+    "c_2": {
+        "id": "c_2", "name": "🧳 Карго-Бокс Аэропорта", "price": 2500, "ico": "✈️",
+        "desc": "Невостребованный VIP-багаж международных авиарейсов", "max_win": "9 000 FC",
         "items": [
-            {"id": "it_mac", "name": "💻 Палета MacBook Pro M4", "ico": "💻", "base": 3400, "rarity": 1, "show_inc": 160, "show_odd": 0.02},
-            {"id": "it_tag", "name": "⌚ Хронограф TAG Heuer", "ico": "⌚", "base": 4800, "rarity": 2, "show_inc": 220, "show_odd": 0.03},
-            {"id": "it_asic", "name": "⚡ Серверная стойка ASIC", "ico": "⚡", "base": 6800, "rarity": 2, "show_inc": 310, "show_odd": 0.03},
-            {"id": "it_harley", "name": "🏍️ Чоппер Harley-Davidson", "ico": "🏍️", "base": 9200, "rarity": 3, "show_inc": 420, "show_odd": 0.04}
+            {"id": "c2_1", "name": "🧳 Дорожный кофр Louis Vuitton", "ico": "🧳", "cat": "art", "base": 1650, "rarity": 1, "show_inc": 80, "show_odd": 0.01},
+            {"id": "c2_2", "name": "🚁 Квадрокоптер DJI Mavic 3 Pro", "ico": "🚁", "cat": "tech", "base": 2100, "rarity": 1, "show_inc": 105, "show_odd": 0.02},
+            {"id": "c2_3", "name": "📷 Дальномерная камера Leica M6", "ico": "📷", "cat": "art", "base": 2650, "rarity": 2, "show_inc": 130, "show_odd": 0.02},
+            {"id": "c2_4", "name": "⌚ Швейцарский хронограф Tissot", "ico": "⌚", "cat": "art", "base": 3200, "rarity": 2, "show_inc": 155, "show_odd": 0.02},
+            {"id": "c2_5", "name": "🎾 Ракетка финала Уимблдона", "ico": "🎾", "cat": "sport", "base": 3800, "rarity": 2, "show_inc": 180, "show_odd": 0.02},
+            {"id": "c2_6", "name": "💻 Ноутбук Razer Blade 18", "ico": "💻", "cat": "tech", "base": 4400, "rarity": 3, "show_inc": 210, "show_odd": 0.03},
+            {"id": "c2_7", "name": "🪙 Кейс инвестиционного серебра", "ico": "🪙", "cat": "crypto", "base": 5200, "rarity": 3, "show_inc": 250, "show_odd": 0.03}
         ]
     },
-    "c_monaco": {
-        "id": "c_monaco", "name": "🏎 Паддок Монако Гран-При", "price": 15000, "ico": "🏁",
-        "desc": "Гоночные болиды, карбоновые узлы и трофеи пилотов F1", "max_win": "52 000 FC",
+    "c_3": {
+        "id": "c_3", "name": "⚓ Таможня Роттердама", "price": 5000, "ico": "🚢",
+        "desc": "Конфискат европейского порта: техника, байки и бренды", "max_win": "18 000 FC",
         "items": [
-            {"id": "it_carbon", "name": "🛞 Карбоновый обвес Ferrari", "ico": "🛞", "base": 10500, "rarity": 2, "show_inc": 480, "show_odd": 0.04},
-            {"id": "it_v8", "name": "⚙️ Мотор Porsche GT3 RS", "ico": "⚙️", "base": 14500, "rarity": 2, "show_inc": 620, "show_odd": 0.05},
-            {"id": "it_senna", "name": "🪖 Шлем Айртона Сенны (Оригинал)", "ico": "🪖", "base": 20500, "rarity": 3, "show_inc": 850, "show_odd": 0.06},
-            {"id": "it_f1car", "name": "🏎️ Шасси болида Формулы-1", "ico": "🏎️", "base": 27000, "rarity": 3, "show_inc": 1100, "show_odd": 0.07}
+            {"id": "c3_1", "name": "📱 Партия смартфонов iPhone 16 Pro", "ico": "📱", "cat": "tech", "base": 3400, "rarity": 1, "show_inc": 160, "show_odd": 0.02},
+            {"id": "c3_2", "name": "🛵 Итальянский скутер Vespa Primavera", "ico": "🛵", "cat": "auto", "base": 4300, "rarity": 2, "show_inc": 195, "show_odd": 0.02},
+            {"id": "c3_3", "name": "⌚ Часы TAG Heuer Monaco", "ico": "⌚", "cat": "art", "base": 5300, "rarity": 2, "show_inc": 230, "show_odd": 0.03},
+            {"id": "c3_4", "name": "⚡ Ферма асиков Antminer S21", "ico": "⚡", "cat": "crypto", "base": 6500, "rarity": 2, "show_inc": 280, "show_odd": 0.03},
+            {"id": "c3_5", "name": "🔊 Акустика Bang & Olufsen Gold", "ico": "🔊", "cat": "tech", "base": 7800, "rarity": 3, "show_inc": 340, "show_odd": 0.03},
+            {"id": "c3_6", "name": "🏍️ Чоппер Harley-Davidson Fat Boy", "ico": "🏍️", "cat": "auto", "base": 9200, "rarity": 3, "show_inc": 410, "show_odd": 0.04},
+            {"id": "c3_7", "name": "💎 Алмазный тубус Антверпена", "ico": "💎", "cat": "art", "base": 10800, "rarity": 3, "show_inc": 460, "show_odd": 0.04}
         ]
     },
-    "c_silicon": {
-        "id": "c_silicon", "name": "💻 Бункер Кремниевой Долины", "price": 35000, "ico": "🛰️",
-        "desc": "Забытые крипто-хранилища, квантовые чипы и прототипы ИИ", "max_win": "125 000 FC",
+    "c_4": {
+        "id": "c_4", "name": "🎸 Студия Abbey Road (Лондон)", "price": 10000, "ico": "🎙️",
+        "desc": "Музыкальные реликвии, редкий винил и коллекционные гитары", "max_win": "36 000 FC",
         "items": [
-            {"id": "it_h100", "name": "🧠 Кластер чипов Nvidia H200", "ico": "🧠", "base": 24500, "rarity": 2, "show_inc": 950, "show_odd": 0.06},
-            {"id": "it_ledger", "name": "🔑 Зашифрованный Ledger (2013 г.)", "ico": "🔑", "base": 34000, "rarity": 3, "show_inc": 1300, "show_odd": 0.08},
-            {"id": "it_quantum", "name": "⚛️ Квантовый процессор IBM", "ico": "⚛️", "base": 47000, "rarity": 3, "show_inc": 1750, "show_odd": 0.09},
-            {"id": "it_botproto", "name": "🤖 Андроид-прототип Tesla Optimus", "ico": "🤖", "base": 62000, "rarity": 4, "show_inc": 2200, "show_odd": 0.11}
+            {"id": "c4_1", "name": "🎛️ Ламповый пульт Neve Vintage", "ico": "🎛️", "cat": "tech", "base": 6800, "rarity": 2, "show_inc": 290, "show_odd": 0.03},
+            {"id": "c4_2", "name": "💿 Платиновый диск Queen (1975)", "ico": "💿", "cat": "art", "base": 8600, "rarity": 2, "show_inc": 350, "show_odd": 0.03},
+            {"id": "c4_3", "name": "🎸 Электрогитара Gibson Les Paul 1959", "ico": "🎸", "cat": "art", "base": 10800, "rarity": 2, "show_inc": 430, "show_odd": 0.04},
+            {"id": "c4_4", "name": "🎹 Синтезатор Moog Modular", "ico": "🎹", "cat": "tech", "base": 13200, "rarity": 3, "show_inc": 510, "show_odd": 0.04},
+            {"id": "c4_5", "name": "🚗 Классический Mini Cooper S", "ico": "🚗", "cat": "auto", "base": 15800, "rarity": 3, "show_inc": 590, "show_odd": 0.05},
+            {"id": "c4_6", "name": "🎤 Золотой микрофон Фредди Меркьюри", "ico": "🎤", "cat": "art", "base": 18500, "rarity": 3, "show_inc": 680, "show_odd": 0.05},
+            {"id": "c4_7", "name": "🏆 Оригинальная статуэтка Грэмми", "ico": "🏆", "cat": "art", "base": 21500, "rarity": 4, "show_inc": 780, "show_odd": 0.06}
         ]
     },
-    "c_dubai": {
-        "id": "c_dubai", "name": "👑 Золотой Борт Шейха (Дубай)", "price": 65000, "ico": "🛩️",
-        "desc": "Суперкары из пустыни, бриллиантовые часы и слитки", "max_win": "235 000 FC",
+    "c_5": {
+        "id": "c_5", "name": "⚽ Раздевалка Легенд Футбола", "price": 20000, "ico": "🏟️",
+        "desc": "Музейные реликвии Чемпионатов Мира и финалов Лиги Чемпионов", "max_win": "72 000 FC",
         "items": [
-            {"id": "it_rm", "name": "💎 Часы Richard Mille Tourbillon", "ico": "💎", "base": 46000, "rarity": 3, "show_inc": 1800, "show_odd": 0.09},
-            {"id": "it_goldbars", "name": "🪙 Кейс слитков Dubai Gold (999)", "ico": "🪙", "base": 64000, "rarity": 3, "show_inc": 2400, "show_odd": 0.11},
-            {"id": "it_lambo", "name": "🟡 Lamborghini Aventador SVJ", "ico": "🟡", "base": 88000, "rarity": 4, "show_inc": 3100, "show_odd": 0.14},
-            {"id": "it_yacht", "name": "🛥️ Супер-катер Brabus Shadow", "ico": "🛥️", "base": 115000, "rarity": 4, "show_inc": 3800, "show_odd": 0.16}
+            {"id": "c5_1", "name": "⚽ Мяч Финала ЛЧ с автографами", "ico": "⚽", "cat": "sport", "base": 13500, "rarity": 2, "show_inc": 520, "show_odd": 0.04},
+            {"id": "c5_2", "name": "👕 Футболка Зидана (Финал ЧМ-1998)", "ico": "👕", "cat": "sport", "base": 17500, "rarity": 2, "show_inc": 640, "show_odd": 0.05},
+            {"id": "c5_3", "name": "👟 Золотые бутсы Роналдиньо", "ico": "👟", "cat": "sport", "base": 21500, "rarity": 3, "show_inc": 760, "show_odd": 0.05},
+            {"id": "c5_4", "name": "🧤 Вратарские перчатки Льва Яшина", "ico": "🧤", "cat": "sport", "base": 26000, "rarity": 3, "show_inc": 890, "show_odd": 0.06},
+            {"id": "c5_5", "name": "🥇 Золотая медаль АПЛ (Invincibles)", "ico": "🥇", "cat": "sport", "base": 31000, "rarity": 3, "show_inc": 1050, "show_odd": 0.06},
+            {"id": "c5_6", "name": "👟 Именная награда «Золотая Бутса»", "ico": "👟", "cat": "sport", "base": 37000, "rarity": 4, "show_inc": 1220, "show_odd": 0.07},
+            {"id": "c5_7", "name": "🏆 Реплика «Золотого Мяча» France Football", "ico": "🏆", "cat": "sport", "base": 43000, "rarity": 4, "show_inc": 1400, "show_odd": 0.08}
         ]
     },
-    "c_area51": {
-        "id": "c_area51", "name": "🛸 Секретный Сектор «Зона-51»", "price": 100000, "ico": "🌌",
-        "desc": "Самый дорогой груз в мире: гиперкары, шедевры и артефакты", "max_win": "380 000 FC",
+    "c_6": {
+        "id": "c_6", "name": "🏎 Паддок Монако Гран-При", "price": 35000, "ico": "🏁",
+        "desc": "Гоночные болиды, карбоновые узлы и трофеи пилотов Формулы-1", "max_win": "125 000 FC",
         "items": [
-            {"id": "it_bugatti", "name": "🔵 Гиперкар Bugatti Chiron Pur Sport", "ico": "🔵", "base": 72000, "rarity": 3, "show_inc": 2800, "show_odd": 0.12},
-            {"id": "it_davinci", "name": "🖼️ Полотно эпохи Возрождения", "ico": "🖼️", "base": 98000, "rarity": 4, "show_inc": 3600, "show_odd": 0.15},
-            {"id": "it_satoshi", "name": "₿ Холодный диск Сатоши (50 BTC)", "ico": "₿", "base": 140000, "rarity": 4, "show_inc": 4500, "show_odd": 0.19},
-            {"id": "it_reactor", "name": "🛸 Антигравитационное ядро Зоны-51", "ico": "🛸", "base": 185000, "rarity": 4, "show_inc": 5500, "show_odd": 0.25}
+            {"id": "c6_1", "name": "🛞 Карбоновый обвес Ferrari SF", "ico": "🛞", "cat": "auto", "base": 24000, "rarity": 2, "show_inc": 820, "show_odd": 0.05},
+            {"id": "c6_2", "name": "🎮 Руль болида F1 с телеметрией", "ico": "🎮", "cat": "tech", "base": 30000, "rarity": 3, "show_inc": 980, "show_odd": 0.06},
+            {"id": "c6_3", "name": "⚙️ Оппозитный мотор Porsche GT3 RS", "ico": "⚙️", "cat": "auto", "base": 37000, "rarity": 3, "show_inc": 1180, "show_odd": 0.07},
+            {"id": "c6_4", "name": "🪖 Шлем Айртона Сенны (Оригинал)", "ico": "🪖", "cat": "sport", "base": 45000, "rarity": 3, "show_inc": 1420, "show_odd": 0.08},
+            {"id": "c6_5", "name": "⌚ Часы Rolex Cosmograph Daytona", "ico": "⌚", "cat": "art", "base": 54000, "rarity": 3, "show_inc": 1680, "show_odd": 0.08},
+            {"id": "c6_6", "name": "🏎️ Шасси болида Red Bull Racing", "ico": "🏎️", "cat": "auto", "base": 64000, "rarity": 4, "show_inc": 1950, "show_odd": 0.09},
+            {"id": "c6_7", "name": "🏎️ Чемпионский болид McLaren MP4/4", "ico": "🏎️", "cat": "auto", "base": 75000, "rarity": 4, "show_inc": 2250, "show_odd": 0.10}
+        ]
+    },
+    "c_7": {
+        "id": "c_7", "name": "💻 Бункер Кремниевой Долины", "price": 60000, "ico": "🛰️",
+        "desc": "Квантовые серверы, нейрочипы и забытые крипто-кошельки", "max_win": "215 000 FC",
+        "items": [
+            {"id": "c7_1", "name": "🧠 Серверная стойка Nvidia H200", "ico": "🧠", "cat": "tech", "base": 41000, "rarity": 2, "show_inc": 1350, "show_odd": 0.07},
+            {"id": "c7_2", "name": "🕶️ Прототип нейро-шлема Apple Vision X", "ico": "🕶️", "cat": "tech", "base": 52000, "rarity": 3, "show_inc": 1650, "show_odd": 0.08},
+            {"id": "c7_3", "name": "🔑 Зашифрованный Ledger (Архив 2013)", "ico": "🔑", "cat": "crypto", "base": 64000, "rarity": 3, "show_inc": 1980, "show_odd": 0.09},
+            {"id": "c7_4", "name": "🔋 Твердотельный реактор Tesla", "ico": "🔋", "cat": "space", "base": 78000, "rarity": 3, "show_inc": 2350, "show_odd": 0.10},
+            {"id": "c7_5", "name": "⚛️ Квантовый процессор IBM Condor", "ico": "⚛️", "cat": "tech", "base": 92000, "rarity": 4, "show_inc": 2750, "show_odd": 0.11},
+            {"id": "c7_6", "name": "🤖 Андроид-прототип Tesla Optimus", "ico": "🤖", "cat": "tech", "base": 108000, "rarity": 4, "show_inc": 3150, "show_odd": 0.12},
+            {"id": "c7_7", "name": "💾 Исходный код ИИ первого поколения", "ico": "💾", "cat": "crypto", "base": 128000, "rarity": 4, "show_inc": 3600, "show_odd": 0.13}
+        ]
+    },
+    "c_8": {
+        "id": "c_8", "name": "🖼️ Закрытый Аукцион Сотбис", "price": 95000, "ico": "🏛️",
+        "desc": "Музейные шедевры, яйца Фаберже и королевские драгоценности", "max_win": "340 000 FC",
+        "items": [
+            {"id": "c8_1", "name": "🏺 Античная амфора династии Мин", "ico": "🏺", "cat": "art", "base": 65000, "rarity": 3, "show_inc": 2100, "show_odd": 0.09},
+            {"id": "c8_2", "name": "🎻 Скрипка Страдивари (1715 г.)", "ico": "🎻", "cat": "art", "base": 82000, "rarity": 3, "show_inc": 2550, "show_odd": 0.10},
+            {"id": "c8_3", "name": "⌚ Часы Patek Philippe Grandmaster", "ico": "⌚", "cat": "art", "base": 102000, "rarity": 3, "show_inc": 3050, "show_odd": 0.11},
+            {"id": "c8_4", "name": "💍 Розовый бриллиант «Звезда Востока»", "ico": "💍", "cat": "art", "base": 124000, "rarity": 4, "show_inc": 3550, "show_odd": 0.12},
+            {"id": "c8_5", "name": "🥚 Императорское яйцо Фаберже", "ico": "🥚", "cat": "art", "base": 148000, "rarity": 4, "show_inc": 4100, "show_odd": 0.13},
+            {"id": "c8_6", "name": "🖼️ Неизвестный эскиз Пикассо", "ico": "🖼️", "cat": "art", "base": 175000, "rarity": 4, "show_inc": 4700, "show_odd": 0.14},
+            {"id": "c8_7", "name": "👑 Корона герцога Бургундского", "ico": "👑", "cat": "art", "base": 205000, "rarity": 4, "show_inc": 5300, "show_odd": 0.15}
+        ]
+    },
+    "c_9": {
+        "id": "c_9", "name": "👑 Золотой Борт Шейха (Дубай)", "price": 135000, "ico": "🛩️",
+        "desc": "Гиперкары из пустыни, слитки 999 пробы и люксовые яхты", "max_win": "480 000 FC",
+        "items": [
+            {"id": "c9_1", "name": "💎 Часы Richard Mille Tourbillon", "ico": "💎", "cat": "art", "base": 92000, "rarity": 3, "show_inc": 2900, "show_odd": 0.11},
+            {"id": "c9_2", "name": "🚙 Бронированный Mercedes G63 6x6", "ico": "🚙", "cat": "auto", "base": 116000, "rarity": 3, "show_inc": 3500, "show_odd": 0.12},
+            {"id": "c9_3", "name": "🪙 Палета золотых слитков Dubai 999", "ico": "🪙", "cat": "crypto", "base": 142000, "rarity": 3, "show_inc": 4200, "show_odd": 0.13},
+            {"id": "c9_4", "name": "🟡 Суперкар Lamborghini Aventador SVJ", "ico": "🟡", "cat": "auto", "base": 172000, "rarity": 4, "show_inc": 4900, "show_odd": 0.15},
+            {"id": "c9_5", "name": "🐎 Арабский скакун чемпиона Мира", "ico": "🐎", "cat": "sport", "base": 205000, "rarity": 4, "show_inc": 5600, "show_odd": 0.16},
+            {"id": "c9_6", "name": "🛥️ Супер-катер Brabus Shadow 900", "ico": "🛥️", "cat": "auto", "base": 245000, "rarity": 4, "show_inc": 6400, "show_odd": 0.17},
+            {"id": "c9_7", "name": "🛩️ Бизнес-джет Gulfstream (Доля)", "ico": "🛩️", "cat": "space", "base": 290000, "rarity": 4, "show_inc": 7300, "show_odd": 0.19}
+        ]
+    },
+    "c_10": {
+        "id": "c_10", "name": "🏦 Швейцарское Крипто-Хранилище", "price": 180000, "ico": "🔐",
+        "desc": "Альпийский бункер с холодными кошельками и банковскими резервами", "max_win": "640 000 FC",
+        "items": [
+            {"id": "c10_1", "name": "💳 Платиновая карта Centurion Безлимит", "ico": "💳", "cat": "crypto", "base": 122000, "rarity": 3, "show_inc": 3800, "show_odd": 0.13},
+            {"id": "c10_2", "name": "📦 Банковская ячейка Цюриха #001", "ico": "📦", "cat": "crypto", "base": 154000, "rarity": 3, "show_inc": 4600, "show_odd": 0.14},
+            {"id": "c10_3", "name": "🔷 Валидатор сети Ethereum (32 ETH)", "ico": "🔷", "cat": "crypto", "base": 190000, "rarity": 4, "show_inc": 5500, "show_odd": 0.16},
+            {"id": "c10_4", "name": "🔵 Гиперкар Bugatti Chiron Pur Sport", "ico": "🔵", "cat": "auto", "base": 230000, "rarity": 4, "show_inc": 6500, "show_odd": 0.18},
+            {"id": "c10_5", "name": "📜 Акции технологического гиганта (Пакет)", "ico": "📜", "cat": "crypto", "base": 275000, "rarity": 4, "show_inc": 7500, "show_odd": 0.19},
+            {"id": "c10_6", "name": "₿ Холодный узел Genesis Block", "ico": "₿", "cat": "crypto", "base": 330000, "rarity": 4, "show_inc": 8600, "show_odd": 0.21},
+            {"id": "c10_7", "name": "🏛️ Золотой резерв Альпийского Банка", "ico": "🏛️", "cat": "crypto", "base": 385000, "rarity": 4, "show_inc": 9800, "show_odd": 0.23}
+        ]
+    },
+    "c_11": {
+        "id": "c_11", "name": "🛸 Секретный Сектор «Зона-51»", "price": 240000, "ico": "👽",
+        "desc": "Засекреченные военные разработки и внеземные артефакты", "max_win": "860 000 FC",
+        "items": [
+            {"id": "c11_1", "name": "✈️ Беспилотник-невидимка X-47B", "ico": "✈️", "cat": "space", "base": 165000, "rarity": 3, "show_inc": 5100, "show_odd": 0.16},
+            {"id": "c11_2", "name": "🦾 Военный экзоскелет поколения V", "ico": "🦾", "cat": "space", "base": 205000, "rarity": 4, "show_inc": 6200, "show_odd": 0.18},
+            {"id": "c11_3", "name": "🖼️ Утраченное полотно Леонардо да Винчи", "ico": "🖼️", "cat": "art", "base": 252000, "rarity": 4, "show_inc": 7400, "show_odd": 0.20},
+            {"id": "c11_4", "name": "🧬 Капсула криогенной регенерации", "ico": "🧬", "cat": "space", "base": 305000, "rarity": 4, "show_inc": 8800, "show_odd": 0.22},
+            {"id": "c11_5", "name": "₿ Архивный диск Сатоши Накамото", "ico": "₿", "cat": "crypto", "base": 365000, "rarity": 4, "show_inc": 10200, "show_odd": 0.24},
+            {"id": "c11_6", "name": "☄️ Метеорит из чистого иридия", "ico": "☄️", "cat": "space", "base": 435000, "rarity": 4, "show_inc": 11800, "show_odd": 0.26},
+            {"id": "c11_7", "name": "🛸 Антигравитационный двигатель Зоны-51", "ico": "🛸", "cat": "space", "base": 515000, "rarity": 4, "show_inc": 13500, "show_odd": 0.29}
+        ]
+    },
+    "c_12": {
+        "id": "c_12", "name": "🌌 Орбитальный Ковчег Миллиардеров", "price": 300000, "ico": "🚀",
+        "desc": "Финальный контейнер игры: космические станции, острова и сверхразум", "max_win": "1 100 000 FC",
+        "items": [
+            {"id": "c12_1", "name": "🛰️ Частный спутник связи Starlink-VIP", "ico": "🛰️", "cat": "space", "base": 205000, "rarity": 4, "show_inc": 6800, "show_odd": 0.20},
+            {"id": "c12_2", "name": "🏎️ Единственный гиперкар Koenigsegg Jesko Absolut", "ico": "🏎️", "cat": "auto", "base": 260000, "rarity": 4, "show_inc": 8200, "show_odd": 0.22},
+            {"id": "c12_3", "name": "🏝️ Частный архипелаг в Полинезии", "ico": "🏝️", "cat": "art", "base": 320000, "rarity": 4, "show_inc": 9800, "show_odd": 0.25},
+            {"id": "c12_4", "name": "☀️ Реактор холодного ядерного синтеза", "ico": "☀️", "cat": "space", "base": 385000, "rarity": 4, "show_inc": 11500, "show_odd": 0.28},
+            {"id": "c12_5", "name": "🧠 Квантовый ИИ-Сверхразум «Оракул»", "ico": "🧠", "cat": "tech", "base": 460000, "rarity": 4, "show_inc": 13500, "show_odd": 0.31},
+            {"id": "c12_6", "name": "🚀 Межпланетный шаттл колонизации", "ico": "🚀", "cat": "space", "base": 545000, "rarity": 4, "show_inc": 15800, "show_odd": 0.35},
+            {"id": "c12_7", "name": "👑 Императорский Монолит Мирового Синдиката", "ico": "👑", "cat": "crypto", "base": 640000, "rarity": 4, "show_inc": 18500, "show_odd": 0.40}
         ]
     }
 }
 
-# Живая лента крупных заносов для мотивации новых игроков
+# 5. ТАРИФЫ VIP-КЛУБА ЗА FC (НАЧИНАЯ ОТ 20 000 FC)
+VIP_PLANS_FC = {
+    "vip_3d": {"id": "vip_3d", "days": 3, "price": 20000, "title": "👑 VIP-Статус на 3 дня", "sub": "Идеально на тур еврокубков"},
+    "vip_14d": {"id": "vip_14d", "days": 14, "price": 65000, "title": "👑 VIP-Статус на 14 дней", "sub": "Выгода 30% • 2 недели привилегий"},
+    "vip_30d": {"id": "vip_30d", "days": 30, "price": 120000, "title": "👑 VIP-Магнат на 30 дней", "sub": "Максимальная выгода на весь месяц"}
+}
+
+VIP_BENEFITS_LIST = [
+    "⚡ <b>+0.15 к коэффициенту</b> каждого Ординара и Экспресса автоматически",
+    "📦 <b>Скидка 10% на покупку всех 12 Контейнеров</b> в Портовом Аукционе",
+    "🔧 <b>Шанс успешной реставрации 84%</b> (вместо 72%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>",
+    "🌐 <b>0% комиссии на P2P-Бирже</b> при продаже находок другим игрокам",
+    "🏟 <b>Подписание любых спонсоров без залога</b> + удвоенный бонус ранга",
+    "👑 <b>Золотая корона VIP</b> рядом с твоим ником в Топ-10 и прямой трансляции"
+]
+
 LIVE_TICKER_FEED = [
-    "🔥 Каппер Alex_Bet выбил «🏎️ Шасси болида F1» за 27 000 FC в контейнере Монако!",
+    "🔥 Каппер Alex_Bet выбил «🏎️ Шасси болида F1» в контейнере Монако!",
     "⚡ Игрок Маэстро_99 собрал Экспресс с кэфом 6.45 и забрал +16 125 FC!",
-    "💎 На P2P-Бирже продан «🔑 Зашифрованный Ledger» за 48 500 FC!",
+    "💎 На P2P-Бирже продан «🔑 Зашифрованный Ledger» за 68 500 FC!",
     "🎰 Каппер LuckyStrike сорвал ДЖЕКПОТ +2 000 FC в бесплатной рулетке!",
-    "👑 Игрок KaperPro отреставрировал «🟡 Lamborghini Aventador» до 165 000 FC!"
+    "👑 Игрок KaperPro активировал VIP-Статус и открыл «🛸 Сектор Зона-51»!"
 ]
 
 def push_live_ticker(event_text: str):
@@ -4518,7 +4669,7 @@ def push_live_ticker(event_text: str):
     if len(LIVE_TICKER_FEED) > 12:
         LIVE_TICKER_FEED.pop()
 
-# 5. ПРОДВИНУТАЯ СИСТЕМА КОНТРАКТОВ СПОНСОРОВ (УРОВНИ ДОСТУПА, ЗАЛОГИ И КВЕСТЫ)
+# 6. КОНТРАКТЫ СПОНСОРОВ И КАЛЕНДАРЬ ВХОДА (ОТ 200 ДО 3 500 FC)
 STADIUM_SPONSORS = [
     {
         "id": "sp_1", "name": "🟢 Winter Cup Energy", "min_lvl": 1, "deposit": 0, "bonus": 350,
@@ -4542,15 +4693,14 @@ STADIUM_SPONSORS = [
     }
 ]
 
-# 6. КАЛЕНДАРЬ ЕЖЕДНЕВНЫХ БОНУСОВ (7 ДНЕЙ ПОДРЯД)
 STREAK_CALENDAR = [
-    {"day": 1, "coins": 250, "booster": "", "label": "+250 FC"},
-    {"day": 2, "coins": 400, "booster": "", "label": "+400 FC"},
-    {"day": 3, "coins": 650, "booster": "", "label": "+650 FC"},
-    {"day": 4, "coins": 1000, "booster": "", "label": "+1 000 FC"},
-    {"day": 5, "coins": 1500, "booster": "boost035", "label": "+1 500 FC + ⚡ Буст +0.35"},
-    {"day": 6, "coins": 2200, "booster": "", "label": "+2 200 FC"},
-    {"day": 7, "coins": 4000, "booster": "insure50", "label": "🎁 +4 000 FC + 🛡 Страховка 50%"}
+    {"day": 1, "coins": 200, "booster": "", "label": "+200 FC"},
+    {"day": 2, "coins": 350, "booster": "", "label": "+350 FC"},
+    {"day": 3, "coins": 550, "booster": "", "label": "+550 FC"},
+    {"day": 4, "coins": 850, "booster": "", "label": "+850 FC"},
+    {"day": 5, "coins": 1300, "booster": "boost035", "label": "+1 300 FC + ⚡ Буст +0.35"},
+    {"day": 6, "coins": 2000, "booster": "", "label": "+2 000 FC"},
+    {"day": 7, "coins": 3500, "booster": "insure50", "label": "🎁 +3 500 FC + 🛡 Страховка 50%"}
 ]
 
 # 7. 36 КАРТОЧЕК FUT
@@ -4643,10 +4793,21 @@ def parse_user_fut_state(user: dict) -> dict:
         "rookie_bet": 1 if (int(raw.get("_rk_bet") or 0) == 1 or has_bets_before) else 0,
         "rookie_box": int(raw.get("_rk_box") or 0),
         "rookie_spin": 1 if (int(raw.get("_rk_spin") or 0) == 1 or has_spun_before) else 0,
-        "rookie_claimed": int(raw.get("_rk_claimed") or 0)
+        "rookie_claimed": int(raw.get("_rk_claimed") or 0),
+        "vip_until_ts": int(raw.get("_vip_until_ts") or 0),
+        "ref_bonus_paid": int(raw.get("_ref_paid") or 0)
     }
 
-def dump_user_fut_state(st: dict) -> str:
+def is_user_vip_active(user: dict, st: dict = None) -> bool:
+    if int(user.get("is_vip") or 0) == 1:
+        return True
+    if st is None:
+        st = parse_user_fut_state(user)
+    return int(st.get("vip_until_ts") or 0) > int(now_msk().timestamp())
+
+def dump_user_fut_state(st: dict, is_vip_flag: bool = False) -> str:
+    max_stor = 12 if is_vip_flag else 8
+    max_show = 4 if is_vip_flag else 3
     payload = {
         **st["squad"],
         "_owned": st["owned"],
@@ -4656,20 +4817,34 @@ def dump_user_fut_state(st: dict) -> str:
         "_ticket_mode": st.get("ticket_mode", "optimal"),
         "_sponsor_id": st.get("sponsor_id", "sp_1"),
         "_sponsor_paid_date": st.get("sponsor_paid_date", ""),
-        "_startup_storage": st.get("startup_storage", [])[:8],
-        "_startup_showroom": st.get("startup_showroom", [])[:3],
+        "_startup_storage": st.get("startup_storage", [])[:max_stor],
+        "_startup_showroom": st.get("startup_showroom", [])[:max_show],
         "_startup_profit": st.get("startup_profit", 0),
         "_rk_bet": st.get("rookie_bet", 0),
         "_rk_box": st.get("rookie_box", 0),
         "_rk_spin": st.get("rookie_spin", 0),
-        "_rk_claimed": st.get("rookie_claimed", 0)
+        "_rk_claimed": st.get("rookie_claimed", 0),
+        "_vip_until_ts": st.get("vip_until_ts", 0),
+        "_ref_paid": st.get("ref_bonus_paid", 0)
     }
     return json.dumps(payload, ensure_ascii=False)
+
+def calculate_forbes_net_worth(user: dict, st: dict = None) -> int:
+    """Считает общий Капитал Форбс: Баланс + Склад + Шоурум + Вложения в Арену"""
+    if st is None:
+        st = parse_user_fut_state(user)
+    bal = float(user.get("balance") or 0)
+    stor_val = sum(int(x.get("value") or 0) for x in st.get("startup_storage", []))
+    show_val = sum(int(x.get("value") or 0) for x in st.get("startup_showroom", []))
+    st_lvl = int(user.get("stadium_level") or 1)
+    arena_val = sum(STADIUM_LEVELS.get(l, {"price": 0})["price"] for l in range(1, st_lvl + 1))
+    return int(round(bal + stor_val + show_val + arena_val * 0.5))
 
 def get_user_fut_buffs_v2(user: dict) -> dict:
     st = parse_user_fut_state(user)
     squad = st["squad"]
     cap_role = st["captain"]
+    vip_active = is_user_vip_active(user, st)
 
     filled_slots = sum(1 for r in FUT_ROLES if squad.get(r))
     chemistry_pct = filled_slots * 20
@@ -4689,6 +4864,7 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
     showroom_items = st.get("startup_showroom") or []
     showroom_daily_fc = sum(int(it.get("show_inc") or 0) for it in showroom_items)
     showroom_odd_boost = round(sum(float(it.get("show_odd") or 0.0) for it in showroom_items), 2)
+    vip_odd_boost = 0.15 if vip_active else 0.0
 
     active_ids = set(v for v in squad.values() if v)
     reserve_ids = [cid for cid in st["owned"] if cid not in active_ids]
@@ -4704,9 +4880,11 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
         "handicap_profit_pct": round(_slot_val("DEF"), 1),
         "loss_cashback_pct": min(35.0, round(_slot_val("GK"), 1)),
         "express_odd_boost": round(_slot_val("COACH"), 2),
-        "lab_odd_boost": round(lab_bonus + showroom_odd_boost + (0.04 if chemistry_pct == 100 else 0.0), 2),
+        "lab_odd_boost": round(lab_bonus + showroom_odd_boost + vip_odd_boost + (0.04 if chemistry_pct == 100 else 0.0), 2),
         "showroom_daily_fc": showroom_daily_fc,
         "showroom_odd_boost": showroom_odd_boost,
+        "vip_odd_boost": vip_odd_boost,
+        "is_vip_active": vip_active,
         "chemistry": chemistry_pct,
         "captain": cap_role,
         "owned_ids": st["owned"],
@@ -4725,6 +4903,7 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
     card = FUT_CARDS[card_id]
     role = card["role"]
     st = parse_user_fut_state(user)
+    vip_act = is_user_vip_active(user, st)
 
     cashback = 0
     if card_id in st["owned"]:
@@ -4743,7 +4922,7 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
     new_bal = round(user["balance"] - cost + cashback, 1)
     await db_manager.exec(
         "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-        new_bal, dump_user_fut_state(st), user_id
+        new_bal, dump_user_fut_state(st, vip_act), user_id
     )
     return {"ok": True, "card": card, "new_balance": new_bal, "status_note": status_note, "st": st}
 
@@ -4763,15 +4942,18 @@ def get_express_boost_multiplier(num_legs: int) -> tuple[float, int]:
 async def fast_create_pending_bet(
     user_id: int, username: str, match_title: str, pick: str,
     amount: int, odds: float, win_prob: float, settle_ts: int,
-    bet_type: str = "single", legs_json: str = "[]"
+    bet_type: str = "single", legs_json: str = "[]", insure_paid: bool = False
 ) -> dict:
     user = await db_manager.get_user(user_id, username)
     if amount < 10:
         return {"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}
-    if user["balance"] < amount:
-        return {"ok": False, "error": f"Недостаточно средств! Твой баланс: {round(user['balance'], 1)} FC."}
 
-    is_all_in = 1 if (user["balance"] - amount < 10.0) else 0
+    ins_fee = int(round(amount * 0.10)) if insure_paid else 0
+    total_deduct = amount + ins_fee
+    if user["balance"] < total_deduct:
+        return {"ok": False, "error": f"Недостаточно средств! С учетом страховки нужно {total_deduct} FC."}
+
+    is_all_in = 1 if (user["balance"] - total_deduct < 10.0) else 0
     fav_club = user.get("favorite_club") or ""
     is_fav_club = 1 if (fav_club and (fav_club in match_title or fav_club in pick)) else 0
 
@@ -4782,7 +4964,23 @@ async def fast_create_pending_bet(
 
     buffs = get_user_fut_buffs_v2(user)
     st = buffs["full_state"]
+    vip_act = buffs["is_vip_active"]
     st["rookie_bet"] = 1
+
+    # ЗАЩИТА ОТ МУЛЬТИАККАУНТОВ: реферальный бонус начисляется пригласившему только при первой реальной ставке друга!
+    ref_inviter = int(user.get("referred_by") or 0)
+    if ref_inviter > 0 and st.get("ref_bonus_paid", 0) == 0:
+        st["ref_bonus_paid"] = 1
+        try:
+            await db_manager.exec("UPDATE users SET balance = balance + 500 WHERE user_id = $1", ref_inviter)
+            await bot.send_message(
+                ref_inviter,
+                f"🤝 <b>РЕФЕРАЛЬНЫЙ БОНУС АКТИВИРОВАН!</b>\n\n"
+                f"<blockquote>Твой друг <b>{username}</b> сделал свою первую ставку в игре! Тебе начислено <b><code>+500 FC</code></b>!</blockquote>",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
 
     exp_mult, exp_pct = get_express_boost_multiplier(len(parsed_legs) if bet_type == "express" else 1)
 
@@ -4796,15 +4994,16 @@ async def fast_create_pending_bet(
     if active_booster == "boost035":
         final_odds = round(final_odds + 0.35, 2)
         booster_used = "boost035"
-    elif active_booster == "insure50":
+    elif active_booster == "insure50" or insure_paid:
         booster_used = "insure50"
 
-    new_balance = round(user["balance"] - amount, 1)
+    new_balance = round(user["balance"] - total_deduct, 1)
     created_str = now_msk().strftime("%d.%m %H:%M")
+    next_booster_val = "" if (active_booster and not insure_paid) else active_booster
 
     await db_manager.exec(
-        "UPDATE users SET balance = $1, active_booster = '', fut_cards = $2 WHERE user_id = $3",
-        new_balance, dump_user_fut_state(st), user_id
+        "UPDATE users SET balance = $1, active_booster = $2, fut_cards = $3 WHERE user_id = $4",
+        new_balance, next_booster_val, dump_user_fut_state(st, vip_act), user_id
     )
 
     if db_manager.use_pg:
@@ -4832,12 +5031,11 @@ async def fast_create_pending_bet(
 
     return {
         "ok": True, "bet_id": bet_id, "final_odds": final_odds, "exp_boost_pct": exp_pct,
-        "booster_used": booster_used, "is_fav_club": is_fav_club,
+        "booster_used": booster_used, "is_fav_club": is_fav_club, "total_deduct": total_deduct,
         "new_balance": new_balance, "potential_win": round(amount * final_odds, 1)
     }
 
 db_manager.create_pending_bet = fast_create_pending_bet
-
 ACHIEVEMENTS_CONFIG.update({
     "winter_2027": {"title": "🎄 Зимний Чемпион", "desc": "Сделать ставку в новогоднем обновлении бота", "reward": 400},
     "exact_score": {"title": "🎯 Снайпер точного счета", "desc": "Угадать точный счет футбольного матча", "reward": 3500},
@@ -4846,7 +5044,8 @@ ACHIEVEMENTS_CONFIG.update({
     "fut_full_squad": {"title": "👕 Полная сыгранность (100%)", "desc": "Заполнить все 5 позиций в составе FUT", "reward": 1500},
     "sbc_master": {"title": "🔄 Мастер СПК (Крафт)", "desc": "Обменять 3 резервные карточки на Золотой пак", "reward": 750},
     "container_hunter": {"title": "📦 Портовый Охотник", "desc": "Вскрыть свой первый контейнер в Порту", "reward": 500},
-    "area51_legend": {"title": "🛸 Магнат Зоны-51", "desc": "Вскрыть секретный контейнер за 100 000 FC", "reward": 5000},
+    "ark_billionaire": {"title": "🌌 Властелин Ковчега", "desc": "Вскрыть Орбитальный Ковчег за 300 000 FC", "reward": 10000},
+    "vip_club_member": {"title": "👑 Член VIP-Клуба", "desc": "Приобрести VIP-статус за FC", "reward": 1500},
     "p2p_merchant": {"title": "🌐 Купец P2P-Биржи", "desc": "Выставить или купить находку на P2P-рынке", "reward": 800},
     "stadium_lvl_5": {"title": "🏟 Архитектор Колизея", "desc": "Построить стадион 5-го уровня", "reward": 2500},
     "stadium_lvl_10": {"title": "👑 Император Арен", "desc": "Возвести Мега-Арену Легенд (10 уровень)", "reward": 15000},
@@ -5187,7 +5386,7 @@ async def get_precomputed_webapp_line() -> dict:
     })
     return PRECOMPUTED_WEBAPP_CACHE
 
-# ================= ПРОВЕРКА УСЛОВИЙ КОНТРАКТА СПОНСОРА И СТРИКА ВХОДОВ =================
+# ================= ПРОВЕРКА УСЛОВИЙ СПОНСОРА И СТРИКА ВХОДОВ =================
 def compute_login_streak_info(st: dict) -> tuple[int, bool]:
     today_dt = now_msk().date()
     today_str = today_dt.strftime("%Y-%m-%d")
@@ -5333,9 +5532,10 @@ def format_archive_bet_legs(b: dict) -> list[dict]:
 def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
     buffs = get_user_fut_buffs_v2(user)
     st = buffs["full_state"]
+    vip_act = buffs["is_vip_active"]
     st_lvl = int(user.get("stadium_level") or 1)
     lab_lvl = int(user.get("lab_level") or 1)
-    rank_name, daily_bonus_amt = get_user_rank_info(user["balance"], user["is_vip"])
+    rank_name, daily_bonus_amt = get_user_rank_info(user["balance"], 1 if vip_act else 0)
     today_str = now_msk().strftime("%Y-%m-%d")
 
     streak_day, can_claim_streak = compute_login_streak_info(st)
@@ -5349,22 +5549,29 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
     sp_id = st.get("sponsor_id", "sp_1")
     quest_ok = check_sponsor_quest_done(sp_id, user, st, active_bets or [])
 
-    # Стартовый квест новичка (3 шага)
     rk_bet = 1 if (st.get("rookie_bet") or len(active_bets or []) > 0) else 0
     rk_box = 1 if (st.get("rookie_box") or len(st.get("startup_storage", [])) > 0 or len(st.get("startup_showroom", [])) > 0) else 0
     rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
     rk_done_count = rk_bet + rk_box + rk_spin
 
-    # Дополняем предметы склада прозрачным прогнозом цены реставрации
+    demand = get_daily_port_demand()
     storage_enriched = []
     for it in st.get("startup_storage", []):
         it_copy = dict(it)
+        it_copy["is_in_demand"] = (it_copy.get("cat") == demand["key"])
         it_copy["expected_restore"] = int(round(it_copy.get("value", 1000) * 2.0, -1))
         storage_enriched.append(it_copy)
+
+    vip_until_ts = int(st.get("vip_until_ts") or 0)
+    now_ts = int(now_msk().timestamp())
+    vip_days_left = max(0, math.ceil((vip_until_ts - now_ts) / 86400)) if vip_until_ts > now_ts else (999 if int(user.get("is_vip") or 0) == 1 else 0)
 
     return {
         "user_id": user["user_id"],
         "username": user["username"],
+        "is_vip": 1 if vip_act else 0,
+        "vip_days_left": vip_days_left,
+        "forbes_capital": calculate_forbes_net_worth(user, st),
         "rank": rank_name,
         "daily_bonus_amt": daily_bonus_amt,
         "can_claim_bonus": can_claim_bonus,
@@ -5391,15 +5598,18 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
         "stadium_prefs": {
             "ticket": st.get("ticket_mode", "optimal"),
             "sponsor": sp_id,
-            "deposit_paid": st.get("sponsor_paid_date") == today_str,
+            "deposit_paid": st.get("sponsor_paid_date") == today_str or vip_act,
             "quest_done": quest_ok
         },
         "startup": {
             "storage": storage_enriched,
+            "max_storage": 12 if vip_act else 8,
             "showroom": st.get("startup_showroom", []),
+            "max_showroom": 4 if vip_act else 3,
             "profit": st.get("startup_profit", 0),
             "showroom_daily_fc": buffs["showroom_daily_fc"],
-            "showroom_odd_boost": buffs["showroom_odd_boost"]
+            "showroom_odd_boost": buffs["showroom_odd_boost"],
+            "restore_chance_pct": 84 if vip_act else 72
         },
         "rookie_quest": {
             "bet": rk_bet,
@@ -5438,11 +5648,13 @@ async def build_user_state_payload(uid: int) -> dict:
     leaderboard = []
     for idx, u in enumerate(SHARED_DB_CACHE["leaderboard_raw"], 1):
         incog = int(u.get("is_incognito") or 0) == 1
+        u_vip = is_user_vip_active(u)
         leaderboard.append({
             "place": idx,
-            "name": f"🕶 Скрытый #{str(u['user_id'])[-4:]}" if incog else u["username"],
+            "name": f"🕶 Скрытый #{str(u['user_id'])[-4:]}" if incog else (f"👑 {u['username']}" if u_vip else u["username"]),
             "club": "" if incog else (u.get("favorite_club") or ""),
             "balance": round(u["balance"], 1),
+            "forbes": calculate_forbes_net_worth(u),
             "wins": u["wins"],
             "is_me": u["user_id"] == uid
         })
@@ -5476,6 +5688,9 @@ async def build_user_state_payload(uid: int) -> dict:
         "ok": True,
         "bot_username": BOT_USERNAME,
         "user": fast_u,
+        "vip_plans": VIP_PLANS_FC,
+        "vip_benefits": VIP_BENEFITS_LIST,
+        "daily_demand": get_daily_port_demand(),
         "live_ticker": LIVE_TICKER_FEED[:8],
         "streak_calendar": STREAK_CALENDAR,
         "containers_catalog": CONTAINERS_CATALOG,
@@ -5561,6 +5776,7 @@ async def _fast_delta_response(uid: int, extra: dict = None, include_bets: bool 
     resp = {
         "ok": True,
         "user": fast_u,
+        "daily_demand": get_daily_port_demand(),
         "live_ticker": LIVE_TICKER_FEED[:8],
         "p2p_market": P2P_CONTAINER_MARKET[:30],
         **(extra or {})
@@ -5611,16 +5827,44 @@ async def api_handle_action(request):
 
     user = await db_manager.get_user(uid)
     st = parse_user_fut_state(user)
+    vip_act = is_user_vip_active(user, st)
     today_str = now_msk().strftime("%Y-%m-%d")
 
-    # 1. ЕЖЕДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ (7 ДНЕЙ ПОДРЯД)
-    if action == "claim_bonus":
+    # 1. ПОКУПКА VIP-СТАТУСА ЗА FC (ОТ 20 000 FC)
+    if action == "buy_vip_fc":
+        plan_id = str(body.get("plan_id") or "vip_3d")
+        plan = VIP_PLANS_FC.get(plan_id)
+        if not plan:
+            return web.json_response({"ok": False, "error": "Тариф VIP не найден"}, headers=CORS_HEADERS)
+        cost = plan["price"]
+        if user["balance"] < cost:
+            return web.json_response({"ok": False, "error": f"Недостаточно средств! Для «{plan['title']}» нужно {cost} FC."}, headers=CORS_HEADERS)
+
+        now_ts = int(now_msk().timestamp())
+        base_ts = max(now_ts, int(st.get("vip_until_ts") or 0))
+        st["vip_until_ts"] = base_ts + (plan["days"] * 86400)
+        new_bal = round(user["balance"] - cost, 1)
+
+        await db_manager.exec(
+            "UPDATE users SET balance = $1, is_vip = 1, fut_cards = $2 WHERE user_id = $3",
+            new_bal, dump_user_fut_state(st, True), uid
+        )
+        SHARED_DB_CACHE["leaderboard_ts"] = 0
+        asyncio.create_task(db_manager.unlock_achievement(uid, "vip_club_member"))
+        push_live_ticker(f"👑 Каппер {user['username']} вступил в VIP-Клуб ({plan['title']})!")
+        return await _fast_delta_response(uid, {
+            "message": f"👑 Поздравляем! Активирован «{plan['title']}» со всеми привилегиями!",
+            "coin_delta": -cost
+        })
+
+    # 2. ЕЖЕДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ (ОТ 200 ДО 3 500 FC)
+    elif action == "claim_bonus":
         streak_day, can_claim = compute_login_streak_info(st)
         if not can_claim or user.get("last_bonus") == today_str:
             return web.json_response({"ok": False, "error": "Бонус сегодня уже получен! Заходи завтра для продолжения серии."}, headers=CORS_HEADERS)
 
         cal_item = STREAK_CALENDAR[streak_day - 1]
-        _, rank_bonus = get_user_rank_info(user["balance"], user["is_vip"])
+        _, rank_bonus = get_user_rank_info(user["balance"], 1 if vip_act else 0)
         total_reward = cal_item["coins"] + int(rank_bonus * 0.5)
 
         st["login_streak"] = streak_day
@@ -5629,7 +5873,7 @@ async def api_handle_action(request):
 
         await db_manager.exec(
             "UPDATE users SET balance = balance + $1, last_bonus = $2, active_booster = $3, fut_cards = $4 WHERE user_id = $5",
-            float(total_reward), today_str, new_booster, dump_user_fut_state(st), uid
+            float(total_reward), today_str, new_booster, dump_user_fut_state(st, vip_act), uid
         )
         b_note = " + Бустер!" if cal_item["booster"] else ""
         return await _fast_delta_response(uid, {
@@ -5637,7 +5881,7 @@ async def api_handle_action(request):
             "coin_delta": total_reward
         })
 
-    # 2. СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +2 500 FC + ЗОЛОТАЯ КАРТА FUT)
+    # 3. СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +1 000 FC + КАРТОЧКА FUT)
     elif action == "claim_rookie_quest":
         if st.get("rookie_claimed") == 1:
             return web.json_response({"ok": False, "error": "Награда стартового квеста уже получена!"}, headers=CORS_HEADERS)
@@ -5664,35 +5908,42 @@ async def api_handle_action(request):
                 st["squad"][role] = bonus_card_id
 
         await db_manager.exec(
-            "UPDATE users SET balance = balance + 2500, fut_cards = $1 WHERE user_id = $2",
-            dump_user_fut_state(st), uid
+            "UPDATE users SET balance = balance + 1000, fut_cards = $1 WHERE user_id = $2",
+            dump_user_fut_state(st, vip_act), uid
         )
-        push_live_ticker(f"🎁 Игрок {user['username']} выполнил Квест Новичка и получил +2 500 FC + карту {bonus_card['name']}!")
+        push_live_ticker(f"🎁 Игрок {user['username']} выполнил Квест Новичка и получил +1 000 FC + карту {bonus_card['name']}!")
         return await _fast_delta_response(uid, {
-            "message": f"🎉 Квест выполнен! Получено +2 500 FC и золотая карта «{bonus_card['name']}»!",
+            "message": f"🎉 Квест выполнен! Получено +1 000 FC и карточка «{bonus_card['name']}»!",
             "card": bonus_card,
-            "coin_delta": 2500
+            "coin_delta": 1000
         })
 
-    # 3. КОНТЕЙНЕРЫ: ПОКУПКА И ВСКРЫТИЕ (ДО 100 000 FC)
+    # 4. КОНТЕЙНЕРЫ: ПОКУПКА И ВСКРЫТИЕ (12 КОНТЕЙНЕРОВ, СКИДКА 10% ДЛЯ VIP, СПРОС ДНЯ +15%)
     elif action == "startup_open_container":
-        cid = str(body.get("container_id") or "c_detroit")
+        cid = str(body.get("container_id") or "c_1")
         box = CONTAINERS_CATALOG.get(cid)
         if not box:
             return web.json_response({"ok": False, "error": "Контейнер не найден"}, headers=CORS_HEADERS)
-        if len(st["startup_storage"]) >= 8:
-            return web.json_response({"ok": False, "error": "Склад переполнен (макс. 8 находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
-        price = box["price"]
+        max_stor = 12 if vip_act else 8
+        if len(st["startup_storage"]) >= max_stor:
+            return web.json_response({"ok": False, "error": f"Склад переполнен (макс. {max_stor} находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
+
+        raw_price = box["price"]
+        price = int(round(raw_price * 0.90)) if vip_act else raw_price
         if user["balance"] < price:
             return web.json_response({"ok": False, "error": f"Недостаточно средств! Нужно {price} FC."}, headers=CORS_HEADERS)
 
         pool = box["items"]
-        weights = [40, 30, 20, 10][:len(pool)]
+        weights = [26, 22, 18, 14, 10, 6, 4][:len(pool)]
         chosen_tpl = random.choices(pool, weights=weights, k=1)[0]
 
-        condition = random.randint(42, 86)
+        demand = get_daily_port_demand()
+        is_hot = (chosen_tpl.get("cat") == demand["key"])
+        demand_mult = 1.15 if is_hot else 1.0
+
+        condition = random.randint(44, 88)
         cond_mult = round(0.65 + (condition / 100.0) * 0.65, 2)
-        market_val = int(round(chosen_tpl["base"] * cond_mult, -1))
+        market_val = int(round(chosen_tpl["base"] * cond_mult * demand_mult, -1))
 
         uid_item = f"lot_{int(now_msk().timestamp()*1000)}_{random.randint(100,999)}"
         found_item = {
@@ -5700,6 +5951,8 @@ async def api_handle_action(request):
             "tpl_id": chosen_tpl["id"],
             "name": chosen_tpl["name"],
             "ico": chosen_tpl["ico"],
+            "cat": chosen_tpl.get("cat", "tech"),
+            "is_in_demand": is_hot,
             "rarity": chosen_tpl["rarity"],
             "condition": condition,
             "restored_count": 0,
@@ -5716,22 +5969,23 @@ async def api_handle_action(request):
 
         await db_manager.exec(
             "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st), uid
+            new_bal, dump_user_fut_state(st, vip_act), uid
         )
         asyncio.create_task(db_manager.unlock_achievement(uid, "container_hunter"))
-        if cid == "c_area51":
-            asyncio.create_task(db_manager.unlock_achievement(uid, "area51_legend"))
+        if cid == "c_12":
+            asyncio.create_task(db_manager.unlock_achievement(uid, "ark_billionaire"))
 
-        if market_val >= 4500 or chosen_tpl["rarity"] >= 3:
+        if market_val >= 8000 or chosen_tpl["rarity"] >= 3:
             push_live_ticker(f"📦 {user['username']} вскрыл «{box['name']}» и нашёл {found_item['name']} ({market_val} FC)!")
 
+        hot_tag = " 🔥[Спрос дня +15%!]" if is_hot else ""
         return await _fast_delta_response(uid, {
-            "message": f"📦 Вскрыт «{box['name']}»! Найдено: {found_item['name']} (Оценка: {found_item['value']} FC)",
+            "message": f"📦 Вскрыт «{box['name']}»! Найдено: {found_item['name']} (Оценка: {found_item['value']} FC){hot_tag}",
             "found_item": found_item,
             "coin_delta": -price
         })
 
-    # 4. КОНТЕЙНЕРЫ: РЕСТАВРАЦИЯ / ВЗЛОМ НАХОДКИ
+    # 5. КОНТЕЙНЕРЫ: РЕСТАВРАЦИЯ (ШАНС 84% ДЛЯ VIP И 72% ОБЫЧНЫЙ)
     elif action == "startup_restore_item":
         item_uid = str(body.get("item_uid") or "")
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
@@ -5747,14 +6001,15 @@ async def api_handle_action(request):
             return web.json_response({"ok": False, "error": f"Для реставрации нужно {r_cost} FC!"}, headers=CORS_HEADERS)
 
         it["restored_count"] = int(it.get("restored_count") or 0) + 1
-        success = random.random() < 0.72
+        win_chance = 0.84 if vip_act else 0.72
+        success = random.random() < win_chance
         if success:
-            boost_mult = random.uniform(1.68, 2.35)
+            boost_mult = random.uniform(1.70, 2.38)
             it["value"] = int(round(it["value"] * boost_mult, -1))
             it["condition"] = min(100, it["condition"] + random.randint(25, 45))
             it["restore_cost"] = int(round(it["value"] * 0.25, -1))
             msg = f"✨ Успешная реставрация! Ценность «{it['name']}» выросла до {it['value']} FC!"
-            if it["value"] >= 15000:
+            if it["value"] >= 20000:
                 push_live_ticker(f"🔧 {user['username']} отреставрировал «{it['name']}» до {it['value']} FC!")
         else:
             it["value"] = max(100, int(round(it["value"] * 0.76, -1)))
@@ -5764,11 +6019,11 @@ async def api_handle_action(request):
         new_bal = round(user["balance"] - r_cost, 1)
         await db_manager.exec(
             "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st), uid
+            new_bal, dump_user_fut_state(st, vip_act), uid
         )
         return await _fast_delta_response(uid, {"message": msg, "coin_delta": -r_cost})
 
-    # 5. КОНТЕЙНЕРЫ: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
+    # 6. КОНТЕЙНЕРЫ: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
     elif action == "startup_sell_npc":
         item_uid = str(body.get("item_uid") or "")
         tactic = str(body.get("tactic") or "base")
@@ -5804,22 +6059,23 @@ async def api_handle_action(request):
 
         await db_manager.exec(
             "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st), uid
+            new_bal, dump_user_fut_state(st, vip_act), uid
         )
         return await _fast_delta_response(uid, {"message": msg, "coin_delta": final_price})
 
-    # 6. КОНТЕЙНЕРЫ: ЛИЧНЫЙ ШОУРУМ (МУЗЕЙ БАФФОВ)
+    # 7. КОНТЕЙНЕРЫ: ЛИЧНЫЙ ШОУРУМ (ДО 4 ВИТРИН ДЛЯ VIP)
     elif action == "startup_to_showroom":
         item_uid = str(body.get("item_uid") or "")
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
         if idx == -1:
             return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
-        if len(st["startup_showroom"]) >= 3:
-            return web.json_response({"ok": False, "error": "В Шоуруме максимум 3 витрины! Сними один экспонат."}, headers=CORS_HEADERS)
+        max_show = 4 if vip_act else 3
+        if len(st["startup_showroom"]) >= max_show:
+            return web.json_response({"ok": False, "error": f"В Шоуруме заняты все витрины ({max_show} шт.)! Сними один экспонат."}, headers=CORS_HEADERS)
 
         it = st["startup_storage"].pop(idx)
         st["startup_showroom"].append(it)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         return await _fast_delta_response(uid, {
             "message": f"🏛 «{it['name']}» выставлен в Шоурум (+{it['show_inc']} FC/день и +{it['show_odd']} к кэфам)!"
         })
@@ -5829,23 +6085,24 @@ async def api_handle_action(request):
         idx = next((i for i, x in enumerate(st["startup_showroom"]) if x["uid"] == item_uid), -1)
         if idx == -1:
             return web.json_response({"ok": False, "error": "Экспонат не найден"}, headers=CORS_HEADERS)
-        if len(st["startup_storage"]) >= 8:
+        max_stor = 12 if vip_act else 8
+        if len(st["startup_storage"]) >= max_stor:
             return web.json_response({"ok": False, "error": "На складе нет свободного места!"}, headers=CORS_HEADERS)
 
         it = st["startup_showroom"].pop(idx)
         st["startup_storage"].append(it)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         return await _fast_delta_response(uid, {"message": f"📦 «{it['name']}» возвращен на склад."})
 
-    # 7. КОНТЕЙНЕРЫ: P2P-БИРЖА МЕЖДУ РЕАЛЬНЫМИ ИГРОКАМИ
+    # 8. P2P-БИРЖА МЕЖДУ ИГРОКАМИ (НАЛОГ 5% ИЛИ 0% ДЛЯ VIP)
     elif action == "p2p_list_item":
         item_uid = str(body.get("item_uid") or "")
         ask_price = int(body.get("price") or 0)
         idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
         if idx == -1:
             return web.json_response({"ok": False, "error": "Предмет не найден на складе"}, headers=CORS_HEADERS)
-        if ask_price < 300 or ask_price > 500000:
-            return web.json_response({"ok": False, "error": "Цена на P2P-бирже должна быть от 300 до 500 000 FC!"}, headers=CORS_HEADERS)
+        if ask_price < 300 or ask_price > 1500000:
+            return web.json_response({"ok": False, "error": "Цена на P2P-бирже должна быть от 300 до 1 500 000 FC!"}, headers=CORS_HEADERS)
 
         it = st["startup_storage"].pop(idx)
         _P2P_LOT_SEQ += 1
@@ -5853,11 +6110,12 @@ async def api_handle_action(request):
             "lot_id": _P2P_LOT_SEQ,
             "seller_id": uid,
             "seller_name": user["username"],
+            "seller_vip": vip_act,
             "item": it,
             "price": ask_price
         }
         P2P_CONTAINER_MARKET.insert(0, lot_obj)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
         push_live_ticker(f"🌐 {user['username']} выставил на P2P-Биржу «{it['name']}» за {ask_price} FC!")
         return await _fast_delta_response(uid, {
@@ -5869,12 +6127,13 @@ async def api_handle_action(request):
         l_idx = next((i for i, x in enumerate(P2P_CONTAINER_MARKET) if x["lot_id"] == lot_id and x["seller_id"] == uid), -1)
         if l_idx == -1:
             return web.json_response({"ok": False, "error": "Лот уже куплен или не найден"}, headers=CORS_HEADERS)
-        if len(st["startup_storage"]) >= 8:
+        max_stor = 12 if vip_act else 8
+        if len(st["startup_storage"]) >= max_stor:
             return web.json_response({"ok": False, "error": "Склад переполнен! Освободи место."}, headers=CORS_HEADERS)
 
         lot_obj = P2P_CONTAINER_MARKET.pop(l_idx)
         st["startup_storage"].append(lot_obj["item"])
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         return await _fast_delta_response(uid, {"message": "✅ Лот снят с P2P-Биржи и возвращен на склад."})
 
     elif action == "p2p_buy_lot":
@@ -5885,8 +6144,9 @@ async def api_handle_action(request):
         lot_obj = P2P_CONTAINER_MARKET[l_idx]
         if lot_obj["seller_id"] == uid:
             return web.json_response({"ok": False, "error": "Это твой собственный лот!"}, headers=CORS_HEADERS)
-        if len(st["startup_storage"]) >= 8:
-            return web.json_response({"ok": False, "error": "Твой склад переполнен (макс. 8 предметов)!"}, headers=CORS_HEADERS)
+        max_stor = 12 if vip_act else 8
+        if len(st["startup_storage"]) >= max_stor:
+            return web.json_response({"ok": False, "error": f"Твой склад переполнен (макс. {max_stor} предметов)!"}, headers=CORS_HEADERS)
 
         price = int(lot_obj["price"])
         if user["balance"] < price:
@@ -5897,10 +6157,12 @@ async def api_handle_action(request):
         bought_item["container_price"] = price
         st["startup_storage"].insert(0, bought_item)
 
-        seller_payout = int(round(price * 0.95))
+        # Налог 5% (или 0% если продавец VIP)
+        tax_mult = 1.0 if lot_obj.get("seller_vip") else 0.95
+        seller_payout = int(round(price * tax_mult))
         await db_manager.exec(
             "UPDATE users SET balance = balance - $1, fut_cards = $2 WHERE user_id = $3",
-            float(price), dump_user_fut_state(st), uid
+            float(price), dump_user_fut_state(st, vip_act), uid
         )
         await db_manager.exec(
             "UPDATE users SET balance = balance + $1, profit = profit + $1 WHERE user_id = $2",
@@ -5910,12 +6172,13 @@ async def api_handle_action(request):
         push_live_ticker(f"🛍 {user['username']} купил «{bought_item['name']}» у игрока {lot_obj['seller_name']} за {price} FC!")
 
         try:
+            tax_note = "0% (VIP-привилегия)" if lot_obj.get("seller_vip") else "5%"
             await bot.send_message(
                 lot_obj["seller_id"],
                 f"🌐 <b>ТВОЙ ЛОТ НА P2P-БИРЖЕ КУПЛЕН!</b>\n\n"
                 f"<blockquote>📦 Предмет: <b>{bought_item['name']}</b>\n"
                 f"👤 Покупатель: <b>{user['username']}</b>\n"
-                f"💰 Зачислено (с учетом 5% комиссии): <b><code>+{seller_payout} FC</code></b></blockquote>",
+                f"💰 Зачислено (комиссия {tax_note}): <b><code>+{seller_payout} FC</code></b></blockquote>",
                 parse_mode="HTML"
             )
         except Exception:
@@ -5926,14 +6189,14 @@ async def api_handle_action(request):
             "coin_delta": -price
         })
 
-    # 8. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
+    # 9. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
     elif action == "equip_fut_card":
         card_id = str(body.get("card_id") or "")
         if card_id not in FUT_CARDS or card_id not in st["owned"]:
             return web.json_response({"ok": False, "error": "Карточка не найдена в коллекции"}, headers=CORS_HEADERS)
         c = FUT_CARDS[card_id]
         st["squad"][c["role"]] = card_id
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         return await _fast_delta_response(uid, {"message": f"👕 {c['name']} вышел в стартовый состав ({c['role']})!"})
 
     elif action == "set_fut_captain":
@@ -5941,7 +6204,7 @@ async def api_handle_action(request):
         if role not in FUT_ROLES:
             return web.json_response({"ok": False, "error": "Неверная позиция"}, headers=CORS_HEADERS)
         st["captain"] = role
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         return await _fast_delta_response(uid, {"message": f"© Капитанская повязка передана позиции {role} (+25% к баффу)!"})
 
     elif action == "craft_fut_pack":
@@ -5955,7 +6218,7 @@ async def api_handle_action(request):
             if sc_id in st["owned"]:
                 st["owned"].remove(sc_id)
 
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         pool_t2 = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
         pool_t3 = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
         won_card_id = random.choices(pool_t2 + pool_t3, weights=[14]*len(pool_t2) + [5]*len(pool_t3), k=1)[0]
@@ -5967,7 +6230,7 @@ async def api_handle_action(request):
             "status_note": f"🔄 СПК выполнен! Обменено 3 резервные карты. {res['status_note']}"
         })
 
-    # 9. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ С ЗАЛОГОМ
+    # 10. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ (ДЛЯ VIP — БЕЗ ЗАЛОГА)
     elif action == "set_stadium_prefs":
         ticket = str(body.get("ticket") or st.get("ticket_mode", "optimal"))
         sponsor_id = str(body.get("sponsor") or st.get("sponsor_id", "sp_1"))
@@ -5981,21 +6244,21 @@ async def api_handle_action(request):
             }, headers=CORS_HEADERS)
 
         coin_delta = 0
-        if sponsor_id != st.get("sponsor_id") and sp_obj["deposit"] > 0 and st.get("sponsor_paid_date") != today_str:
+        if not vip_act and sponsor_id != st.get("sponsor_id") and sp_obj["deposit"] > 0 and st.get("sponsor_paid_date") != today_str:
             dep = sp_obj["deposit"]
             if user["balance"] < dep:
-                return web.json_response({"ok": False, "error": f"Для подписания контракта нужен страховой залог {dep} FC!"}, headers=CORS_HEADERS)
+                return web.json_response({"ok": False, "error": f"Для подписания контракта нужен страховой залог {dep} FC (или VIP-статус)!"}, headers=CORS_HEADERS)
             st["sponsor_paid_date"] = today_str
             coin_delta = -dep
             await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(dep), uid)
 
         st["ticket_mode"] = ticket
         st["sponsor_id"] = sponsor_id
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         if ticket == "vip":
             asyncio.create_task(db_manager.unlock_achievement(uid, "matchday_vip"))
 
-        dep_msg = f" (Внесен залог -{abs(coin_delta)} FC)" if coin_delta < 0 else ""
+        dep_msg = f" (Внесен залог -{abs(coin_delta)} FC)" if coin_delta < 0 else (" (👑 VIP: без залога)" if vip_act and sp_obj["deposit"] > 0 else "")
         return await _fast_delta_response(uid, {
             "message": f"🏟 Контракт и тариф арены сохранены!{dep_msg}",
             "coin_delta": coin_delta
@@ -6025,7 +6288,7 @@ async def api_handle_action(request):
             t_note = "VIP-Аншлаг (+65%!)" if has_activity else "VIP (80% без ставок)"
 
         quest_ok = check_sponsor_quest_done(sp_id, user, st, active_bets)
-        dep_returned = sp_obj["deposit"] if (st.get("sponsor_paid_date") == today_str and quest_ok) else 0
+        dep_returned = sp_obj["deposit"] if (not vip_act and st.get("sponsor_paid_date") == today_str and quest_ok) else 0
         sp_bonus = (sp_obj["bonus"] + dep_returned) if quest_ok else 0
 
         showroom_inc = sum(int(x.get("show_inc") or 0) for x in st.get("startup_showroom", []))
@@ -6081,7 +6344,7 @@ async def api_handle_action(request):
             "coin_delta": -cost
         })
 
-    # 10. РУЛЕТКА С ТОЧНЫМ ИНДЕКСОМ СЕКТОРА (0..6) И ОТМЕТКОЙ КВЕСТА НОВИЧКА
+    # 11. РУЛЕТКА (ПРЕЖНИЕ ПАРАМЕТРЫ + ТОЧНАЯ КАЛИБРОВКА СЕКТОРА)
     elif action == "spin_roulette":
         if user.get("last_spin") == today_str:
             return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
@@ -6099,7 +6362,7 @@ async def api_handle_action(request):
         await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
 
         st["rookie_spin"] = 1
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st), uid)
+        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
         if chosen["coins"] >= 750:
             push_live_ticker(f"🎰 {user['username']} выбил {chosen['name']} в ежедневной рулетке!")
 
@@ -6127,10 +6390,12 @@ async def api_handle_action(request):
             "coin_delta": -amount
         })
 
+    # 12. ПРИЕМ КУПОНА (С ОПЦИЕЙ ПЛАТНОЙ СТРАХОВКИ +10% К СУММЕ)
     elif action == "submit_slip":
         items = body.get("items") or []
         stake_amount = int(body.get("stake") or 0)
         is_secret = bool(body.get("is_secret"))
+        insure_paid = bool(body.get("insure_paid"))
 
         if not items:
             return web.json_response({"ok": False, "error": "Купон пуст! Выбери хотя бы один исход."}, headers=CORS_HEADERS)
@@ -6156,7 +6421,7 @@ async def api_handle_action(request):
             res = await fast_create_pending_bet(
                 uid, user["username"], f"{ru_teams} ({m['short_date']})", mkt["label"],
                 stake_amount, mkt["odds"], mkt["prob"], m["end_ts"],
-                bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False)
+                bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
             )
             if not res["ok"]:
                 return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
@@ -6165,9 +6430,10 @@ async def api_handle_action(request):
             if is_secret:
                 asyncio.create_task(db_manager.unlock_achievement(uid, "secret_agent"))
 
+            ins_note = " 🛡[Застрахован 50%]" if res.get("booster_used") == "insure50" else ""
             return await _fast_delta_response(uid, {
-                "message": f"✅ Ординар #{res['bet_id']} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
-                "coin_delta": -stake_amount
+                "message": f"✅ Ординар #{res['bet_id']}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+                "coin_delta": -res["total_deduct"]
             }, include_bets=True)
 
         total_odd, comb_prob, max_end = 1.0, 1.0, 0
@@ -6191,16 +6457,17 @@ async def api_handle_action(request):
         res = await fast_create_pending_bet(
             uid, user["username"], f"Экспресс ({len(legs)} матчей)", "\n".join(titles),
             stake_amount, final_exp_odd, round(comb_prob * 100, 1), max_end,
-            bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False)
+            bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
         )
         if not res["ok"]:
             return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
 
         asyncio.create_task(db_manager.unlock_achievement(uid, "winter_2027"))
         boost_tag = f" [Буст +{res['exp_boost_pct']}%]" if res.get("exp_boost_pct", 0) > 0 else ""
+        ins_note = " 🛡[Страховка 50%]" if res.get("booster_used") == "insure50" else ""
         return await _fast_delta_response(uid, {
-            "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
-            "coin_delta": -stake_amount
+            "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+            "coin_delta": -res["total_deduct"]
         }, include_bets=True)
 
     elif action == "cashout_bet":
@@ -6259,7 +6526,7 @@ async def api_handle_action(request):
             LAST_PVP_MATCH[uid] = {"mode": "bot", "target": "", "opponent_name": "🤖 Кипер Лиги", "stake": stake}
             c_delta = 0
             if g1 > g2:
-                win_profit = round(stake * 0.90, 1)
+                win_profit = round(stake * 0.95, 1)
                 c_delta = win_profit
                 await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $1 WHERE user_id = $2", win_profit, uid)
                 if int(user.get("pvp_wins") or 0) + 1 >= 5:
@@ -6323,7 +6590,7 @@ async def api_handle_action(request):
         LAST_PVP_MATCH[d["creator_id"]] = {"mode": "direct", "target": str(uid), "opponent_name": user["username"], "stake": stake}
 
         g1, g2, log_txt = resolve_penalty_shootout(d["kick_dir"], d["save_dir"], kick_dir, save_dir)
-        bank = round(stake * 2 * 0.95, 1)
+        bank = round(stake * 2 * 0.95, 1)  # 5% комиссия
         c_delta = 0
 
         if g1 > g2:
@@ -6384,6 +6651,15 @@ async def api_handle_action(request):
 
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
+# Фоновый пульс БД каждые 18 секунд, исключающий засыпание сокета на Render
+async def db_keep_alive_worker():
+    while True:
+        await asyncio.sleep(18)
+        try:
+            await db_manager.fetchval("SELECT 1")
+        except Exception:
+            pass
+
 async def start_web_server():
     app = web.Application()
     app.router.add_route("OPTIONS", "/{tail:.*}", handle_options)
@@ -6429,6 +6705,7 @@ async def main():
     await get_precomputed_webapp_line()
     await start_web_server()
     await setup_bot_commands()
+    asyncio.create_task(db_keep_alive_worker())
     asyncio.create_task(match_settlement_worker())
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
