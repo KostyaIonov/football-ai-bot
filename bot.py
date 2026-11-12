@@ -6657,6 +6657,56 @@ async def api_handle_action(request):
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
 # Фоновый пульс БД каждые 18 секунд, исключающий засыпание сокета на Render
+_WEBAPP_HTML_MEMO = None
+
+async def serve_webapp_html(request):
+    """Переопределяет отдачу webapp.html через RAM-кэш без правок в середине файла"""
+    global _WEBAPP_HTML_MEMO
+    if _WEBAPP_HTML_MEMO is None:
+        html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
+        if not os.path.exists(html_path):
+            return web.Response(text="<h2>Файл webapp.html еще не загружен.</h2>", content_type="text/html", headers=CORS_HEADERS)
+        with open(html_path, "r", encoding="utf-8") as f:
+            _WEBAPP_HTML_MEMO = f.read()
+    return web.Response(text=_WEBAPP_HTML_MEMO, content_type="text/html", headers=CORS_HEADERS)
+
+async def handle_db_status(request):
+    """Живая диагностика БД и пинга по адресу /db_status"""
+    t0 = now_msk().timestamp()
+    try:
+        users_cnt = await db_manager.fetchval("SELECT COUNT(*) FROM users")
+        pending_bets = await db_manager.fetchval("SELECT COUNT(*) FROM bets WHERE status = 'pending'")
+        total_bets = await db_manager.fetchval("SELECT COUNT(*) FROM bets")
+        ping_ms = round((now_msk().timestamp() - t0) * 1000, 1)
+        engine_name = "PostgreSQL (Внешняя облачная БД — НАДЕЖНО ✅)" if db_manager.use_pg else "SQLite (Локальный файл — РИСК СБРОСА НА RENDER ⚠️)"
+
+        return web.json_response({
+            "ok": True,
+            "db_engine": engine_name,
+            "db_ping_ms": f"{ping_ms} мс",
+            "total_users": users_cnt,
+            "active_bets": pending_bets,
+            "total_bets": total_bets,
+            "ram_cached_users": len(RAM_USER_CACHE),
+            "precomputed_matches": len(PRECOMPUTED_WEBAPP_CACHE.get("matches", []))
+        }, headers=CORS_HEADERS)
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
+
+async def ensure_high_load_indexes():
+    """Создает скоростные индексы БД для мгновенной работы при тысячах ставок"""
+    queries = [
+        "CREATE INDEX IF NOT EXISTS idx_bets_user_status ON bets (user_id, status);",
+        "CREATE INDEX IF NOT EXISTS idx_bets_status ON bets (status);",
+        "CREATE INDEX IF NOT EXISTS idx_users_balance ON users (balance DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_pvp_status ON pvp_duels (status);"
+    ]
+    for q in queries:
+        try:
+            await db_manager.exec(q)
+        except Exception as e:
+            logging.warning(f"Индекс БД: {e}")
+
 async def db_keep_alive_worker():
     while True:
         await asyncio.sleep(18)
@@ -6667,12 +6717,14 @@ async def db_keep_alive_worker():
 
 async def start_web_server():
     app = web.Application()
-    app.router.add_route("OPTIONS", "/{tail:.*}", handle_options)
+    # Сначала регистрируем все GET и POST маршруты, а OPTIONS ставим последним (убирает ошибку 405)
     app.router.add_get("/", handle_ping)
+    app.router.add_get("/db_status", handle_db_status)
     app.router.add_get("/app", serve_webapp_html)
     app.router.add_get("/api/state/{user_id}", api_get_state)
     app.router.add_get("/api/match_ai/{league_key}/{event_id}", api_get_match_ai)
     app.router.add_post("/api/action", api_handle_action)
+    app.router.add_route("OPTIONS", "/{tail:.*}", handle_options)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 8080))
@@ -6700,6 +6752,7 @@ async def setup_bot_commands():
 async def main():
     logging.basicConfig(level=logging.INFO)
     await db_manager.init()
+    await ensure_high_load_indexes()
     if not db_manager.use_pg:
         try:
             await db_manager.exec("PRAGMA journal_mode=WAL;")
