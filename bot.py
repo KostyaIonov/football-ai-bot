@@ -4169,8 +4169,9 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + СВЕРХБЫСТРОЕ ЯДРО WEBAPP, 12 КОНТЕЙНЕРОВ (84 ПРЕДМЕТА) И VIP-КЛУБ =================
-from aiogram.types import MenuButtonWebApp, WebAppInfo
+# ================= ВЕБ-СЕРВЕР + ЗАЩИЩЕННОЕ ЯДРО WEBAPP, 12 КОНТЕЙНЕРОВ, P2P В БД И ПРОСМОТР ПРОФИЛЕЙ =================
+from collections import defaultdict
+from aiogram.types import MenuButtonWebApp, WebAppInfo, BufferedInputFile
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
 
@@ -4180,7 +4181,7 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type"
 }
 
-# 1. МИНИМАЛИСТИЧНОЕ МЕНЮ БОТА В ЧАТЕ (ТОЛЬКО WEB-APP, ПРОФИЛЬ И АКТИВНЫЕ СТАВКИ)
+# 1. МИНИМАЛИСТИЧНОЕ МЕНЮ БОТА В ЧАТЕ + КОМАНДА /BACKUP ДЛЯ АДМИНА
 def minimalist_chat_menu_kb(user_id: int = 0) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if WEBAPP_BASE_URL.startswith("https://"):
@@ -4192,12 +4193,67 @@ def minimalist_chat_menu_kb(user_id: int = 0) -> InlineKeyboardMarkup:
     builder.button(text="⏳ Активные ставки", callback_data="chat_only_active_bets")
     if user_id == ADMIN_ID:
         builder.button(text="⚙️ Админ-панель", callback_data="admin_panel")
-        builder.adjust(1, 2, 1)
+        builder.button(text="💾 Скачать бэкап БД", callback_data="admin_make_backup")
+        builder.adjust(1, 2, 2)
     else:
         builder.adjust(1, 2)
     return builder.as_markup()
 
 globals()["main_menu_kb"] = minimalist_chat_menu_kb
+
+async def send_database_backup_to_admin(trigger_note: str = "Ручной запрос"):
+    """Выгружает полную копию БД (игроки, активные ставки, лоты P2P) в JSON-файл и отправляет админу"""
+    try:
+        users_rows = await db_manager.fetch("SELECT * FROM users")
+        bets_rows = await db_manager.fetch("SELECT * FROM bets WHERE status = 'pending'")
+        p2p_rows = await db_manager.fetch("SELECT * FROM p2p_lots")
+
+        backup_data = {
+            "created_at": now_msk().strftime("%Y-%m-%d %H:%M:%S MSK"),
+            "trigger": trigger_note,
+            "users_count": len(users_rows),
+            "pending_bets_count": len(bets_rows),
+            "p2p_lots_count": len(p2p_rows),
+            "users": [dict(r) for r in users_rows],
+            "pending_bets": [dict(r) for r in bets_rows],
+            "p2p_lots": [dict(r) for r in p2p_rows]
+        }
+        raw_bytes = json.dumps(backup_data, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+        fname = f"backup_aibet_{now_msk().strftime('%Y%m%d_%H%M')}.json"
+        doc = BufferedInputFile(raw_bytes, filename=fname)
+        await bot.send_document(
+            ADMIN_ID,
+            document=doc,
+            caption=(
+                f"💾 <b>РЕЗЕРВНАЯ КОПИЯ БАЗЫ ДАННЫХ</b>\n\n"
+                f"<blockquote>📌 Тип: <b>{trigger_note}</b>\n"
+                f"👥 Игроков в базе: <b>{len(users_rows)}</b>\n"
+                f"🎫 Активных купонов: <b>{len(bets_rows)}</b>\n"
+                f"🌐 Лотов на P2P-Бирже: <b>{len(p2p_rows)}</b>\n"
+                f"🕒 Время: <code>{backup_data['created_at']}</code></blockquote>"
+            ),
+            parse_mode="HTML"
+        )
+        return True
+    except Exception as e:
+        logging.warning(f"Ошибка создания бэкапа: {e}")
+        return False
+
+@dp.message(Command("backup"))
+async def cmd_admin_backup(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer("⏳ Формирую резервную копию базы данных PostgreSQL...")
+    ok = await send_database_backup_to_admin("Команда /backup")
+    if not ok:
+        await message.answer("⚠️ Не удалось сформировать бэкап, проверь логи.")
+
+@dp.callback_query(F.data == "admin_make_backup")
+async def cb_admin_backup(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        return await callback.answer("Только для администратора!", show_alert=True)
+    await callback.answer("⏳ Выгружаю базу в файл...")
+    await send_database_backup_to_admin("Кнопка из меню")
 
 @dp.callback_query(F.data == "chat_only_profile")
 async def process_chat_only_profile(callback: CallbackQuery):
@@ -4214,9 +4270,10 @@ async def process_chat_only_profile(callback: CallbackQuery):
         f"🆔 Твой ID: <code>{uid}</code> <i>(нажми для копирования)</i>\n"
         f"🏅 Ранг: <b>{rank_name}</b>\n"
         f"💰 Баланс: <b><code>{round(u['balance'], 1)} FC</code></b>\n"
+        f"💎 Капитал Форбс: <b><code>{calculate_forbes_net_worth(u, st)} FC</code></b>\n"
         f"📊 Статистика: <b>{u['wins']}В / {u['losses']}П ({wr}%)</b>\n"
         f"📈 Чистый профит: <b><code>{round(u['profit'], 1)} FC</code></b></blockquote>\n\n"
-        f"📱 <i>Все ставки, 12 контейнеров, VIP-Клуб и арена доступны в Web-App по кнопке ниже!</i>"
+        f"📱 <i>Все ставки, 12 контейнеров, VIP-Клуб и просмотр профилей других игроков доступны в Web-App!</i>"
     )
     await callback.message.edit_text(text, reply_markup=minimalist_chat_menu_kb(uid), parse_mode="HTML")
     await callback.answer()
@@ -4359,7 +4416,7 @@ EXACT_CLUB_DICTIONARY = {
     "Kazakhstan": "Казахстан", "Armenia": "Армения", "Belarus": "Беларусь", "Azerbaijan": "Азербайджан", "Iceland": "Исландия",
     "Bosnia and Herzegovina": "Босния и Герцеговина", "Israel": "Израиль", "Albania": "Албания", "North Macedonia": "Северная Македония",
     "Montenegro": "Черногория", "Bulgaria": "Болгария", "Kosovo": "Косово", "Luxembourg": "Люксембург", "Cyprus": "Кипр",
-    "Estonia": "Эстония", "Latvia": "Латвия", "Lithuania": "Литва", "Moldova": "Молдова", "Malta": "Мальта",
+    "Estonia": "Эстония", "Latvia": "Latvia", "Lithuania": "Литва", "Moldova": "Молдова", "Malta": "Мальта",
     "Andorra": "Андорра", "San Marino": "Сан-Марино", "Liechtenstein": "Лихтенштейн", "Gibraltar": "Гибралтар", "Faroe Islands": "Фарерские о-ва",
     "Brazil": "Бразилия", "Argentina": "Аргентина", "Uruguay": "Уругвай", "Colombia": "Колумбия", "USA": "США", "Mexico": "Мексика"
 }
@@ -4407,14 +4464,16 @@ def translate_team_ru(name: str) -> str:
 
 globals()["translate_team"] = translate_team_ru
 
-# 3. УСТРАНЕНИЕ ЗАДЕРЖКИ ПЕРВОГО КЛИКА: RAM-КЭШ ПРОФИЛЯ + DB KEEP-ALIVE ПУЛ
+# 3. АНТИ-ДЮП БЛОКИРОВКИ, RAM-КЭШ ПРОФИЛЯ И ЗАЩИЩЕННЫЙ ПУЛ БД
 _orig_db_exec = db_manager.exec
 _orig_db_fetchrow = db_manager.fetchrow
 _orig_db_fetch = db_manager.fetch
 _orig_db_fetchval = db_manager.fetchval
 _orig_get_user = db_manager.get_user
 _DB_RECONNECT_LOCK = asyncio.Lock()
+
 RAM_USER_CACHE = {}  # {user_id: {"data": dict, "ts": float}}
+USER_ACTION_LOCKS = defaultdict(asyncio.Lock)  # Защита от двойного клика и дюпа валюты/предметов
 
 async def _safe_db_call(func, *args):
     for attempt in range(2):
@@ -4448,14 +4507,17 @@ async def _cached_exec(query: str, *args):
                 RAM_USER_CACHE.pop(a, None)
     return res
 
-async def _fast_get_user(user_id: int, username: str = None, referrer_id: int = 0) -> dict:
+async def _fast_get_user(user_id: int, *args, **kwargs) -> dict:
     now_f = now_msk().timestamp()
-    cached = RAM_USER_CACHE.get(user_id)
-    if cached and (now_f - cached["ts"] < 25.0):
-        return dict(cached["data"])
-    u = await _orig_get_user(user_id, username, referrer_id)
+    if not args and not kwargs:
+        cached = RAM_USER_CACHE.get(user_id)
+        if cached and (now_f - cached["ts"] < 25.0):
+            return dict(cached["data"])
+    u = await _orig_get_user(user_id, *args, **kwargs)
     if u:
-        RAM_USER_CACHE[user_id] = {"data": dict(u), "ts": now_f}
+        u_dict = dict(u)
+        RAM_USER_CACHE[user_id] = {"data": u_dict, "ts": now_f}
+        return u_dict
     return u
 
 db_manager.exec = _cached_exec
@@ -4464,7 +4526,83 @@ db_manager.fetch = lambda q, *a: _safe_db_call(_orig_db_fetch, q, *a)
 db_manager.fetchval = lambda q, *a: _safe_db_call(_orig_db_fetchval, q, *a)
 db_manager.get_user = _fast_get_user
 
-# 4. 12 КОНТЕЙНЕРОВ (ОТ 1 000 ДО 300 000 FC) И 84 УНИКАЛЬНЫХ ПРЕДМЕТА + СПРОС ДНЯ (+15%)
+# 4. СОХРАНЕНИЕ P2P-БИРЖИ В БАЗЕ ДАННЫХ (ЗАЩИТА ОТ ПОТЕРИ ЛОТОВ ПРИ ПЕРЕЗАПУСКЕ СЕРВЕРА)
+P2P_CONTAINER_MARKET = []
+_P2P_LOT_SEQ = 100
+
+async def init_and_load_p2p_market():
+    """Создает таблицу p2p_lots и восстанавливает все лоты игроков после перезапуска сервера"""
+    global _P2P_LOT_SEQ
+    try:
+        await db_manager.exec("""
+            CREATE TABLE IF NOT EXISTS p2p_lots (
+                lot_id INTEGER PRIMARY KEY,
+                seller_id BIGINT,
+                seller_name TEXT,
+                seller_vip INTEGER DEFAULT 0,
+                price INTEGER,
+                item_json TEXT,
+                created_at TEXT
+            )
+        """)
+        rows = await db_manager.fetch("SELECT * FROM p2p_lots ORDER BY lot_id DESC LIMIT 60")
+        P2P_CONTAINER_MARKET.clear()
+        max_id = 100
+        for r in rows:
+            rd = dict(r)
+            lid = int(rd["lot_id"])
+            if lid > max_id:
+                max_id = lid
+            try:
+                item_obj = json.loads(rd.get("item_json") or "{}")
+            except Exception:
+                item_obj = {}
+            if item_obj:
+                P2P_CONTAINER_MARKET.append({
+                    "lot_id": lid,
+                    "seller_id": int(rd["seller_id"]),
+                    "seller_name": rd["seller_name"],
+                    "seller_vip": bool(rd.get("seller_vip")),
+                    "price": int(rd["price"]),
+                    "item": item_obj
+                })
+        _P2P_LOT_SEQ = max_id
+    except Exception as e:
+        logging.warning(f"Инициализация таблицы P2P-Биржи: {e}")
+
+async def db_insert_p2p_lot(lot_obj: dict):
+    try:
+        if db_manager.use_pg:
+            await db_manager.exec(
+                "INSERT INTO p2p_lots (lot_id, seller_id, seller_name, seller_vip, price, item_json, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                lot_obj["lot_id"], lot_obj["seller_id"], lot_obj["seller_name"],
+                1 if lot_obj.get("seller_vip") else 0, lot_obj["price"],
+                json.dumps(lot_obj["item"], ensure_ascii=False), now_msk().strftime("%d.%m %H:%M")
+            )
+        else:
+            async with aiosqlite.connect(db_manager.sqlite_path) as db:
+                await db.execute(
+                    "INSERT INTO p2p_lots (lot_id, seller_id, seller_name, seller_vip, price, item_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (lot_obj["lot_id"], lot_obj["seller_id"], lot_obj["seller_name"],
+                     1 if lot_obj.get("seller_vip") else 0, lot_obj["price"],
+                     json.dumps(lot_obj["item"], ensure_ascii=False), now_msk().strftime("%d.%m %H:%M"))
+                )
+                await db.commit()
+    except Exception as e:
+        logging.warning(f"Ошибка сохранения P2P-лота в БД: {e}")
+
+async def db_delete_p2p_lot(lot_id: int):
+    try:
+        if db_manager.use_pg:
+            await db_manager.exec("DELETE FROM p2p_lots WHERE lot_id = $1", lot_id)
+        else:
+            async with aiosqlite.connect(db_manager.sqlite_path) as db:
+                await db.execute("DELETE FROM p2p_lots WHERE lot_id = ?", (lot_id,))
+                await db.commit()
+    except Exception as e:
+        logging.warning(f"Ошибка удаления P2P-лота из БД: {e}")
+
+# 5. 12 КОНТЕЙНЕРОВ (ОТ 1 000 ДО 300 000 FC) И 84 УНИКАЛЬНЫХ ПРЕДМЕТА + СПРОС ДНЯ (+15%)
 DEMAND_CATEGORIES = {
     "tech": {"key": "tech", "title": "💻 Электроника и ИИ", "ico": "💻"},
     "auto": {"key": "auto", "title": "🏎 Авто и Болиды", "ico": "🏎"},
@@ -4475,7 +4613,6 @@ DEMAND_CATEGORIES = {
 }
 
 def get_daily_port_demand() -> dict:
-    """Каждый день выбирает 1 категорию повышенного спроса (+15% к оценке и продаже)"""
     day_seed = now_msk().timetuple().tm_yday
     keys = list(DEMAND_CATEGORIES.keys())
     chosen_k = keys[day_seed % len(keys)]
@@ -4640,7 +4777,7 @@ CONTAINERS_CATALOG = {
     }
 }
 
-# 5. ТАРИФЫ VIP-КЛУБА ЗА FC (НАЧИНАЯ ОТ 20 000 FC)
+# 6. ТАРИФЫ VIP-КЛУБА ЗА FC (НАЧИНАЯ ОТ 20 000 FC)
 VIP_PLANS_FC = {
     "vip_3d": {"id": "vip_3d", "days": 3, "price": 20000, "title": "👑 VIP-Статус на 3 дня", "sub": "Идеально на тур еврокубков"},
     "vip_14d": {"id": "vip_14d", "days": 14, "price": 65000, "title": "👑 VIP-Статус на 14 дней", "sub": "Выгода 30% • 2 недели привилегий"},
@@ -4657,10 +4794,10 @@ VIP_BENEFITS_LIST = [
 ]
 
 LIVE_TICKER_FEED = [
+    "🎄 Добро пожаловать в Новогодний сезон AI_BET_BOT 2027! Вскрывай контейнеры и собирай состав мечты!",
     "🔥 Каппер Alex_Bet выбил «🏎️ Шасси болида F1» в контейнере Монако!",
     "⚡ Игрок Маэстро_99 собрал Экспресс с кэфом 6.45 и забрал +16 125 FC!",
     "💎 На P2P-Бирже продан «🔑 Зашифрованный Ledger» за 68 500 FC!",
-    "🎰 Каппер LuckyStrike сорвал ДЖЕКПОТ +2 000 FC в бесплатной рулетке!",
     "👑 Игрок KaperPro активировал VIP-Статус и открыл «🛸 Сектор Зона-51»!"
 ]
 
@@ -4669,7 +4806,7 @@ def push_live_ticker(event_text: str):
     if len(LIVE_TICKER_FEED) > 12:
         LIVE_TICKER_FEED.pop()
 
-# 6. КОНТРАКТЫ СПОНСОРОВ И КАЛЕНДАРЬ ВХОДА (ОТ 200 ДО 3 500 FC)
+# 7. КОНТРАКТЫ СПОНСОРОВ И КАЛЕНДАРЬ ВХОДА (ОТ 200 ДО 3 500 FC)
 STADIUM_SPONSORS = [
     {
         "id": "sp_1", "name": "🟢 Winter Cup Energy", "min_lvl": 1, "deposit": 0, "bonus": 350,
@@ -4703,7 +4840,7 @@ STREAK_CALENDAR = [
     {"day": 7, "coins": 3500, "booster": "insure50", "label": "🎁 +3 500 FC + 🛡 Страховка 50%"}
 ]
 
-# 7. 36 КАРТОЧЕК FUT
+# 8. 36 КАРТОЧЕК FUT
 FUT_CARDS.clear()
 FUT_CARDS.update({
     "fw_1": {"id": "fw_1", "role": "FW", "tier": 1, "ovr": 84, "nation": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "🥉 Джейми Варди", "val": 6, "desc": "+6% к прибыли на Тоталах", "pack": "Базовый"},
@@ -4749,15 +4886,15 @@ FUT_CARDS.update({
 })
 
 FUT_ROLES = ["FW", "MID", "DEF", "GK", "COACH"]
-P2P_CONTAINER_MARKET = []
-_P2P_LOT_SEQ = 100
 
 def parse_user_fut_state(user: dict) -> dict:
     try:
-        raw = json.loads(user.get("fut_cards") or "{}")
+        u_d = dict(user) if user else {}
+        raw = json.loads(u_d.get("fut_cards") or "{}")
         if not isinstance(raw, dict):
             raw = {}
     except Exception:
+        u_d = {}
         raw = {}
 
     owned = [c for c in (raw.get("_owned") or []) if c in FUT_CARDS]
@@ -4775,8 +4912,8 @@ def parse_user_fut_state(user: dict) -> dict:
     if captain not in FUT_ROLES:
         captain = "FW"
 
-    has_bets_before = (int(user.get("wins") or 0) + int(user.get("losses") or 0)) > 0
-    has_spun_before = bool(user.get("last_spin"))
+    has_bets_before = (int(u_d.get("wins") or 0) + int(u_d.get("losses") or 0)) > 0
+    has_spun_before = bool(u_d.get("last_spin"))
 
     return {
         "squad": squad,
@@ -4799,11 +4936,15 @@ def parse_user_fut_state(user: dict) -> dict:
     }
 
 def is_user_vip_active(user: dict, st: dict = None) -> bool:
-    if int(user.get("is_vip") or 0) == 1:
-        return True
-    if st is None:
-        st = parse_user_fut_state(user)
-    return int(st.get("vip_until_ts") or 0) > int(now_msk().timestamp())
+    try:
+        u_d = dict(user) if user else {}
+        if int(u_d.get("is_vip") or 0) == 1:
+            return True
+        if st is None:
+            st = parse_user_fut_state(u_d)
+        return int(st.get("vip_until_ts") or 0) > int(now_msk().timestamp())
+    except Exception:
+        return False
 
 def dump_user_fut_state(st: dict, is_vip_flag: bool = False) -> str:
     max_stor = 12 if is_vip_flag else 8
@@ -4830,21 +4971,25 @@ def dump_user_fut_state(st: dict, is_vip_flag: bool = False) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 def calculate_forbes_net_worth(user: dict, st: dict = None) -> int:
-    """Считает общий Капитал Форбс: Баланс + Склад + Шоурум + Вложения в Арену"""
-    if st is None:
-        st = parse_user_fut_state(user)
-    bal = float(user.get("balance") or 0)
-    stor_val = sum(int(x.get("value") or 0) for x in st.get("startup_storage", []))
-    show_val = sum(int(x.get("value") or 0) for x in st.get("startup_showroom", []))
-    st_lvl = int(user.get("stadium_level") or 1)
-    arena_val = sum(STADIUM_LEVELS.get(l, {"price": 0})["price"] for l in range(1, st_lvl + 1))
-    return int(round(bal + stor_val + show_val + arena_val * 0.5))
+    try:
+        u_d = dict(user) if user else {}
+        if st is None:
+            st = parse_user_fut_state(u_d)
+        bal = float(u_d.get("balance") or 0)
+        stor_val = sum(int(x.get("value") or 0) for x in st.get("startup_storage", []))
+        show_val = sum(int(x.get("value") or 0) for x in st.get("startup_showroom", []))
+        st_lvl = int(u_d.get("stadium_level") or 1)
+        arena_val = sum(int(STADIUM_LEVELS.get(l, {}).get("price", 0)) for l in range(1, st_lvl + 1))
+        return int(round(bal + stor_val + show_val + arena_val * 0.5))
+    except Exception:
+        return int(float(dict(user).get("balance") or 0)) if user else 0
 
 def get_user_fut_buffs_v2(user: dict) -> dict:
-    st = parse_user_fut_state(user)
+    u_d = dict(user) if user else {}
+    st = parse_user_fut_state(u_d)
     squad = st["squad"]
     cap_role = st["captain"]
-    vip_active = is_user_vip_active(user, st)
+    vip_active = is_user_vip_active(u_d, st)
 
     filled_slots = sum(1 for r in FUT_ROLES if squad.get(r))
     chemistry_pct = filled_slots * 20
@@ -4858,7 +5003,7 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
         cap_mult = 1.25 if cap_role == role_key else 1.0
         return round(base_v * cap_mult * chem_mult, 2)
 
-    lab_lvl = int(user.get("lab_level") or 1)
+    lab_lvl = int(u_d.get("lab_level") or 1)
     lab_bonus = LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["odd_bonus"]
 
     showroom_items = st.get("startup_showroom") or []
@@ -4967,7 +5112,7 @@ async def fast_create_pending_bet(
     vip_act = buffs["is_vip_active"]
     st["rookie_bet"] = 1
 
-    # ЗАЩИТА ОТ МУЛЬТИАККАУНТОВ: реферальный бонус начисляется пригласившему только при первой реальной ставке друга!
+    # ЗАЩИТА ОТ МУЛЬТИАККАУНТОВ: реферальный бонус начисляется пригласившему только при первой ставке друга
     ref_inviter = int(user.get("referred_by") or 0)
     if ref_inviter > 0 and st.get("ref_bonus_paid", 0) == 0:
         st["ref_bonus_paid"] = 1
@@ -5056,6 +5201,62 @@ ACHIEVEMENTS_CONFIG.update({
 
 ACTIVE_LIVE_WIDGETS = {}
 LAST_PVP_MATCH = {}
+
+# ================= СБОРКА ПУБЛИЧНОГО ПРОФИЛЯ ЛЮБОГО ИГРОКА ДЛЯ ОБЗОРА =================
+def build_public_player_profile(target_user: dict) -> dict:
+    u_d = dict(target_user)
+    buffs = get_user_fut_buffs_v2(u_d)
+    st = buffs["full_state"]
+    vip_act = buffs["is_vip_active"]
+    incog = int(u_d.get("is_incognito") or 0) == 1
+    st_lvl = int(u_d.get("stadium_level") or 1)
+    lab_lvl = int(u_d.get("lab_level") or 1)
+    rank_name, _ = get_user_rank_info(u_d["balance"], 1 if vip_act else 0)
+
+    total_bets = int(u_d.get("wins") or 0) + int(u_d.get("losses") or 0)
+    winrate = round((int(u_d.get("wins") or 0) / total_bets) * 100) if total_bets > 0 else 0
+
+    try:
+        ach_list = json.loads(u_d.get("achievements") or "[]")
+    except Exception:
+        ach_list = []
+
+    squad_cards = {}
+    for r_key in FUT_ROLES:
+        cid = buffs["squad_ids"].get(r_key, "")
+        squad_cards[r_key] = FUT_CARDS.get(cid) if cid in FUT_CARDS else None
+
+    display_name = f"🕶 Скрытый каппер #{str(u_d['user_id'])[-4:]}" if incog else u_d["username"]
+
+    return {
+        "user_id": u_d["user_id"],
+        "username": display_name,
+        "raw_username": u_d["username"],
+        "is_incognito": incog,
+        "is_vip": 1 if vip_act else 0,
+        "rank": rank_name,
+        "favorite_club": "" if incog else (u_d.get("favorite_club") or ""),
+        "balance": round(u_d["balance"], 1),
+        "forbes_capital": calculate_forbes_net_worth(u_d, st),
+        "wins": int(u_d.get("wins") or 0),
+        "losses": int(u_d.get("losses") or 0),
+        "winrate": winrate,
+        "streak": int(u_d.get("streak") or 0),
+        "profit": round(u_d.get("profit") or 0, 1),
+        "pvp_wins": int(u_d.get("pvp_wins") or 0),
+        "stadium_level": st_lvl,
+        "stadium_name": STADIUM_LEVELS.get(st_lvl, STADIUM_LEVELS[1])["name"],
+        "lab_level": lab_lvl,
+        "lab_name": LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["name"],
+        "chemistry": buffs["chemistry"],
+        "captain_role": buffs["captain"],
+        "squad_cards": squad_cards,
+        "owned_cards_count": len(buffs["owned_ids"]),
+        "showroom": st.get("startup_showroom", []),
+        "showroom_daily_fc": buffs["showroom_daily_fc"],
+        "showroom_odd_boost": buffs["showroom_odd_boost"],
+        "trophies_count": len(ach_list)
+    }
 
 # ================= КАЛЬКУЛЯТОР 45+ РЫНКОВ =================
 _orig_evaluate_custom_market = evaluate_custom_market
@@ -5420,15 +5621,16 @@ def check_sponsor_quest_done(sp_id: str, user: dict, st: dict, active_bets: list
     return True
 
 # ================= REST API HANDLERS ДЛЯ WEBAPP =================
+_WEBAPP_HTML_MEMO = None
+
 async def handle_options(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 async def handle_ping(request):
     return web.Response(text="AI_BET_BOT Ultra-Fast Engine is running 24/7!", headers=CORS_HEADERS)
 
-_WEBAPP_HTML_MEMO = None
-
 async def serve_webapp_html(request):
+    """Отдает webapp.html напрямую из оперативной памяти (0 обращений к диску при наплыве трафика)"""
     global _WEBAPP_HTML_MEMO
     if _WEBAPP_HTML_MEMO is None:
         html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
@@ -5656,6 +5858,7 @@ async def build_user_state_payload(uid: int) -> dict:
         u_vip = is_user_vip_active(u)
         leaderboard.append({
             "place": idx,
+            "user_id": u["user_id"],
             "name": f"🕶 Скрытый #{str(u['user_id'])[-4:]}" if incog else (f"👑 {u['username']}" if u_vip else u["username"]),
             "club": "" if incog else (u.get("favorite_club") or ""),
             "balance": round(u["balance"], 1),
@@ -5732,6 +5935,7 @@ async def build_user_state_payload(uid: int) -> dict:
         "black_market": {
             "card": lot_card,
             "highest_bid": lot["highest_bid"],
+            "leader_id": int(lot["leader_id"]),
             "leader_name": lot["leader_name"],
             "min_next_bid": int(lot["highest_bid"]) + 500 if int(lot["leader_id"]) != 0 else int(lot["highest_bid"])
         },
@@ -5830,888 +6034,850 @@ async def api_handle_action(request):
     if not uid:
         return web.json_response({"ok": False, "error": "Не указан ID игрока"}, status=400, headers=CORS_HEADERS)
 
-    user = await db_manager.get_user(uid)
-    st = parse_user_fut_state(user)
-    vip_act = is_user_vip_active(user, st)
-    today_str = now_msk().strftime("%Y-%m-%d")
+    # ОБЗОР ЧУЖОГО ПРОФИЛЯ ИГРОКА (БЕЗ БЛОКИРОВКИ ОЧЕРЕДИ)
+    if action == "inspect_player":
+        query_val = str(body.get("query") or body.get("target_id") or "").strip()
+        if not query_val:
+            return web.json_response({"ok": False, "error": "Укажи Никнейм или ID игрока для поиска!"}, headers=CORS_HEADERS)
+        target_u = await db_manager.find_user_by_query(query_val)
+        if not target_u:
+            return web.json_response({"ok": False, "error": f"Игрок «{query_val}» не найден в базе!"}, headers=CORS_HEADERS)
+        pub_prof = build_public_player_profile(target_u)
+        return web.json_response({"ok": True, "profile": pub_prof}, headers=CORS_HEADERS)
 
-    # 1. ПОКУПКА VIP-СТАТУСА ЗА FC (ОТ 20 000 FC)
-    if action == "buy_vip_fc":
-        plan_id = str(body.get("plan_id") or "vip_3d")
-        plan = VIP_PLANS_FC.get(plan_id)
-        if not plan:
-            return web.json_response({"ok": False, "error": "Тариф VIP не найден"}, headers=CORS_HEADERS)
-        cost = plan["price"]
-        if user["balance"] < cost:
-            return web.json_response({"ok": False, "error": f"Недостаточно средств! Для «{plan['title']}» нужно {cost} FC."}, headers=CORS_HEADERS)
+    # СТРОГАЯ АНТИ-ДЮП БЛОКИРОВКА НА ВСЕ ДЕЙСТВИЯ С БАЛАНСОМ И ПРЕДМЕТАМИ
+    async with USER_ACTION_LOCKS[uid]:
+        user = await db_manager.get_user(uid)
+        st = parse_user_fut_state(user)
+        vip_act = is_user_vip_active(user, st)
+        today_str = now_msk().strftime("%Y-%m-%d")
 
-        now_ts = int(now_msk().timestamp())
-        base_ts = max(now_ts, int(st.get("vip_until_ts") or 0))
-        st["vip_until_ts"] = base_ts + (plan["days"] * 86400)
-        new_bal = round(user["balance"] - cost, 1)
+        # 1. ПОКУПКА VIP-СТАТУСА ЗА FC (ОТ 20 000 FC)
+        if action == "buy_vip_fc":
+            plan_id = str(body.get("plan_id") or "vip_3d")
+            plan = VIP_PLANS_FC.get(plan_id)
+            if not plan:
+                return web.json_response({"ok": False, "error": "Тариф VIP не найден"}, headers=CORS_HEADERS)
+            cost = plan["price"]
+            if user["balance"] < cost:
+                return web.json_response({"ok": False, "error": f"Недостаточно средств! Для «{plan['title']}» нужно {cost} FC."}, headers=CORS_HEADERS)
 
-        await db_manager.exec(
-            "UPDATE users SET balance = $1, is_vip = 1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st, True), uid
-        )
-        SHARED_DB_CACHE["leaderboard_ts"] = 0
-        asyncio.create_task(db_manager.unlock_achievement(uid, "vip_club_member"))
-        push_live_ticker(f"👑 Каппер {user['username']} вступил в VIP-Клуб ({plan['title']})!")
-        return await _fast_delta_response(uid, {
-            "message": f"👑 Поздравляем! Активирован «{plan['title']}» со всеми привилегиями!",
-            "coin_delta": -cost
-        })
+            now_ts = int(now_msk().timestamp())
+            base_ts = max(now_ts, int(st.get("vip_until_ts") or 0))
+            st["vip_until_ts"] = base_ts + (plan["days"] * 86400)
+            new_bal = round(user["balance"] - cost, 1)
 
-    # 2. ЕЖЕДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ (ОТ 200 ДО 3 500 FC)
-    elif action == "claim_bonus":
-        streak_day, can_claim = compute_login_streak_info(st)
-        if not can_claim or user.get("last_bonus") == today_str:
-            return web.json_response({"ok": False, "error": "Бонус сегодня уже получен! Заходи завтра для продолжения серии."}, headers=CORS_HEADERS)
-
-        cal_item = STREAK_CALENDAR[streak_day - 1]
-        _, rank_bonus = get_user_rank_info(user["balance"], 1 if vip_act else 0)
-        total_reward = cal_item["coins"] + int(rank_bonus * 0.5)
-
-        st["login_streak"] = streak_day
-        st["last_streak_date"] = today_str
-        new_booster = cal_item["booster"] or user.get("active_booster") or ""
-
-        await db_manager.exec(
-            "UPDATE users SET balance = balance + $1, last_bonus = $2, active_booster = $3, fut_cards = $4 WHERE user_id = $5",
-            float(total_reward), today_str, new_booster, dump_user_fut_state(st, vip_act), uid
-        )
-        b_note = " + Бустер!" if cal_item["booster"] else ""
-        return await _fast_delta_response(uid, {
-            "message": f"🔥 День {streak_day}/7! Получено +{total_reward} FC{b_note}",
-            "coin_delta": total_reward
-        })
-
-    # 3. СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +1 000 FC + КАРТОЧКА FUT)
-    elif action == "claim_rookie_quest":
-        if st.get("rookie_claimed") == 1:
-            return web.json_response({"ok": False, "error": "Награда стартового квеста уже получена!"}, headers=CORS_HEADERS)
-        act_bets = await db_manager.get_user_bets(uid, active_only=True)
-        rk_bet = 1 if (st.get("rookie_bet") or len(act_bets) > 0) else 0
-        rk_box = 1 if (st.get("rookie_box") or len(st.get("startup_storage", [])) > 0 or len(st.get("startup_showroom", [])) > 0) else 0
-        rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
-
-        if (rk_bet + rk_box + rk_spin) < 3:
-            return web.json_response({"ok": False, "error": "Выполни все 3 простых шага (1 ставка, 1 контейнер и 1 спин рулетки)!"}, headers=CORS_HEADERS)
-
-        st["rookie_claimed"] = 1
-        st["rookie_bet"] = 1
-        st["rookie_box"] = 1
-        st["rookie_spin"] = 1
-
-        tier2_pool = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
-        bonus_card_id = random.choice(tier2_pool)
-        bonus_card = FUT_CARDS[bonus_card_id]
-        if bonus_card_id not in st["owned"]:
-            st["owned"].append(bonus_card_id)
-            role = bonus_card["role"]
-            if not st["squad"].get(role):
-                st["squad"][role] = bonus_card_id
-
-        await db_manager.exec(
-            "UPDATE users SET balance = balance + 1000, fut_cards = $1 WHERE user_id = $2",
-            dump_user_fut_state(st, vip_act), uid
-        )
-        push_live_ticker(f"🎁 Игрок {user['username']} выполнил Квест Новичка и получил +1 000 FC + карту {bonus_card['name']}!")
-        return await _fast_delta_response(uid, {
-            "message": f"🎉 Квест выполнен! Получено +1 000 FC и карточка «{bonus_card['name']}»!",
-            "card": bonus_card,
-            "coin_delta": 1000
-        })
-
-    # 4. КОНТЕЙНЕРЫ: ПОКУПКА И ВСКРЫТИЕ (12 КОНТЕЙНЕРОВ, СКИДКА 10% ДЛЯ VIP, СПРОС ДНЯ +15%)
-    elif action == "startup_open_container":
-        cid = str(body.get("container_id") or "c_1")
-        box = CONTAINERS_CATALOG.get(cid)
-        if not box:
-            return web.json_response({"ok": False, "error": "Контейнер не найден"}, headers=CORS_HEADERS)
-        max_stor = 12 if vip_act else 8
-        if len(st["startup_storage"]) >= max_stor:
-            return web.json_response({"ok": False, "error": f"Склад переполнен (макс. {max_stor} находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
-
-        raw_price = box["price"]
-        price = int(round(raw_price * 0.90)) if vip_act else raw_price
-        if user["balance"] < price:
-            return web.json_response({"ok": False, "error": f"Недостаточно средств! Нужно {price} FC."}, headers=CORS_HEADERS)
-
-        pool = box["items"]
-        weights = [26, 22, 18, 14, 10, 6, 4][:len(pool)]
-        chosen_tpl = random.choices(pool, weights=weights, k=1)[0]
-
-        demand = get_daily_port_demand()
-        is_hot = (chosen_tpl.get("cat") == demand["key"])
-        demand_mult = 1.15 if is_hot else 1.0
-
-        condition = random.randint(44, 88)
-        cond_mult = round(0.65 + (condition / 100.0) * 0.65, 2)
-        market_val = int(round(chosen_tpl["base"] * cond_mult * demand_mult, -1))
-
-        uid_item = f"lot_{int(now_msk().timestamp()*1000)}_{random.randint(100,999)}"
-        found_item = {
-            "uid": uid_item,
-            "tpl_id": chosen_tpl["id"],
-            "name": chosen_tpl["name"],
-            "ico": chosen_tpl["ico"],
-            "cat": chosen_tpl.get("cat", "tech"),
-            "is_in_demand": is_hot,
-            "rarity": chosen_tpl["rarity"],
-            "condition": condition,
-            "restored_count": 0,
-            "value": market_val,
-            "expected_restore": int(round(market_val * 2.0, -1)),
-            "restore_cost": max(150, int(round(market_val * 0.22, -1))),
-            "show_inc": chosen_tpl["show_inc"],
-            "show_odd": chosen_tpl["show_odd"],
-            "container_price": price
-        }
-        st["startup_storage"].insert(0, found_item)
-        st["rookie_box"] = 1
-        new_bal = round(user["balance"] - price, 1)
-
-        await db_manager.exec(
-            "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st, vip_act), uid
-        )
-        asyncio.create_task(db_manager.unlock_achievement(uid, "container_hunter"))
-        if cid == "c_12":
-            asyncio.create_task(db_manager.unlock_achievement(uid, "ark_billionaire"))
-
-        if market_val >= 8000 or chosen_tpl["rarity"] >= 3:
-            push_live_ticker(f"📦 {user['username']} вскрыл «{box['name']}» и нашёл {found_item['name']} ({market_val} FC)!")
-
-        hot_tag = " 🔥[Спрос дня +15%!]" if is_hot else ""
-        return await _fast_delta_response(uid, {
-            "message": f"📦 Вскрыт «{box['name']}»! Найдено: {found_item['name']} (Оценка: {found_item['value']} FC){hot_tag}",
-            "found_item": found_item,
-            "coin_delta": -price
-        })
-
-    # 5. КОНТЕЙНЕРЫ: РЕСТАВРАЦИЯ (ШАНС 84% ДЛЯ VIP И 72% ОБЫЧНЫЙ)
-    elif action == "startup_restore_item":
-        item_uid = str(body.get("item_uid") or "")
-        idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
-        if idx == -1:
-            return web.json_response({"ok": False, "error": "Предмет не найден на складе"}, headers=CORS_HEADERS)
-
-        it = st["startup_storage"][idx]
-        if it.get("restored_count", 0) >= 2 or it["condition"] >= 100:
-            return web.json_response({"ok": False, "error": "Этот предмет уже отреставрирован до максимума!"}, headers=CORS_HEADERS)
-
-        r_cost = int(it.get("restore_cost") or 200)
-        if user["balance"] < r_cost:
-            return web.json_response({"ok": False, "error": f"Для реставрации нужно {r_cost} FC!"}, headers=CORS_HEADERS)
-
-        it["restored_count"] = int(it.get("restored_count") or 0) + 1
-        win_chance = 0.84 if vip_act else 0.72
-        success = random.random() < win_chance
-        if success:
-            boost_mult = random.uniform(1.70, 2.38)
-            it["value"] = int(round(it["value"] * boost_mult, -1))
-            it["condition"] = min(100, it["condition"] + random.randint(25, 45))
-            it["restore_cost"] = int(round(it["value"] * 0.25, -1))
-            msg = f"✨ Успешная реставрация! Ценность «{it['name']}» выросла до {it['value']} FC!"
-            if it["value"] >= 20000:
-                push_live_ticker(f"🔧 {user['username']} отреставрировал «{it['name']}» до {it['value']} FC!")
-        else:
-            it["value"] = max(100, int(round(it["value"] * 0.76, -1)))
-            it["condition"] = max(20, it["condition"] - 12)
-            msg = f"⚠️ Вскрылся скрытый дефект при разборке! Оценка снизилась до {it['value']} FC."
-
-        new_bal = round(user["balance"] - r_cost, 1)
-        await db_manager.exec(
-            "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st, vip_act), uid
-        )
-        return await _fast_delta_response(uid, {"message": msg, "coin_delta": -r_cost})
-
-    # 6. КОНТЕЙНЕРЫ: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
-    elif action == "startup_sell_npc":
-        item_uid = str(body.get("item_uid") or "")
-        tactic = str(body.get("tactic") or "base")
-        idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
-        if idx == -1:
-            return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
-
-        it = st["startup_storage"].pop(idx)
-        base_val = int(it["value"])
-
-        if tactic == "base":
-            final_price = base_val
-            msg = f"🤝 Сделка закрыта по оценке! Продано «{it['name']}» за +{final_price} FC."
-        elif tactic == "push25":
-            if random.random() < 0.65:
-                final_price = int(round(base_val * 1.25, -1))
-                msg = f"🔥 Скупщик согласился на наценку +25%! Продано за +{final_price} FC!"
-            else:
-                final_price = int(round(base_val * 0.90, -1))
-                msg = f"😤 Скупщик заметил царапины и сбил цену на 10%. Продано за +{final_price} FC."
-        else:
-            if random.random() < 0.38:
-                final_price = int(round(base_val * 1.65, -1))
-                msg = f"💎 ДЖЕКПОТ ТОРГА (+65%)! Коллекционер забрал «{it['name']}» за +{final_price} FC!"
-                push_live_ticker(f"💎 {user['username']} выторговал +65% и продал «{it['name']}» за {final_price} FC!")
-            else:
-                final_price = int(round(base_val * 0.78, -1))
-                msg = f"📉 Блеф не прошел! Пришлось отдать перекупщикам за +{final_price} FC."
-
-        net_diff = final_price - int(it.get("container_price") or base_val)
-        st["startup_profit"] = int(st.get("startup_profit") or 0) + net_diff
-        new_bal = round(user["balance"] + final_price, 1)
-
-        await db_manager.exec(
-            "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
-            new_bal, dump_user_fut_state(st, vip_act), uid
-        )
-        return await _fast_delta_response(uid, {"message": msg, "coin_delta": final_price})
-
-    # 7. КОНТЕЙНЕРЫ: ЛИЧНЫЙ ШОУРУМ (ДО 4 ВИТРИН ДЛЯ VIP)
-    elif action == "startup_to_showroom":
-        item_uid = str(body.get("item_uid") or "")
-        idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
-        if idx == -1:
-            return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
-        max_show = 4 if vip_act else 3
-        if len(st["startup_showroom"]) >= max_show:
-            return web.json_response({"ok": False, "error": f"В Шоуруме заняты все витрины ({max_show} шт.)! Сними один экспонат."}, headers=CORS_HEADERS)
-
-        it = st["startup_storage"].pop(idx)
-        st["startup_showroom"].append(it)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        return await _fast_delta_response(uid, {
-            "message": f"🏛 «{it['name']}» выставлен в Шоурум (+{it['show_inc']} FC/день и +{it['show_odd']} к кэфам)!"
-        })
-
-    elif action == "startup_from_showroom":
-        item_uid = str(body.get("item_uid") or "")
-        idx = next((i for i, x in enumerate(st["startup_showroom"]) if x["uid"] == item_uid), -1)
-        if idx == -1:
-            return web.json_response({"ok": False, "error": "Экспонат не найден"}, headers=CORS_HEADERS)
-        max_stor = 12 if vip_act else 8
-        if len(st["startup_storage"]) >= max_stor:
-            return web.json_response({"ok": False, "error": "На складе нет свободного места!"}, headers=CORS_HEADERS)
-
-        it = st["startup_showroom"].pop(idx)
-        st["startup_storage"].append(it)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        return await _fast_delta_response(uid, {"message": f"📦 «{it['name']}» возвращен на склад."})
-
-    # 8. P2P-БИРЖА МЕЖДУ ИГРОКАМИ (НАЛОГ 5% ИЛИ 0% ДЛЯ VIP)
-    elif action == "p2p_list_item":
-        item_uid = str(body.get("item_uid") or "")
-        ask_price = int(body.get("price") or 0)
-        idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
-        if idx == -1:
-            return web.json_response({"ok": False, "error": "Предмет не найден на складе"}, headers=CORS_HEADERS)
-        if ask_price < 300 or ask_price > 1500000:
-            return web.json_response({"ok": False, "error": "Цена на P2P-бирже должна быть от 300 до 1 500 000 FC!"}, headers=CORS_HEADERS)
-
-        it = st["startup_storage"].pop(idx)
-        _P2P_LOT_SEQ += 1
-        lot_obj = {
-            "lot_id": _P2P_LOT_SEQ,
-            "seller_id": uid,
-            "seller_name": user["username"],
-            "seller_vip": vip_act,
-            "item": it,
-            "price": ask_price
-        }
-        P2P_CONTAINER_MARKET.insert(0, lot_obj)
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
-        push_live_ticker(f"🌐 {user['username']} выставил на P2P-Биржу «{it['name']}» за {ask_price} FC!")
-        return await _fast_delta_response(uid, {
-            "message": f"🌐 Лот #{lot_obj['lot_id']} «{it['name']}» выставлен на P2P-Биржу за {ask_price} FC!"
-        })
-
-    elif action == "p2p_cancel_lot":
-        lot_id = int(body.get("lot_id") or 0)
-        l_idx = next((i for i, x in enumerate(P2P_CONTAINER_MARKET) if x["lot_id"] == lot_id and x["seller_id"] == uid), -1)
-        if l_idx == -1:
-            return web.json_response({"ok": False, "error": "Лот уже куплен или не найден"}, headers=CORS_HEADERS)
-        max_stor = 12 if vip_act else 8
-        if len(st["startup_storage"]) >= max_stor:
-            return web.json_response({"ok": False, "error": "Склад переполнен! Освободи место."}, headers=CORS_HEADERS)
-
-        lot_obj = P2P_CONTAINER_MARKET.pop(l_idx)
-        st["startup_storage"].append(lot_obj["item"])
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        return await _fast_delta_response(uid, {"message": "✅ Лот снят с P2P-Биржи и возвращен на склад."})
-
-    elif action == "p2p_buy_lot":
-        lot_id = int(body.get("lot_id") or 0)
-        l_idx = next((i for i, x in enumerate(P2P_CONTAINER_MARKET) if x["lot_id"] == lot_id), -1)
-        if l_idx == -1:
-            return web.json_response({"ok": False, "error": "Этот лот уже выкуплен другим игроком!"}, headers=CORS_HEADERS)
-        lot_obj = P2P_CONTAINER_MARKET[l_idx]
-        if lot_obj["seller_id"] == uid:
-            return web.json_response({"ok": False, "error": "Это твой собственный лот!"}, headers=CORS_HEADERS)
-        max_stor = 12 if vip_act else 8
-        if len(st["startup_storage"]) >= max_stor:
-            return web.json_response({"ok": False, "error": f"Твой склад переполнен (макс. {max_stor} предметов)!"}, headers=CORS_HEADERS)
-
-        price = int(lot_obj["price"])
-        if user["balance"] < price:
-            return web.json_response({"ok": False, "error": f"Недостаточно средств ({price} FC)!"}, headers=CORS_HEADERS)
-
-        P2P_CONTAINER_MARKET.pop(l_idx)
-        bought_item = lot_obj["item"]
-        bought_item["container_price"] = price
-        st["startup_storage"].insert(0, bought_item)
-
-        # Налог 5% (или 0% если продавец VIP)
-        tax_mult = 1.0 if lot_obj.get("seller_vip") else 0.95
-        seller_payout = int(round(price * tax_mult))
-        await db_manager.exec(
-            "UPDATE users SET balance = balance - $1, fut_cards = $2 WHERE user_id = $3",
-            float(price), dump_user_fut_state(st, vip_act), uid
-        )
-        await db_manager.exec(
-            "UPDATE users SET balance = balance + $1, profit = profit + $1 WHERE user_id = $2",
-            float(seller_payout), lot_obj["seller_id"]
-        )
-        asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
-        push_live_ticker(f"🛍 {user['username']} купил «{bought_item['name']}» у игрока {lot_obj['seller_name']} за {price} FC!")
-
-        try:
-            tax_note = "0% (VIP-привилегия)" if lot_obj.get("seller_vip") else "5%"
-            await bot.send_message(
-                lot_obj["seller_id"],
-                f"🌐 <b>ТВОЙ ЛОТ НА P2P-БИРЖЕ КУПЛЕН!</b>\n\n"
-                f"<blockquote>📦 Предмет: <b>{bought_item['name']}</b>\n"
-                f"👤 Покупатель: <b>{user['username']}</b>\n"
-                f"💰 Зачислено (комиссия {tax_note}): <b><code>+{seller_payout} FC</code></b></blockquote>",
-                parse_mode="HTML"
+            await db_manager.exec(
+                "UPDATE users SET balance = $1, is_vip = 1, fut_cards = $2 WHERE user_id = $3",
+                new_bal, dump_user_fut_state(st, True), uid
             )
-        except Exception:
-            pass
+            SHARED_DB_CACHE["leaderboard_ts"] = 0
+            asyncio.create_task(db_manager.unlock_achievement(uid, "vip_club_member"))
+            push_live_ticker(f"👑 Каппер {user['username']} вступил в VIP-Клуб ({plan['title']})!")
+            return await _fast_delta_response(uid, {
+                "message": f"👑 Поздравляем! Активирован «{plan['title']}» со всеми привилегиями!",
+                "coin_delta": -cost
+            })
 
-        return await _fast_delta_response(uid, {
-            "message": f"🛍 Куплено «{bought_item['name']}» у игрока {lot_obj['seller_name']}!",
-            "coin_delta": -price
-        })
+        # 2. ЕЖЕДНЕВНЫЙ КАЛЕНДАРЬ БОНУСОВ (ОТ 200 ДО 3 500 FC)
+        elif action == "claim_bonus":
+            streak_day, can_claim = compute_login_streak_info(st)
+            if not can_claim or user.get("last_bonus") == today_str:
+                return web.json_response({"ok": False, "error": "Бонус сегодня уже получен! Заходи завтра для продолжения серии."}, headers=CORS_HEADERS)
 
-    # 9. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
-    elif action == "equip_fut_card":
-        card_id = str(body.get("card_id") or "")
-        if card_id not in FUT_CARDS or card_id not in st["owned"]:
-            return web.json_response({"ok": False, "error": "Карточка не найдена в коллекции"}, headers=CORS_HEADERS)
-        c = FUT_CARDS[card_id]
-        st["squad"][c["role"]] = card_id
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        return await _fast_delta_response(uid, {"message": f"👕 {c['name']} вышел в стартовый состав ({c['role']})!"})
+            cal_item = STREAK_CALENDAR[streak_day - 1]
+            _, rank_bonus = get_user_rank_info(user["balance"], 1 if vip_act else 0)
+            total_reward = cal_item["coins"] + int(rank_bonus * 0.5)
 
-    elif action == "set_fut_captain":
-        role = str(body.get("role") or "FW")
-        if role not in FUT_ROLES:
-            return web.json_response({"ok": False, "error": "Неверная позиция"}, headers=CORS_HEADERS)
-        st["captain"] = role
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        return await _fast_delta_response(uid, {"message": f"© Капитанская повязка передана позиции {role} (+25% к баффу)!"})
+            st["login_streak"] = streak_day
+            st["last_streak_date"] = today_str
+            new_booster = cal_item["booster"] or user.get("active_booster") or ""
 
-    elif action == "craft_fut_pack":
-        active_set = set(v for v in st["squad"].values() if v)
-        reserves = [cid for cid in st["owned"] if cid not in active_set]
-        if len(reserves) < 3:
-            return web.json_response({"ok": False, "error": f"Для СПК нужно 3 резервные карты (сейчас: {len(reserves)})."}, headers=CORS_HEADERS)
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + $1, last_bonus = $2, active_booster = $3, fut_cards = $4 WHERE user_id = $5",
+                float(total_reward), today_str, new_booster, dump_user_fut_state(st, vip_act), uid
+            )
+            b_note = " + Бустер!" if cal_item["booster"] else ""
+            return await _fast_delta_response(uid, {
+                "message": f"🔥 День {streak_day}/7! Получено +{total_reward} FC{b_note}",
+                "coin_delta": total_reward
+            })
 
-        reserves.sort(key=lambda x: FUT_CARDS.get(x, {}).get("ovr", 80))
-        for sc_id in reserves[:3]:
-            if sc_id in st["owned"]:
-                st["owned"].remove(sc_id)
+        # 3. СТАРТОВЫЙ КВЕСТ НОВИЧКА (3 ШАГА ➔ +1 000 FC + КАРТОЧКА FUT)
+        elif action == "claim_rookie_quest":
+            if st.get("rookie_claimed") == 1:
+                return web.json_response({"ok": False, "error": "Награда стартового квеста уже получена!"}, headers=CORS_HEADERS)
+            act_bets = await db_manager.get_user_bets(uid, active_only=True)
+            rk_bet = 1 if (st.get("rookie_bet") or len(act_bets) > 0) else 0
+            rk_box = 1 if (st.get("rookie_box") or len(st.get("startup_storage", [])) > 0 or len(st.get("startup_showroom", [])) > 0) else 0
+            rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
 
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        pool_t2 = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
-        pool_t3 = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
-        won_card_id = random.choices(pool_t2 + pool_t3, weights=[14]*len(pool_t2) + [5]*len(pool_t3), k=1)[0]
+            if (rk_bet + rk_box + rk_spin) < 3:
+                return web.json_response({"ok": False, "error": "Выполни все 3 простых шага (1 ставка, 1 контейнер и 1 спин рулетки)!"}, headers=CORS_HEADERS)
 
-        res = await open_fut_pack_v2(uid, 0, won_card_id)
-        asyncio.create_task(db_manager.unlock_achievement(uid, "sbc_master"))
-        return await _fast_delta_response(uid, {
-            "card": res["card"],
-            "status_note": f"🔄 СПК выполнен! Обменено 3 резервные карты. {res['status_note']}"
-        })
+            st["rookie_claimed"] = 1
+            st["rookie_bet"] = 1
+            st["rookie_box"] = 1
+            st["rookie_spin"] = 1
 
-    # 10. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ (ДЛЯ VIP — БЕЗ ЗАЛОГА)
-    elif action == "set_stadium_prefs":
-        ticket = str(body.get("ticket") or st.get("ticket_mode", "optimal"))
-        sponsor_id = str(body.get("sponsor") or st.get("sponsor_id", "sp_1"))
-        st_lvl = int(user.get("stadium_level") or 1)
+            tier2_pool = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+            bonus_card_id = random.choice(tier2_pool)
+            bonus_card = FUT_CARDS[bonus_card_id]
+            if bonus_card_id not in st["owned"]:
+                st["owned"].append(bonus_card_id)
+                role = bonus_card["role"]
+                if not st["squad"].get(role):
+                    st["squad"][role] = bonus_card_id
 
-        sp_obj = next((s for s in STADIUM_SPONSORS if s["id"] == sponsor_id), STADIUM_SPONSORS[0])
-        if st_lvl < sp_obj["min_lvl"]:
-            return web.json_response({
-                "ok": False,
-                "error": f"🔒 Контракт «{sp_obj['name']}» требует Стадион {sp_obj['min_lvl']}-го уровня!"
-            }, headers=CORS_HEADERS)
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + 1000, fut_cards = $1 WHERE user_id = $2",
+                dump_user_fut_state(st, vip_act), uid
+            )
+            push_live_ticker(f"🎁 Игрок {user['username']} выполнил Квест Новичка и получил +1 000 FC + карту {bonus_card['name']}!")
+            return await _fast_delta_response(uid, {
+                "message": f"🎉 Квест выполнен! Получено +1 000 FC и карточка «{bonus_card['name']}»!",
+                "card": bonus_card,
+                "coin_delta": 1000
+            })
 
-        coin_delta = 0
-        if not vip_act and sponsor_id != st.get("sponsor_id") and sp_obj["deposit"] > 0 and st.get("sponsor_paid_date") != today_str:
-            dep = sp_obj["deposit"]
-            if user["balance"] < dep:
-                return web.json_response({"ok": False, "error": f"Для подписания контракта нужен страховой залог {dep} FC (или VIP-статус)!"}, headers=CORS_HEADERS)
-            st["sponsor_paid_date"] = today_str
-            coin_delta = -dep
-            await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(dep), uid)
+        # 4. КОНТЕЙНЕРЫ: ПОКУПКА И ВСКРЫТИЕ (12 КОНТЕЙНЕРОВ, СКИДКА 10% ДЛЯ VIP, СПРОС ДНЯ +15%)
+        elif action == "startup_open_container":
+            cid = str(body.get("container_id") or "c_1")
+            box = CONTAINERS_CATALOG.get(cid)
+            if not box:
+                return web.json_response({"ok": False, "error": "Контейнер не найден"}, headers=CORS_HEADERS)
+            max_stor = 12 if vip_act else 8
+            if len(st["startup_storage"]) >= max_stor:
+                return web.json_response({"ok": False, "error": f"Склад переполнен (макс. {max_stor} находок)! Продай или выстави предмет на биржу."}, headers=CORS_HEADERS)
 
-        st["ticket_mode"] = ticket
-        st["sponsor_id"] = sponsor_id
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        if ticket == "vip":
-            asyncio.create_task(db_manager.unlock_achievement(uid, "matchday_vip"))
+            raw_price = box["price"]
+            price = int(round(raw_price * 0.90)) if vip_act else raw_price
+            if user["balance"] < price:
+                return web.json_response({"ok": False, "error": f"Недостаточно средств! Нужно {price} FC."}, headers=CORS_HEADERS)
 
-        dep_msg = f" (Внесен залог -{abs(coin_delta)} FC)" if coin_delta < 0 else (" (👑 VIP: без залога)" if vip_act and sp_obj["deposit"] > 0 else "")
-        return await _fast_delta_response(uid, {
-            "message": f"🏟 Контракт и тариф арены сохранены!{dep_msg}",
-            "coin_delta": coin_delta
-        })
+            pool = box["items"]
+            weights = [26, 22, 18, 14, 10, 6, 4][:len(pool)]
+            chosen_tpl = random.choices(pool, weights=weights, k=1)[0]
 
-    elif action == "claim_stadium":
-        if user.get("last_stadium_claim") == today_str:
-            return web.json_response({"ok": False, "error": "Касса арены сегодня уже собрана! Заходи завтра."}, headers=CORS_HEADERS)
+            demand = get_daily_port_demand()
+            is_hot = (chosen_tpl.get("cat") == demand["key"])
+            demand_mult = 1.15 if is_hot else 1.0
 
-        lvl = int(user.get("stadium_level") or 1)
-        st_cfg = STADIUM_LEVELS.get(lvl, STADIUM_LEVELS[1])
-        base_inc = st_cfg["income"]
-        t_mode = st.get("ticket_mode", "optimal")
-        sp_id = st.get("sponsor_id", "sp_1")
-        sp_obj = next((s for s in STADIUM_SPONSORS if s["id"] == sp_id), STADIUM_SPONSORS[0])
+            condition = random.randint(44, 88)
+            cond_mult = round(0.65 + (condition / 100.0) * 0.65, 2)
+            market_val = int(round(chosen_tpl["base"] * cond_mult * demand_mult, -1))
 
-        active_bets = await db_manager.get_user_bets(uid, active_only=True)
-        has_activity = len(active_bets) > 0 or int(user.get("streak") or 0) > 0
+            uid_item = f"lot_{int(now_msk().timestamp()*1000)}_{random.randint(100,999)}"
+            found_item = {
+                "uid": uid_item,
+                "tpl_id": chosen_tpl["id"],
+                "name": chosen_tpl["name"],
+                "ico": chosen_tpl["ico"],
+                "cat": chosen_tpl.get("cat", "tech"),
+                "is_in_demand": is_hot,
+                "rarity": chosen_tpl["rarity"],
+                "condition": condition,
+                "restored_count": 0,
+                "value": market_val,
+                "expected_restore": int(round(market_val * 2.0, -1)),
+                "restore_cost": max(150, int(round(market_val * 0.22, -1))),
+                "show_inc": chosen_tpl["show_inc"],
+                "show_odd": chosen_tpl["show_odd"],
+                "container_price": price
+            }
+            st["startup_storage"].insert(0, found_item)
+            st["rookie_box"] = 1
+            new_bal = round(user["balance"] - price, 1)
 
-        if t_mode == "social":
-            mult, t_note = 1.0, "Социальный (100%)"
-        elif t_mode == "optimal":
-            mult = 1.30 if has_activity else 1.0
-            t_note = "Оптимальный (+30%)" if has_activity else "Оптимальный (база)"
-        else:
-            mult = 1.65 if has_activity else 0.80
-            t_note = "VIP-Аншлаг (+65%!)" if has_activity else "VIP (80% без ставок)"
+            await db_manager.exec(
+                "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
+                new_bal, dump_user_fut_state(st, vip_act), uid
+            )
+            asyncio.create_task(db_manager.unlock_achievement(uid, "container_hunter"))
+            if cid == "c_12":
+                asyncio.create_task(db_manager.unlock_achievement(uid, "ark_billionaire"))
 
-        quest_ok = check_sponsor_quest_done(sp_id, user, st, active_bets)
-        dep_returned = sp_obj["deposit"] if (not vip_act and st.get("sponsor_paid_date") == today_str and quest_ok) else 0
-        sp_bonus = (sp_obj["bonus"] + dep_returned) if quest_ok else 0
+            if market_val >= 8000 or chosen_tpl["rarity"] >= 3:
+                push_live_ticker(f"📦 {user['username']} вскрыл «{box['name']}» и нашёл {found_item['name']} ({market_val} FC)!")
 
-        showroom_inc = sum(int(x.get("show_inc") or 0) for x in st.get("startup_showroom", []))
-        total_inc = int(round(base_inc * mult)) + sp_bonus + showroom_inc
+            hot_tag = " 🔥[Спрос дня +15%!]" if is_hot else ""
+            return await _fast_delta_response(uid, {
+                "message": f"📦 Вскрыт «{box['name']}»! Найдено: {found_item['name']} (Оценка: {found_item['value']} FC){hot_tag}",
+                "found_item": found_item,
+                "coin_delta": -price
+            })
 
-        await db_manager.exec(
-            "UPDATE users SET balance = balance + $1, last_stadium_claim = $2 WHERE user_id = $3",
-            float(total_inc), today_str, uid
-        )
-        sp_txt = f" + Спонсор +{sp_bonus} FC" if quest_ok else " (Условие спонсора не выполнено: 0 FC)"
-        sh_txt = f" + Шоурум +{showroom_inc} FC" if showroom_inc > 0 else ""
-        return await _fast_delta_response(uid, {
-            "message": f"🏟 Касса «{st_cfg['name']}»: +{total_inc} FC ({t_note}{sp_txt}{sh_txt})!",
-            "coin_delta": total_inc
-        })
+        # 5. КОНТЕЙНЕРЫ: РЕСТАВРАЦИЯ (ШАНС 84% ДЛЯ VIP И 72% ОБЫЧНЫЙ)
+        elif action == "startup_restore_item":
+            item_uid = str(body.get("item_uid") or "")
+            idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
+            if idx == -1:
+                return web.json_response({"ok": False, "error": "Предмет не найден на складе"}, headers=CORS_HEADERS)
 
-    elif action == "upgrade_building":
-        b_type = str(body.get("b_type") or "stadium")
-        res = await db_manager.upgrade_empire_building(uid, b_type)
-        if not res["ok"]:
-            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
-        if b_type == "stadium":
-            if res["new_lvl"] >= 5:
-                asyncio.create_task(db_manager.unlock_achievement(uid, "stadium_lvl_5"))
-            if res["new_lvl"] >= 10:
-                asyncio.create_task(db_manager.unlock_achievement(uid, "stadium_lvl_10"))
-        return await _fast_delta_response(uid, {"message": f"✅ Построено: {res['name']} (Ур. {res['new_lvl']})!"})
+            it = st["startup_storage"][idx]
+            if it.get("restored_count", 0) >= 2 or it["condition"] >= 100:
+                return web.json_response({"ok": False, "error": "Этот предмет уже отреставрирован до максимума!"}, headers=CORS_HEADERS)
 
-    elif action == "buy_pack":
-        p_type = str(body.get("pack_type") or "basic")
-        tier1_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 1]
-        tier2_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
-        tier3_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
+            r_cost = int(it.get("restore_cost") or 200)
+            if user["balance"] < r_cost:
+                return web.json_response({"ok": False, "error": f"Для реставрации нужно {r_cost} FC!"}, headers=CORS_HEADERS)
 
-        if p_type == "basic":
-            cost, pool, weights = 1500, tier1_keys + tier2_keys, [12]*len(tier1_keys) + [3]*len(tier2_keys)
-        elif p_type == "gold":
-            cost, pool, weights = 5000, tier1_keys + tier2_keys + tier3_keys, [4]*len(tier1_keys) + [14]*len(tier2_keys) + [3]*len(tier3_keys)
-        else:
-            cost, pool, weights = 15000, tier2_keys + tier3_keys, [6]*len(tier2_keys) + [16]*len(tier3_keys)
+            it["restored_count"] = int(it.get("restored_count") or 0) + 1
+            win_chance = 0.84 if vip_act else 0.72
+            success = random.random() < win_chance
+            if success:
+                boost_mult = random.uniform(1.70, 2.38)
+                it["value"] = int(round(it["value"] * boost_mult, -1))
+                it["condition"] = min(100, it["condition"] + random.randint(25, 45))
+                it["restore_cost"] = int(round(it["value"] * 0.25, -1))
+                msg = f"✨ Успешная реставрация! Ценность «{it['name']}» выросла до {it['value']} FC!"
+                if it["value"] >= 20000:
+                    push_live_ticker(f"🔧 {user['username']} отреставрировал «{it['name']}» до {it['value']} FC!")
+            else:
+                it["value"] = max(100, int(round(it["value"] * 0.76, -1)))
+                it["condition"] = max(20, it["condition"] - 12)
+                msg = f"⚠️ Вскрылся скрытый дефект при разборке! Оценка снизилась до {it['value']} FC."
 
-        card_id = random.choices(pool, weights=weights, k=1)[0]
-        res = await open_fut_pack_v2(uid, cost, card_id)
-        if not res["ok"]:
-            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            new_bal = round(user["balance"] - r_cost, 1)
+            await db_manager.exec(
+                "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
+                new_bal, dump_user_fut_state(st, vip_act), uid
+            )
+            return await _fast_delta_response(uid, {"message": msg, "coin_delta": -r_cost})
 
-        if all(res["st"]["squad"].get(r) for r in FUT_ROLES):
-            asyncio.create_task(db_manager.unlock_achievement(uid, "fut_full_squad"))
+        # 6. КОНТЕЙНЕРЫ: ЖИВОЙ ТОРГ СО СКУПЩИКОМ (3 ТАКТИКИ)
+        elif action == "startup_sell_npc":
+            item_uid = str(body.get("item_uid") or "")
+            tactic = str(body.get("tactic") or "base")
+            idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
+            if idx == -1:
+                return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
 
-        return await _fast_delta_response(uid, {
-            "card": res["card"],
-            "status_note": re.sub(r"<.*?>", "", res["status_note"]),
-            "coin_delta": -cost
-        })
+            it = st["startup_storage"].pop(idx)
+            base_val = int(it["value"])
 
-    # 11. РУЛЕТКА (ПРЕЖНИЕ ПАРАМЕТРЫ + ТОЧНАЯ КАЛИБРОВКА СЕКТОРА)
-    elif action == "spin_roulette":
-        if user.get("last_spin") == today_str:
-            return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
+            if tactic == "base":
+                final_price = base_val
+                msg = f"🤝 Сделка закрыта по оценке! Продано «{it['name']}» за +{final_price} FC."
+            elif tactic == "push25":
+                if random.random() < 0.65:
+                    final_price = int(round(base_val * 1.25, -1))
+                    msg = f"🔥 Скупщик согласился на наценку +25%! Продано за +{final_price} FC!"
+                else:
+                    final_price = int(round(base_val * 0.90, -1))
+                    msg = f"😤 Скупщик заметил царапины и сбил цену на 10%. Продано за +{final_price} FC."
+            else:
+                if random.random() < 0.38:
+                    final_price = int(round(base_val * 1.65, -1))
+                    msg = f"💎 ДЖЕКПОТ ТОРГА (+65%)! Коллекционер забрал «{it['name']}» за +{final_price} FC!"
+                    push_live_ticker(f"💎 {user['username']} выторговал +65% и продал «{it['name']}» за {final_price} FC!")
+                else:
+                    final_price = int(round(base_val * 0.78, -1))
+                    msg = f"📉 Блеф не прошел! Пришлось отдать перекупщикам за +{final_price} FC."
 
-        sectors = [
-            {"idx": 0, "name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
-            {"idx": 1, "name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
-            {"idx": 2, "name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
-            {"idx": 3, "name": "⚡ Буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
-            {"idx": 4, "name": "🎟 Билет (+100 + Спин)", "coins": 100, "booster": "", "respin": True, "weight": 10},
-            {"idx": 5, "name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
-            {"idx": 6, "name": "🔥 ДЖЕКПОТ +2000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
-        ]
-        chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
-        await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
+            net_diff = final_price - int(it.get("container_price") or base_val)
+            st["startup_profit"] = int(st.get("startup_profit") or 0) + net_diff
+            new_bal = round(user["balance"] + final_price, 1)
 
-        st["rookie_spin"] = 1
-        await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
-        if chosen["coins"] >= 750:
-            push_live_ticker(f"🎰 {user['username']} выбил {chosen['name']} в ежедневной рулетке!")
+            await db_manager.exec(
+                "UPDATE users SET balance = $1, fut_cards = $2 WHERE user_id = $3",
+                new_bal, dump_user_fut_state(st, vip_act), uid
+            )
+            return await _fast_delta_response(uid, {"message": msg, "coin_delta": final_price})
 
-        return await _fast_delta_response(uid, {
-            "sector": chosen,
-            "coin_delta": chosen["coins"]
-        })
+        # 7. КОНТЕЙНЕРЫ: ЛИЧНЫЙ ШОУРУМ (ДО 4 ВИТРИН ДЛЯ VIP)
+        elif action == "startup_to_showroom":
+            item_uid = str(body.get("item_uid") or "")
+            idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
+            if idx == -1:
+                return web.json_response({"ok": False, "error": "Предмет не найден"}, headers=CORS_HEADERS)
+            max_show = 4 if vip_act else 3
+            if len(st["startup_showroom"]) >= max_show:
+                return web.json_response({"ok": False, "error": f"В Шоуруме заняты все витрины ({max_show} шт.)! Сними один экспонат."}, headers=CORS_HEADERS)
 
-    elif action == "bm_bid":
-        amount = int(body.get("amount") or 0)
-        res = await db_manager.place_black_market_bid(uid, amount)
-        if not res["ok"]:
-            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
-        SHARED_DB_CACHE["bm_lot"] = await db_manager.get_or_rotate_black_market()
-        SHARED_DB_CACHE["bm_ts"] = int(now_msk().timestamp())
-        lot = SHARED_DB_CACHE["bm_lot"]
-        lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 24, "ovr": 99})
-        asyncio.create_task(db_manager.unlock_achievement(uid, "bm_tycoon"))
-        return await _fast_delta_response(uid, {
-            "message": f"🔨 Ставка {amount} FC принята! Ты лидер торгов!",
-            "black_market": {
-                "card": lot_card, "highest_bid": lot["highest_bid"], "leader_name": lot["leader_name"],
-                "min_next_bid": int(lot["highest_bid"]) + 500
-            },
-            "coin_delta": -amount
-        })
+            it = st["startup_storage"].pop(idx)
+            st["startup_showroom"].append(it)
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            return await _fast_delta_response(uid, {
+                "message": f"🏛 «{it['name']}» выставлен в Шоурум (+{it['show_inc']} FC/день и +{it['show_odd']} к кэфам)!"
+            })
 
-    # 12. ПРИЕМ КУПОНА (С ОПЦИЕЙ ПЛАТНОЙ СТРАХОВКИ +10% К СУММЕ)
-    elif action == "submit_slip":
-        items = body.get("items") or []
-        stake_amount = int(body.get("stake") or 0)
-        is_secret = bool(body.get("is_secret"))
-        insure_paid = bool(body.get("insure_paid"))
+        elif action == "startup_from_showroom":
+            item_uid = str(body.get("item_uid") or "")
+            idx = next((i for i, x in enumerate(st["startup_showroom"]) if x["uid"] == item_uid), -1)
+            if idx == -1:
+                return web.json_response({"ok": False, "error": "Экспонат не найден"}, headers=CORS_HEADERS)
+            max_stor = 12 if vip_act else 8
+            if len(st["startup_storage"]) >= max_stor:
+                return web.json_response({"ok": False, "error": "На складе нет свободного места!"}, headers=CORS_HEADERS)
 
-        if not items:
-            return web.json_response({"ok": False, "error": "Купон пуст! Выбери хотя бы один исход."}, headers=CORS_HEADERS)
-        if len(items) > 6:
-            return web.json_response({"ok": False, "error": "Максимум 6 событий в одном экспрессе!"}, headers=CORS_HEADERS)
-        if stake_amount < 10:
-            return web.json_response({"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}, headers=CORS_HEADERS)
+            it = st["startup_showroom"].pop(idx)
+            st["startup_storage"].append(it)
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            return await _fast_delta_response(uid, {"message": f"📦 «{it['name']}» возвращен на склад."})
 
-        db_schedule = await get_matches_instant()
-        now_ts = int(now_msk().timestamp())
+        # 8. P2P-БИРЖА МЕЖДУ ИГРОКАМИ (С СОХРАНЕНИЕМ В POSTGRESQL)
+        elif action == "p2p_list_item":
+            item_uid = str(body.get("item_uid") or "")
+            ask_price = int(body.get("price") or 0)
+            idx = next((i for i, x in enumerate(st["startup_storage"]) if x["uid"] == item_uid), -1)
+            if idx == -1:
+                return web.json_response({"ok": False, "error": "Предмет не найден на складе"}, headers=CORS_HEADERS)
+            if ask_price < 300 or ask_price > 1500000:
+                return web.json_response({"ok": False, "error": "Цена на P2P-бирже должна быть от 300 до 1 500 000 FC!"}, headers=CORS_HEADERS)
 
-        if len(items) == 1:
-            it = items[0]
-            m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(str(it["event_id"]))
-            if not m or m.get("is_live") or m["start_ts"] <= now_ts:
-                return web.json_response({"ok": False, "error": f"Прием ставок на матч {it.get('teamsTitle', '')} уже закрыт!"}, headers=CORS_HEADERS)
-            mkt = evaluate_custom_market(m, it["pick_code"])
-            if not mkt:
-                return web.json_response({"ok": False, "error": "Некорректный исход!"}, headers=CORS_HEADERS)
+            it = st["startup_storage"].pop(idx)
+            _P2P_LOT_SEQ += 1
+            lot_obj = {
+                "lot_id": _P2P_LOT_SEQ,
+                "seller_id": uid,
+                "seller_name": user["username"],
+                "seller_vip": vip_act,
+                "item": it,
+                "price": ask_price
+            }
+            P2P_CONTAINER_MARKET.insert(0, lot_obj)
+            await db_insert_p2p_lot(lot_obj)
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
+            push_live_ticker(f"🌐 {user['username']} выставил на P2P-Биржу «{it['name']}» за {ask_price} FC!")
+            return await _fast_delta_response(uid, {
+                "message": f"🌐 Лот #{lot_obj['lot_id']} «{it['name']}» выставлен на P2P-Биржу за {ask_price} FC!"
+            })
 
-            ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
-            legs = [{"league_slug": m["league_slug"], "event_id": m["event_id"], "teams": ru_teams, "pick_code": mkt["pick_code"], "pick_label": mkt["label"], "odds": mkt["odds"]}]
+        elif action == "p2p_cancel_lot":
+            lot_id = int(body.get("lot_id") or 0)
+            l_idx = next((i for i, x in enumerate(P2P_CONTAINER_MARKET) if x["lot_id"] == lot_id and x["seller_id"] == uid), -1)
+            if l_idx == -1:
+                return web.json_response({"ok": False, "error": "Лот уже куплен или не найден"}, headers=CORS_HEADERS)
+            max_stor = 12 if vip_act else 8
+            if len(st["startup_storage"]) >= max_stor:
+                return web.json_response({"ok": False, "error": "Склад переполнен! Освободи место."}, headers=CORS_HEADERS)
+
+            lot_obj = P2P_CONTAINER_MARKET.pop(l_idx)
+            await db_delete_p2p_lot(lot_id)
+            st["startup_storage"].append(lot_obj["item"])
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            return await _fast_delta_response(uid, {"message": "✅ Лот снят с P2P-Биржи и возвращен на склад."})
+
+        elif action == "p2p_buy_lot":
+            lot_id = int(body.get("lot_id") or 0)
+            l_idx = next((i for i, x in enumerate(P2P_CONTAINER_MARKET) if x["lot_id"] == lot_id), -1)
+            if l_idx == -1:
+                return web.json_response({"ok": False, "error": "Этот лот уже выкуплен другим игроком!"}, headers=CORS_HEADERS)
+            lot_obj = P2P_CONTAINER_MARKET[l_idx]
+            if lot_obj["seller_id"] == uid:
+                return web.json_response({"ok": False, "error": "Это твой собственный лот!"}, headers=CORS_HEADERS)
+            max_stor = 12 if vip_act else 8
+            if len(st["startup_storage"]) >= max_stor:
+                return web.json_response({"ok": False, "error": f"Твой склад переполнен (макс. {max_stor} предметов)!"}, headers=CORS_HEADERS)
+
+            price = int(lot_obj["price"])
+            if user["balance"] < price:
+                return web.json_response({"ok": False, "error": f"Недостаточно средств ({price} FC)!"}, headers=CORS_HEADERS)
+
+            P2P_CONTAINER_MARKET.pop(l_idx)
+            await db_delete_p2p_lot(lot_id)
+            bought_item = lot_obj["item"]
+            bought_item["container_price"] = price
+            st["startup_storage"].insert(0, bought_item)
+
+            tax_mult = 1.0 if lot_obj.get("seller_vip") else 0.95
+            seller_payout = int(round(price * tax_mult))
+            await db_manager.exec(
+                "UPDATE users SET balance = balance - $1, fut_cards = $2 WHERE user_id = $3",
+                float(price), dump_user_fut_state(st, vip_act), uid
+            )
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + $1, profit = profit + $1 WHERE user_id = $2",
+                float(seller_payout), lot_obj["seller_id"]
+            )
+            asyncio.create_task(db_manager.unlock_achievement(uid, "p2p_merchant"))
+            push_live_ticker(f"🛍 {user['username']} купил «{bought_item['name']}» у игрока {lot_obj['seller_name']} за {price} FC!")
+
+            try:
+                tax_note = "0% (VIP-привилегия)" if lot_obj.get("seller_vip") else "5%"
+                await bot.send_message(
+                    lot_obj["seller_id"],
+                    f"🌐 <b>ТВОЙ ЛОТ НА P2P-БИРЖЕ КУПЛЕН!</b>\n\n"
+                    f"<blockquote>📦 Предмет: <b>{bought_item['name']}</b>\n"
+                    f"👤 Покупатель: <b>{user['username']}</b>\n"
+                    f"💰 Зачислено (комиссия {tax_note}): <b><code>+{seller_payout} FC</code></b></blockquote>",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+            return await _fast_delta_response(uid, {
+                "message": f"🛍 Куплено «{bought_item['name']}» у игрока {lot_obj['seller_name']}!",
+                "coin_delta": -price
+            })
+
+        # 9. FUT: СМЕНА СОСТАВА, КАПИТАН И СПК
+        elif action == "equip_fut_card":
+            card_id = str(body.get("card_id") or "")
+            if card_id not in FUT_CARDS or card_id not in st["owned"]:
+                return web.json_response({"ok": False, "error": "Карточка не найдена в коллекции"}, headers=CORS_HEADERS)
+            c = FUT_CARDS[card_id]
+            st["squad"][c["role"]] = card_id
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            return await _fast_delta_response(uid, {"message": f"👕 {c['name']} вышел в стартовый состав ({c['role']})!"})
+
+        elif action == "set_fut_captain":
+            role = str(body.get("role") or "FW")
+            if role not in FUT_ROLES:
+                return web.json_response({"ok": False, "error": "Неверная позиция"}, headers=CORS_HEADERS)
+            st["captain"] = role
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            return await _fast_delta_response(uid, {"message": f"© Капитанская повязка передана позиции {role} (+25% к баффу)!"})
+
+        elif action == "craft_fut_pack":
+            active_set = set(v for v in st["squad"].values() if v)
+            reserves = [cid for cid in st["owned"] if cid not in active_set]
+            if len(reserves) < 3:
+                return web.json_response({"ok": False, "error": f"Для СПК нужно 3 резервные карты (сейчас: {len(reserves)})."}, headers=CORS_HEADERS)
+
+            reserves.sort(key=lambda x: FUT_CARDS.get(x, {}).get("ovr", 80))
+            for sc_id in reserves[:3]:
+                if sc_id in st["owned"]:
+                    st["owned"].remove(sc_id)
+
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            pool_t2 = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+            pool_t3 = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
+            won_card_id = random.choices(pool_t2 + pool_t3, weights=[14]*len(pool_t2) + [5]*len(pool_t3), k=1)[0]
+
+            res = await open_fut_pack_v2(uid, 0, won_card_id)
+            asyncio.create_task(db_manager.unlock_achievement(uid, "sbc_master"))
+            return await _fast_delta_response(uid, {
+                "card": res["card"],
+                "status_note": f"🔄 СПК выполнен! Обменено 3 резервные карты. {res['status_note']}"
+            })
+
+        # 10. АРЕНА И УРОВНЕВЫЕ КОНТРАКТЫ СПОНСОРОВ (ДЛЯ VIP — БЕЗ ЗАЛОГА)
+        elif action == "set_stadium_prefs":
+            ticket = str(body.get("ticket") or st.get("ticket_mode", "optimal"))
+            sponsor_id = str(body.get("sponsor") or st.get("sponsor_id", "sp_1"))
+            st_lvl = int(user.get("stadium_level") or 1)
+
+            sp_obj = next((s for s in STADIUM_SPONSORS if s["id"] == sponsor_id), STADIUM_SPONSORS[0])
+            if st_lvl < sp_obj["min_lvl"]:
+                return web.json_response({
+                    "ok": False,
+                    "error": f"🔒 Контракт «{sp_obj['name']}» требует Стадион {sp_obj['min_lvl']}-го уровня!"
+                }, headers=CORS_HEADERS)
+
+            coin_delta = 0
+            if not vip_act and sponsor_id != st.get("sponsor_id") and sp_obj["deposit"] > 0 and st.get("sponsor_paid_date") != today_str:
+                dep = sp_obj["deposit"]
+                if user["balance"] < dep:
+                    return web.json_response({"ok": False, "error": f"Для подписания контракта нужен страховой залог {dep} FC (или VIP-статус)!"}, headers=CORS_HEADERS)
+                st["sponsor_paid_date"] = today_str
+                coin_delta = -dep
+                await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(dep), uid)
+
+            st["ticket_mode"] = ticket
+            st["sponsor_id"] = sponsor_id
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            if ticket == "vip":
+                asyncio.create_task(db_manager.unlock_achievement(uid, "matchday_vip"))
+
+            dep_msg = f" (Внесен залог -{abs(coin_delta)} FC)" if coin_delta < 0 else (" (👑 VIP: без залога)" if vip_act and sp_obj["deposit"] > 0 else "")
+            return await _fast_delta_response(uid, {
+                "message": f"🏟 Контракт и тариф арены сохранены!{dep_msg}",
+                "coin_delta": coin_delta
+            })
+
+        elif action == "claim_stadium":
+            if user.get("last_stadium_claim") == today_str:
+                return web.json_response({"ok": False, "error": "Касса арены сегодня уже собрана! Заходи завтра."}, headers=CORS_HEADERS)
+
+            lvl = int(user.get("stadium_level") or 1)
+            st_cfg = STADIUM_LEVELS.get(lvl, STADIUM_LEVELS[1])
+            base_inc = st_cfg["income"]
+            t_mode = st.get("ticket_mode", "optimal")
+            sp_id = st.get("sponsor_id", "sp_1")
+            sp_obj = next((s for s in STADIUM_SPONSORS if s["id"] == sp_id), STADIUM_SPONSORS[0])
+
+            active_bets = await db_manager.get_user_bets(uid, active_only=True)
+            has_activity = len(active_bets) > 0 or int(user.get("streak") or 0) > 0
+
+            if t_mode == "social":
+                mult, t_note = 1.0, "Социальный (100%)"
+            elif t_mode == "optimal":
+                mult = 1.30 if has_activity else 1.0
+                t_note = "Оптимальный (+30%)" if has_activity else "Оптимальный (база)"
+            else:
+                mult = 1.65 if has_activity else 0.80
+                t_note = "VIP-Аншлаг (+65%!)" if has_activity else "VIP (80% без ставок)"
+
+            quest_ok = check_sponsor_quest_done(sp_id, user, st, active_bets)
+            dep_returned = sp_obj["deposit"] if (not vip_act and st.get("sponsor_paid_date") == today_str and quest_ok) else 0
+            sp_bonus = (sp_obj["bonus"] + dep_returned) if quest_ok else 0
+
+            showroom_inc = sum(int(x.get("show_inc") or 0) for x in st.get("startup_showroom", []))
+            total_inc = int(round(base_inc * mult)) + sp_bonus + showroom_inc
+
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + $1, last_stadium_claim = $2 WHERE user_id = $3",
+                float(total_inc), today_str, uid
+            )
+            sp_txt = f" + Спонсор +{sp_bonus} FC" if quest_ok else " (Условие спонсора не выполнено: 0 FC)"
+            sh_txt = f" + Шоурум +{showroom_inc} FC" if showroom_inc > 0 else ""
+            return await _fast_delta_response(uid, {
+                "message": f"🏟 Касса «{st_cfg['name']}»: +{total_inc} FC ({t_note}{sp_txt}{sh_txt})!",
+                "coin_delta": total_inc
+            })
+
+        elif action == "upgrade_building":
+            b_type = str(body.get("b_type") or "stadium")
+            res = await db_manager.upgrade_empire_building(uid, b_type)
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            if b_type == "stadium":
+                if res["new_lvl"] >= 5:
+                    asyncio.create_task(db_manager.unlock_achievement(uid, "stadium_lvl_5"))
+                if res["new_lvl"] >= 10:
+                    asyncio.create_task(db_manager.unlock_achievement(uid, "stadium_lvl_10"))
+            return await _fast_delta_response(uid, {"message": f"✅ Построено: {res['name']} (Ур. {res['new_lvl']})!"})
+
+        elif action == "buy_pack":
+            p_type = str(body.get("pack_type") or "basic")
+            tier1_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 1]
+            tier2_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 2]
+            tier3_keys = [k for k, v in FUT_CARDS.items() if v["tier"] == 3]
+
+            if p_type == "basic":
+                cost, pool, weights = 1500, tier1_keys + tier2_keys, [12]*len(tier1_keys) + [3]*len(tier2_keys)
+            elif p_type == "gold":
+                cost, pool, weights = 5000, tier1_keys + tier2_keys + tier3_keys, [4]*len(tier1_keys) + [14]*len(tier2_keys) + [3]*len(tier3_keys)
+            else:
+                cost, pool, weights = 15000, tier2_keys + tier3_keys, [6]*len(tier2_keys) + [16]*len(tier3_keys)
+
+            card_id = random.choices(pool, weights=weights, k=1)[0]
+            res = await open_fut_pack_v2(uid, cost, card_id)
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+
+            if all(res["st"]["squad"].get(r) for r in FUT_ROLES):
+                asyncio.create_task(db_manager.unlock_achievement(uid, "fut_full_squad"))
+
+            return await _fast_delta_response(uid, {
+                "card": res["card"],
+                "status_note": re.sub(r"<.*?>", "", res["status_note"]),
+                "coin_delta": -cost
+            })
+
+        # 11. РУЛЕТКА (ПРЕЖНИЕ ПАРАМЕТРЫ + ТОЧНАЯ КАЛИБРОВКА СЕКТОРА)
+        elif action == "spin_roulette":
+            if user.get("last_spin") == today_str:
+                return web.json_response({"ok": False, "error": "Ты уже крутил рулетку сегодня!"}, headers=CORS_HEADERS)
+
+            sectors = [
+                {"idx": 0, "name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
+                {"idx": 1, "name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
+                {"idx": 2, "name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
+                {"idx": 3, "name": "⚡ Буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
+                {"idx": 4, "name": "🎟 Билет (+100 + Спин)", "coins": 100, "booster": "", "respin": True, "weight": 10},
+                {"idx": 5, "name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
+                {"idx": 6, "name": "🔥 ДЖЕКПОТ +2000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
+            ]
+            chosen = random.choices(sectors, weights=[s["weight"] for s in sectors], k=1)[0]
+            await db_manager.spin_roulette_db(uid, chosen["coins"], chosen["booster"], chosen["respin"])
+
+            st["rookie_spin"] = 1
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            if chosen["coins"] >= 750:
+                push_live_ticker(f"🎰 {user['username']} выбил {chosen['name']} в ежедневной рулетке!")
+
+            return await _fast_delta_response(uid, {
+                "sector": chosen,
+                "coin_delta": chosen["coins"]
+            })
+
+        elif action == "bm_bid":
+            amount = int(body.get("amount") or 0)
+            res = await db_manager.place_black_market_bid(uid, amount)
+            if not res["ok"]:
+                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+            SHARED_DB_CACHE["bm_lot"] = await db_manager.get_or_rotate_black_market()
+            SHARED_DB_CACHE["bm_ts"] = int(now_msk().timestamp())
+            lot = SHARED_DB_CACHE["bm_lot"]
+            lot_card = FUT_CARDS.get(lot["lot_id"], {"name": "Секретный лот", "desc": "", "role": "FW", "val": 24, "ovr": 99})
+            asyncio.create_task(db_manager.unlock_achievement(uid, "bm_tycoon"))
+            return await _fast_delta_response(uid, {
+                "message": f"🔨 Ставка {amount} FC принята! Ты лидер торгов!",
+                "black_market": {
+                    "card": lot_card, "highest_bid": lot["highest_bid"],
+                    "leader_id": int(lot["leader_id"]), "leader_name": lot["leader_name"],
+                    "min_next_bid": int(lot["highest_bid"]) + 500
+                },
+                "coin_delta": -amount
+            })
+
+        # 12. ПРИЕМ КУПОНА (С ОПЦИЕЙ ПЛАТНОЙ СТРАХОВКИ +10% К СУММЕ)
+        elif action == "submit_slip":
+            items = body.get("items") or []
+            stake_amount = int(body.get("stake") or 0)
+            is_secret = bool(body.get("is_secret"))
+            insure_paid = bool(body.get("insure_paid"))
+
+            if not items:
+                return web.json_response({"ok": False, "error": "Купон пуст! Выбери хотя бы один исход."}, headers=CORS_HEADERS)
+            if len(items) > 6:
+                return web.json_response({"ok": False, "error": "Максимум 6 событий в одном экспрессе!"}, headers=CORS_HEADERS)
+            if stake_amount < 10:
+                return web.json_response({"ok": False, "error": "Минимальная сумма ставки — 10 FC!"}, headers=CORS_HEADERS)
+
+            db_schedule = await get_matches_instant()
+            now_ts = int(now_msk().timestamp())
+
+            if len(items) == 1:
+                it = items[0]
+                m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(str(it["event_id"]))
+                if not m or m.get("is_live") or m["start_ts"] <= now_ts:
+                    return web.json_response({"ok": False, "error": f"Прием ставок на матч {it.get('teamsTitle', '')} уже закрыт!"}, headers=CORS_HEADERS)
+                mkt = evaluate_custom_market(m, it["pick_code"])
+                if not mkt:
+                    return web.json_response({"ok": False, "error": "Некорректный исход!"}, headers=CORS_HEADERS)
+
+                ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
+                legs = [{"league_slug": m["league_slug"], "event_id": m["event_id"], "teams": ru_teams, "pick_code": mkt["pick_code"], "pick_label": mkt["label"], "odds": mkt["odds"]}]
+                res = await fast_create_pending_bet(
+                    uid, user["username"], f"{ru_teams} ({m['short_date']})", mkt["label"],
+                    stake_amount, mkt["odds"], mkt["prob"], m["end_ts"],
+                    bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
+                )
+                if not res["ok"]:
+                    return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+
+                asyncio.create_task(db_manager.unlock_achievement(uid, "winter_2027"))
+                if is_secret:
+                    asyncio.create_task(db_manager.unlock_achievement(uid, "secret_agent"))
+
+                ins_note = " 🛡[Застрахован 50%]" if res.get("booster_used") == "insure50" else ""
+                return await _fast_delta_response(uid, {
+                    "message": f"✅ Ординар #{res['bet_id']}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+                    "coin_delta": -res["total_deduct"]
+                }, include_bets=True)
+
+            total_odd, comb_prob, max_end = 1.0, 1.0, 0
+            legs, titles = [], []
+            for idx, it in enumerate(items, 1):
+                m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(str(it["event_id"]))
+                if not m or m.get("is_live") or m["start_ts"] <= now_ts:
+                    return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} уже начался!"}, headers=CORS_HEADERS)
+                mkt = evaluate_custom_market(m, it["pick_code"])
+                if not mkt:
+                    return web.json_response({"ok": False, "error": "Ошибка расчета котировки"}, headers=CORS_HEADERS)
+                total_odd *= mkt["odds"]
+                comb_prob *= (mkt["prob"] / 100.0)
+                if m["end_ts"] > max_end:
+                    max_end = m["end_ts"]
+                ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
+                titles.append(f"{idx}. {ru_teams} — {mkt['label']} ({mkt['odds']})")
+                legs.append({"league_slug": m["league_slug"], "event_id": m["event_id"], "teams": ru_teams, "pick_code": mkt["pick_code"], "pick_label": mkt["label"], "odds": mkt["odds"]})
+
+            final_exp_odd = round(total_odd, 2)
             res = await fast_create_pending_bet(
-                uid, user["username"], f"{ru_teams} ({m['short_date']})", mkt["label"],
-                stake_amount, mkt["odds"], mkt["prob"], m["end_ts"],
-                bet_type="single", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
+                uid, user["username"], f"Экспресс ({len(legs)} матчей)", "\n".join(titles),
+                stake_amount, final_exp_odd, round(comb_prob * 100, 1), max_end,
+                bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
             )
             if not res["ok"]:
                 return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
 
             asyncio.create_task(db_manager.unlock_achievement(uid, "winter_2027"))
-            if is_secret:
-                asyncio.create_task(db_manager.unlock_achievement(uid, "secret_agent"))
-
-            ins_note = " 🛡[Застрахован 50%]" if res.get("booster_used") == "insure50" else ""
+            boost_tag = f" [Буст +{res['exp_boost_pct']}%]" if res.get("exp_boost_pct", 0) > 0 else ""
+            ins_note = " 🛡[Страховка 50%]" if res.get("booster_used") == "insure50" else ""
             return await _fast_delta_response(uid, {
-                "message": f"✅ Ординар #{res['bet_id']}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+                "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
                 "coin_delta": -res["total_deduct"]
             }, include_bets=True)
 
-        total_odd, comb_prob, max_end = 1.0, 1.0, 0
-        legs, titles = [], []
-        for idx, it in enumerate(items, 1):
-            m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(str(it["event_id"]))
-            if not m or m.get("is_live") or m["start_ts"] <= now_ts:
-                return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} уже начался!"}, headers=CORS_HEADERS)
-            mkt = evaluate_custom_market(m, it["pick_code"])
-            if not mkt:
-                return web.json_response({"ok": False, "error": "Ошибка расчета котировки"}, headers=CORS_HEADERS)
-            total_odd *= mkt["odds"]
-            comb_prob *= (mkt["prob"] / 100.0)
-            if m["end_ts"] > max_end:
-                max_end = m["end_ts"]
-            ru_teams = f"{translate_team_ru(m['home_team'])} — {translate_team_ru(m['away_team'])}"
-            titles.append(f"{idx}. {ru_teams} — {mkt['label']} ({mkt['odds']})")
-            legs.append({"league_slug": m["league_slug"], "event_id": m["event_id"], "teams": ru_teams, "pick_code": mkt["pick_code"], "pick_label": mkt["label"], "odds": mkt["odds"]})
+        elif action == "cashout_bet":
+            bet_id = int(body.get("bet_id") or 0)
+            bet = await db_manager.get_bet_by_id(bet_id, uid)
+            if not bet or bet["status"] != "pending":
+                return web.json_response({"ok": False, "error": "Купон уже рассчитан!"}, headers=CORS_HEADERS)
+            async with aiohttp.ClientSession() as session:
+                offer = await calculate_cashout_offer(session, bet)
+            if offer <= 0:
+                return web.json_response({"ok": False, "error": "CashOut недоступен: одно из событий уже проиграло."}, headers=CORS_HEADERS)
+            res = await db_manager.settle_bet_in_db(bet, "cashout", offer, f"CashOut ({offer} FC)")
+            return await _fast_delta_response(uid, {
+                "message": f"💸 Купон #{bet_id} выкуплен! На баланс зачислено +{res['payout']} FC!",
+                "coin_delta": res["payout"]
+            }, include_bets=True)
 
-        final_exp_odd = round(total_odd, 2)
-        res = await fast_create_pending_bet(
-            uid, user["username"], f"Экспресс ({len(legs)} матчей)", "\n".join(titles),
-            stake_amount, final_exp_odd, round(comb_prob * 100, 1), max_end,
-            bet_type="express", legs_json=json.dumps(legs, ensure_ascii=False), insure_paid=insure_paid
-        )
-        if not res["ok"]:
-            return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+        elif action == "se_submit":
+            picks_map = body.get("picks") or {}
+            line_cache = await get_precomputed_webapp_line()
+            round_key, weekly_matches = await db_manager.get_or_create_weekly_superexpress(line_cache["filtered_db"])
+            if len(weekly_matches) < 6:
+                return web.json_response({"ok": False, "error": "Тираж недели еще формируется."}, headers=CORS_HEADERS)
+            if await db_manager.get_superexpress_entry(uid, round_key):
+                return web.json_response({"ok": False, "error": "Ты уже участвуешь в тираже этой недели!"}, headers=CORS_HEADERS)
 
-        asyncio.create_task(db_manager.unlock_achievement(uid, "winter_2027"))
-        boost_tag = f" [Буст +{res['exp_boost_pct']}%]" if res.get("exp_boost_pct", 0) > 0 else ""
-        ins_note = " 🛡[Страховка 50%]" if res.get("booster_used") == "insure50" else ""
-        return await _fast_delta_response(uid, {
-            "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
-            "coin_delta": -res["total_deduct"]
-        }, include_bets=True)
+            lbl_map = {"p1": "П1", "x": "Х", "p2": "П2"}
+            picks_list = []
+            for idx, m in enumerate(weekly_matches):
+                c = str(picks_map.get(str(idx)) or "")
+                if c not in ("p1", "x", "p2"):
+                    return web.json_response({"ok": False, "error": f"Выбери исход для матча #{idx+1}!"}, headers=CORS_HEADERS)
+                picks_list.append({"event_id": m["event_id"], "league_slug": m["league_slug"], "teams": m["teams"], "pick_code": c, "pick_label": lbl_map[c]})
+            await db_manager.create_superexpress_entry(uid, round_key, picks_list)
+            return await _fast_delta_response(uid, {
+                "message": "🎯 Прогноз на Суперэкспресс недели зафиксирован!",
+                "se_entry": {"status": "pending", "guessed": 0, "payout": 0, "picks": picks_list}
+            })
 
-    elif action == "cashout_bet":
-        bet_id = int(body.get("bet_id") or 0)
-        bet = await db_manager.get_bet_by_id(bet_id, uid)
-        if not bet or bet["status"] != "pending":
-            return web.json_response({"ok": False, "error": "Купон уже рассчитан!"}, headers=CORS_HEADERS)
-        async with aiohttp.ClientSession() as session:
-            offer = await calculate_cashout_offer(session, bet)
-        if offer <= 0:
-            return web.json_response({"ok": False, "error": "CashOut недоступен: одно из событий уже проиграло."}, headers=CORS_HEADERS)
-        res = await db_manager.settle_bet_in_db(bet, "cashout", offer, f"CashOut ({offer} FC)")
-        return await _fast_delta_response(uid, {
-            "message": f"💸 Купон #{bet_id} выкуплен! На баланс зачислено +{res['payout']} FC!",
-            "coin_delta": res["payout"]
-        }, include_bets=True)
+        elif action == "pvp_create":
+            mode = str(body.get("mode") or "bot")
+            stake = int(body.get("stake") or 0)
+            kick_dir = str(body.get("kick") or "C")
+            save_dir = str(body.get("save") or "C")
+            target_query = str(body.get("target") or "").strip()
 
-    elif action == "se_submit":
-        picks_map = body.get("picks") or {}
-        line_cache = await get_precomputed_webapp_line()
-        round_key, weekly_matches = await db_manager.get_or_create_weekly_superexpress(line_cache["filtered_db"])
-        if len(weekly_matches) < 6:
-            return web.json_response({"ok": False, "error": "Тираж недели еще формируется."}, headers=CORS_HEADERS)
-        if await db_manager.get_superexpress_entry(uid, round_key):
-            return web.json_response({"ok": False, "error": "Ты уже участвуешь в тираже этой недели!"}, headers=CORS_HEADERS)
+            if stake < 50:
+                return web.json_response({"ok": False, "error": "Минимальная ставка в PvP — 50 FC!"}, headers=CORS_HEADERS)
+            if user["balance"] < stake:
+                return web.json_response({"ok": False, "error": "Недостаточно FC на балансе!"}, headers=CORS_HEADERS)
 
-        lbl_map = {"p1": "П1", "x": "Х", "p2": "П2"}
-        picks_list = []
-        for idx, m in enumerate(weekly_matches):
-            c = str(picks_map.get(str(idx)) or "")
-            if c not in ("p1", "x", "p2"):
-                return web.json_response({"ok": False, "error": f"Выбери исход для матча #{idx+1}!"}, headers=CORS_HEADERS)
-            picks_list.append({"event_id": m["event_id"], "league_slug": m["league_slug"], "teams": m["teams"], "pick_code": c, "pick_label": lbl_map[c]})
-        await db_manager.create_superexpress_entry(uid, round_key, picks_list)
-        return await _fast_delta_response(uid, {
-            "message": "🎯 Прогноз на Суперэкспресс недели зафиксирован!",
-            "se_entry": {"status": "pending", "guessed": 0, "payout": 0, "picks": picks_list}
-        })
+            if mode == "bot":
+                bot_kick, bot_save = random.choice(["L", "C", "R"]), random.choice(["L", "C", "R"])
+                g1, g2, log_txt = resolve_penalty_shootout(kick_dir, save_dir, bot_kick, bot_save)
+                clean_log = re.sub(r"<.*?>", "", log_txt)
+                LAST_PVP_MATCH[uid] = {"mode": "bot", "target": "", "opponent_name": "🤖 Кипер Лиги", "stake": stake}
+                c_delta = 0
+                if g1 > g2:
+                    win_profit = round(stake * 0.95, 1)
+                    c_delta = win_profit
+                    await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $1 WHERE user_id = $2", win_profit, uid)
+                    if int(user.get("pvp_wins") or 0) + 1 >= 5:
+                        asyncio.create_task(db_manager.unlock_achievement(uid, "pvp_gladiator"))
+                    res_msg = f"🎉 ПОБЕДА ({g1}:{g2})! Выигрыш: +{win_profit} FC!"
+                    if stake >= 500:
+                        push_live_ticker(f"⚽ {user['username']} обыграл Кипера Лиги в пенальти и забрал +{win_profit} FC!")
+                elif g2 > g1:
+                    c_delta = -stake
+                    await db_manager.exec("UPDATE users SET balance = balance - $1, profit = profit - $1 WHERE user_id = $2", float(stake), uid)
+                    res_msg = f"❌ ПОРАЖЕНИЕ ({g1}:{g2})! Потеряно: -{stake} FC."
+                else:
+                    res_msg = f"🤝 НИЧЬЯ ({g1}:{g2})! Ставка {stake} FC возвращена."
+                return await _fast_delta_response(uid, {"message": res_msg, "detail": clean_log, "coin_delta": c_delta})
 
-    elif action == "pvp_create":
-        mode = str(body.get("mode") or "bot")
-        stake = int(body.get("stake") or 0)
-        kick_dir = str(body.get("kick") or "C")
-        save_dir = str(body.get("save") or "C")
-        target_query = str(body.get("target") or "").strip()
+            elif mode == "lobby":
+                res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=0)
+                if not res["ok"]:
+                    return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+                return await _fast_delta_response(uid, {"message": f"🌐 Вызов #{res['duel_id']} ({stake} FC) опубликован в лобби!", "coin_delta": -stake}, include_pvp=True)
 
-        if stake < 50:
-            return web.json_response({"ok": False, "error": "Минимальная ставка в PvP — 50 FC!"}, headers=CORS_HEADERS)
-        if user["balance"] < stake:
-            return web.json_response({"ok": False, "error": "Недостаточно FC на балансе!"}, headers=CORS_HEADERS)
+            elif mode == "direct":
+                target_user = await db_manager.find_user_by_query(target_query)
+                if not target_user:
+                    return web.json_response({"ok": False, "error": "Игрок с таким Ником или ID не найден!"}, headers=CORS_HEADERS)
+                if target_user["user_id"] == uid:
+                    return web.json_response({"ok": False, "error": "Нельзя вызвать самого себя!"}, headers=CORS_HEADERS)
+                res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=target_user["user_id"])
+                if not res["ok"]:
+                    return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
+                duel_id = res["duel_id"]
+                LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(target_user["user_id"]), "opponent_name": target_user["username"], "stake": stake}
+                try:
+                    t_kb = InlineKeyboardBuilder()
+                    if WEBAPP_BASE_URL.startswith("https://"):
+                        t_kb.button(text=f"⚔️ Принять вызов в Web-App ({stake} FC)", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app?uid={target_user['user_id']}"))
+                    await bot.send_message(
+                        target_user["user_id"],
+                        f"🔥 <b>ЛИЧНЫЙ ВЫЗОВ В ПЕНАЛЬТИ!</b>\n\n<blockquote>👤 Соперник: <b>{user['username']}</b>\n💵 Ставка: <b><code>{stake} FC</code></b></blockquote>",
+                        reply_markup=t_kb.as_markup(), parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+                return await _fast_delta_response(uid, {"message": f"🎯 Вызов #{duel_id} отправлен игроку {target_user['username']}!", "coin_delta": -stake}, include_pvp=True)
 
-        if mode == "bot":
-            bot_kick, bot_save = random.choice(["L", "C", "R"]), random.choice(["L", "C", "R"])
-            g1, g2, log_txt = resolve_penalty_shootout(kick_dir, save_dir, bot_kick, bot_save)
-            clean_log = re.sub(r"<.*?>", "", log_txt)
-            LAST_PVP_MATCH[uid] = {"mode": "bot", "target": "", "opponent_name": "🤖 Кипер Лиги", "stake": stake}
+        elif action == "pvp_accept":
+            duel_id = int(body.get("duel_id") or 0)
+            kick_dir = str(body.get("kick") or "C")
+            save_dir = str(body.get("save") or "C")
+            d = await db_manager.get_pvp_duel(duel_id)
+            if not d or d["status"] != "open":
+                return web.json_response({"ok": False, "error": "Этот вызов уже закрыт!"}, headers=CORS_HEADERS)
+            stake = int(d["stake"])
+            if user["balance"] < stake:
+                return web.json_response({"ok": False, "error": f"Недостаточно средств ({stake} FC)!"}, headers=CORS_HEADERS)
+
+            await db_manager.exec("UPDATE pvp_duels SET status = 'closed' WHERE duel_id = $1", duel_id)
+            await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(stake), uid)
+
+            LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(d["creator_id"]), "opponent_name": d["creator_name"], "stake": stake}
+            LAST_PVP_MATCH[d["creator_id"]] = {"mode": "direct", "target": str(uid), "opponent_name": user["username"], "stake": stake}
+
+            g1, g2, log_txt = resolve_penalty_shootout(d["kick_dir"], d["save_dir"], kick_dir, save_dir)
+            bank = round(stake * 2 * 0.95, 1)
             c_delta = 0
+
             if g1 > g2:
-                win_profit = round(stake * 0.95, 1)
-                c_delta = win_profit
-                await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $1 WHERE user_id = $2", win_profit, uid)
-                if int(user.get("pvp_wins") or 0) + 1 >= 5:
-                    asyncio.create_task(db_manager.unlock_achievement(uid, "pvp_gladiator"))
-                res_msg = f"🎉 ПОБЕДА ({g1}:{g2})! Выигрыш: +{win_profit} FC!"
-                if stake >= 500:
-                    push_live_ticker(f"⚽ {user['username']} обыграл Кипера Лиги в пенальти и забрал +{win_profit} FC!")
-            elif g2 > g1:
                 c_delta = -stake
-                await db_manager.exec("UPDATE users SET balance = balance - $1, profit = profit - $1 WHERE user_id = $2", float(stake), uid)
-                res_msg = f"❌ ПОРАЖЕНИЕ ({g1}:{g2})! Потеряно: -{stake} FC."
+                await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, d["creator_id"])
+                res_headline = f"🏆 Победил {d['creator_name']} (+{bank} FC)!"
+                push_live_ticker(f"⚔️ {d['creator_name']} победил в PvP-дуэли и забрал банк {bank} FC!")
+            elif g2 > g1:
+                c_delta = round(bank - stake, 1)
+                await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, uid)
+                res_headline = f"🏆 Ты победил (+{bank} FC)!"
+                push_live_ticker(f"⚔️ {user['username']} победил в PvP-дуэли и забрал банк {bank} FC!")
             else:
-                res_msg = f"🤝 НИЧЬЯ ({g1}:{g2})! Ставка {stake} FC возвращена."
-            return await _fast_delta_response(uid, {"message": res_msg, "detail": clean_log, "coin_delta": c_delta})
+                await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), d["creator_id"])
+                await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), uid)
+                res_headline = f"🤝 Ничья ({g1}:{g2})! Ставки возвращены."
 
-        elif mode == "lobby":
-            res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=0)
-            if not res["ok"]:
-                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
-            return await _fast_delta_response(uid, {"message": f"🌐 Вызов #{res['duel_id']} ({stake} FC) опубликован в лобби!", "coin_delta": -stake}, include_pvp=True)
-
-        elif mode == "direct":
-            target_user = await db_manager.find_user_by_query(target_query)
-            if not target_user:
-                return web.json_response({"ok": False, "error": "Игрок с таким Ником или ID не найден!"}, headers=CORS_HEADERS)
-            if target_user["user_id"] == uid:
-                return web.json_response({"ok": False, "error": "Нельзя вызвать самого себя!"}, headers=CORS_HEADERS)
-            res = await db_manager.create_pvp_duel(uid, stake, kick_dir, save_dir, target_id=target_user["user_id"])
-            if not res["ok"]:
-                return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
-            duel_id = res["duel_id"]
-            LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(target_user["user_id"]), "opponent_name": target_user["username"], "stake": stake}
             try:
-                t_kb = InlineKeyboardBuilder()
-                if WEBAPP_BASE_URL.startswith("https://"):
-                    t_kb.button(text=f"⚔️ Принять вызов в Web-App ({stake} FC)", web_app=WebAppInfo(url=f"{WEBAPP_BASE_URL}/app?uid={target_user['user_id']}"))
                 await bot.send_message(
-                    target_user["user_id"],
-                    f"🔥 <b>ЛИЧНЫЙ ВЫЗОВ В ПЕНАЛЬТИ!</b>\n\n<blockquote>👤 Соперник: <b>{user['username']}</b>\n💵 Ставка: <b><code>{stake} FC</code></b></blockquote>",
-                    reply_markup=t_kb.as_markup(), parse_mode="HTML"
+                    d["creator_id"],
+                    f"⚔️ <b>ИТОГ PVP-ДУЭЛИ #{duel_id}</b>\n<b>{d['creator_name']}</b> vs <b>{user['username']}</b>\n\n<blockquote>{log_txt}</blockquote>\n{res_headline}",
+                    parse_mode="HTML"
                 )
             except Exception:
                 pass
-            return await _fast_delta_response(uid, {"message": f"🎯 Вызов #{duel_id} отправлен игроку {target_user['username']}!", "coin_delta": -stake}, include_pvp=True)
+            return await _fast_delta_response(uid, {"message": res_headline, "detail": re.sub(r"<.*?>", "", log_txt), "coin_delta": c_delta}, include_pvp=True)
 
-    elif action == "pvp_accept":
-        duel_id = int(body.get("duel_id") or 0)
-        kick_dir = str(body.get("kick") or "C")
-        save_dir = str(body.get("save") or "C")
-        d = await db_manager.get_pvp_duel(duel_id)
-        if not d or d["status"] != "open":
-            return web.json_response({"ok": False, "error": "Этот вызов уже закрыт!"}, headers=CORS_HEADERS)
-        stake = int(d["stake"])
-        if user["balance"] < stake:
-            return web.json_response({"ok": False, "error": f"Недостаточно средств ({stake} FC)!"}, headers=CORS_HEADERS)
+        elif action == "pvp_cancel":
+            duel_id = int(body.get("duel_id") or 0)
+            cancelled = await db_manager.cancel_pvp_duel(duel_id, uid)
+            if not cancelled:
+                return web.json_response({"ok": False, "error": "Не удалось отменить вызов"}, headers=CORS_HEADERS)
+            return await _fast_delta_response(uid, {"message": "✅ Вызов отменен, средства возвращены!"}, include_pvp=True)
 
-        await db_manager.exec("UPDATE pvp_duels SET status = 'closed' WHERE duel_id = $1", duel_id)
-        await db_manager.exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", float(stake), uid)
+        elif action == "set_club":
+            club = str(body.get("club") or "")
+            if club in POPULAR_CLUBS:
+                await db_manager.set_favorite_club(uid, club)
+                return await _fast_delta_response(uid, {"message": f"⭐ Любимый клуб: {club} (+10% к прибыли)!"})
+            return web.json_response({"ok": False, "error": "Клуб не найден"}, headers=CORS_HEADERS)
 
-        LAST_PVP_MATCH[uid] = {"mode": "direct", "target": str(d["creator_id"]), "opponent_name": d["creator_name"], "stake": stake}
-        LAST_PVP_MATCH[d["creator_id"]] = {"mode": "direct", "target": str(uid), "opponent_name": user["username"], "stake": stake}
+        elif action == "set_nickname":
+            mode = str(body.get("mode") or "custom")
+            if mode == "random":
+                new_nick = generate_football_nickname()
+            else:
+                ok, val = validate_custom_nickname(str(body.get("nickname") or ""))
+                if not ok:
+                    return web.json_response({"ok": False, "error": val}, headers=CORS_HEADERS)
+                new_nick = val
+            await db_manager.update_nickname(uid, new_nick)
+            return await _fast_delta_response(uid, {"message": f"✏️ Твой новый никнейм: {new_nick}"})
 
-        g1, g2, log_txt = resolve_penalty_shootout(d["kick_dir"], d["save_dir"], kick_dir, save_dir)
-        bank = round(stake * 2 * 0.95, 1)  # 5% комиссия
-        c_delta = 0
-
-        if g1 > g2:
-            c_delta = -stake
-            await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, d["creator_id"])
-            res_headline = f"🏆 Победил {d['creator_name']} (+{bank} FC)!"
-            push_live_ticker(f"⚔️ {d['creator_name']} победил в PvP-дуэли и забрал банк {bank} FC!")
-        elif g2 > g1:
-            c_delta = round(bank - stake, 1)
-            await db_manager.exec("UPDATE users SET balance = balance + $1, pvp_wins = pvp_wins + 1, profit = profit + $2 WHERE user_id = $3", bank, bank - stake, uid)
-            res_headline = f"🏆 Ты победил (+{bank} FC)!"
-            push_live_ticker(f"⚔️ {user['username']} победил в PvP-дуэли и забрал банк {bank} FC!")
-        else:
-            await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), d["creator_id"])
-            await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", float(stake), uid)
-            res_headline = f"🤝 Ничья ({g1}:{g2})! Ставки возвращены."
-
-        try:
-            await bot.send_message(
-                d["creator_id"],
-                f"⚔️ <b>ИТОГ PVP-ДУЭЛИ #{duel_id}</b>\n<b>{d['creator_name']}</b> vs <b>{user['username']}</b>\n\n<blockquote>{log_txt}</blockquote>\n{res_headline}",
-                parse_mode="HTML"
-            )
-        except Exception:
-            pass
-        return await _fast_delta_response(uid, {"message": res_headline, "detail": re.sub(r"<.*?>", "", log_txt), "coin_delta": c_delta}, include_pvp=True)
-
-    elif action == "pvp_cancel":
-        duel_id = int(body.get("duel_id") or 0)
-        cancelled = await db_manager.cancel_pvp_duel(duel_id, uid)
-        if not cancelled:
-            return web.json_response({"ok": False, "error": "Не удалось отменить вызов"}, headers=CORS_HEADERS)
-        return await _fast_delta_response(uid, {"message": "✅ Вызов отменен, средства возвращены!"}, include_pvp=True)
-
-    elif action == "set_club":
-        club = str(body.get("club") or "")
-        if club in POPULAR_CLUBS:
-            await db_manager.set_favorite_club(uid, club)
-            return await _fast_delta_response(uid, {"message": f"⭐ Любимый клуб: {club} (+10% к прибыли)!"})
-        return web.json_response({"ok": False, "error": "Клуб не найден"}, headers=CORS_HEADERS)
-
-    elif action == "set_nickname":
-        mode = str(body.get("mode") or "custom")
-        if mode == "random":
-            new_nick = generate_football_nickname()
-        else:
-            ok, val = validate_custom_nickname(str(body.get("nickname") or ""))
-            if not ok:
-                return web.json_response({"ok": False, "error": val}, headers=CORS_HEADERS)
-            new_nick = val
-        await db_manager.update_nickname(uid, new_nick)
-        return await _fast_delta_response(uid, {"message": f"✏️ Твой новый никнейм: {new_nick}"})
-
-    elif action == "toggle_incognito":
-        inc_st = await db_manager.toggle_user_incognito(uid)
-        msg = "🕶 Инкогнито ВКЛЮЧЕН (ник скрыт в Топ-10)" if inc_st == 1 else "👀 Инкогнито ВЫКЛЮЧЕН"
-        return await _fast_delta_response(uid, {"message": msg})
+        elif action == "toggle_incognito":
+            inc_st = await db_manager.toggle_user_incognito(uid)
+            msg = "🕶 Инкогнито ВКЛЮЧЕН (ник скрыт в Топ-10)" if inc_st == 1 else "👀 Инкогнито ВЫКЛЮЧЕН"
+            return await _fast_delta_response(uid, {"message": msg})
 
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
-_WEBAPP_HTML_MEMO = None
-
-# ИСПРАВЛЕНИЕ СИНХРОНИЗАЦИИ ПРОФИЛЯ (ТОЧНАЯ ПЕРЕДАЧА АРГУМЕНТОВ В GET_USER)
-async def _fast_get_user(user_id: int, *args, **kwargs) -> dict:
-    now_f = now_msk().timestamp()
-    if not args and not kwargs:
-        cached = RAM_USER_CACHE.get(user_id)
-        if cached and (now_f - cached["ts"] < 25.0):
-            return dict(cached["data"])
-    u = await _orig_get_user(user_id, *args, **kwargs)
-    if u:
-        u_dict = dict(u)
-        RAM_USER_CACHE[user_id] = {"data": u_dict, "ts": now_f}
-        return u_dict
-    return u
-
-db_manager.get_user = _fast_get_user
-
-def is_user_vip_active(user: dict, st: dict = None) -> bool:
-    try:
-        u_d = dict(user) if user else {}
-        if int(u_d.get("is_vip") or 0) == 1:
-            return True
-        if st is None:
-            st = parse_user_fut_state(u_d)
-        return int(st.get("vip_until_ts") or 0) > int(now_msk().timestamp())
-    except Exception:
-        return False
-
-def calculate_forbes_net_worth(user: dict, st: dict = None) -> int:
-    try:
-        u_d = dict(user) if user else {}
-        if st is None:
-            st = parse_user_fut_state(u_d)
-        bal = float(u_d.get("balance") or 0)
-        stor_val = sum(int(x.get("value") or 0) for x in st.get("startup_storage", []))
-        show_val = sum(int(x.get("value") or 0) for x in st.get("startup_showroom", []))
-        st_lvl = int(u_d.get("stadium_level") or 1)
-        arena_val = sum(int(STADIUM_LEVELS.get(l, {}).get("price", 0)) for l in range(1, st_lvl + 1))
-        return int(round(bal + stor_val + show_val + arena_val * 0.5))
-    except Exception:
-        return int(float(dict(user).get("balance") or 0)) if user else 0
-
-async def serve_webapp_html(request):
-    """Отдает webapp.html напрямую из оперативной памяти"""
-    global _WEBAPP_HTML_MEMO
-    if _WEBAPP_HTML_MEMO is None:
-        html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
-        if not os.path.exists(html_path):
-            return web.Response(text="<h2>Файл webapp.html еще не загружен.</h2>", content_type="text/html", headers=CORS_HEADERS)
-        with open(html_path, "r", encoding="utf-8") as f:
-            _WEBAPP_HTML_MEMO = f.read()
-    return web.Response(text=_WEBAPP_HTML_MEMO, content_type="text/html", headers=CORS_HEADERS)
-
 async def handle_db_status(request):
-    """Живая диагностика БД и пинга по адресу /db_status"""
+    """Живая диагностика БД, кэша и P2P-лотов по адресу /db_status"""
     t0 = now_msk().timestamp()
     try:
         users_cnt = await db_manager.fetchval("SELECT COUNT(*) FROM users")
@@ -6727,6 +6893,7 @@ async def handle_db_status(request):
             "total_users": users_cnt,
             "active_bets": pending_bets,
             "total_bets": total_bets,
+            "p2p_active_lots": len(P2P_CONTAINER_MARKET),
             "ram_cached_users": len(RAM_USER_CACHE),
             "precomputed_matches": len(PRECOMPUTED_WEBAPP_CACHE.get("matches", []))
         }, headers=CORS_HEADERS)
@@ -6747,13 +6914,31 @@ async def ensure_high_load_indexes():
         except Exception as e:
             logging.warning(f"Индекс БД: {e}")
 
+# Фоновый пульс БД каждые 18 секунд + автоочистка RAM (защита от OOM 512MB) + авто-бэкап раз в 12 часов
 async def db_keep_alive_worker():
+    last_backup_ts = now_msk().timestamp()
     while True:
         await asyncio.sleep(18)
+        now_f = now_msk().timestamp()
         try:
             await db_manager.fetchval("SELECT 1")
         except Exception:
             pass
+        # Очистка устаревших записей из RAM_USER_CACHE (старше 120 сек)
+        try:
+            stale_uids = [k for k, v in list(RAM_USER_CACHE.items()) if (now_f - v.get("ts", 0)) > 120.0]
+            for k in stale_uids:
+                RAM_USER_CACHE.pop(k, None)
+            if len(USER_ACTION_LOCKS) > 1500:
+                free_locks = [k for k, lck in list(USER_ACTION_LOCKS.items()) if not lck.locked()]
+                for k in free_locks[:1000]:
+                    USER_ACTION_LOCKS.pop(k, None)
+        except Exception:
+            pass
+        # Автоматический бэкап базы админу в Telegram каждые 12 часов (43200 сек)
+        if (now_f - last_backup_ts) >= 43200:
+            last_backup_ts = now_f
+            asyncio.create_task(send_database_backup_to_admin("Авто-бэкап (каждые 12ч)"))
 
 async def start_web_server():
     app = web.Application()
@@ -6782,6 +6967,7 @@ async def setup_bot_commands():
         commands = [
             BotCommand(command="start", description="🎄 Открыть игру и Профиль"),
             BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
+            BotCommand(command="backup", description="💾 Выгрузить бэкап БД (Админ)"),
             BotCommand(command="admin", description="⚙️ Панель управления (Админ)")
         ]
         await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
@@ -6792,6 +6978,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     await db_manager.init()
     await ensure_high_load_indexes()
+    await init_and_load_p2p_market()
     if not db_manager.use_pg:
         try:
             await db_manager.exec("PRAGMA journal_mode=WAL;")
