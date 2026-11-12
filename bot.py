@@ -5426,12 +5426,17 @@ async def handle_options(request):
 async def handle_ping(request):
     return web.Response(text="AI_BET_BOT Ultra-Fast Engine is running 24/7!", headers=CORS_HEADERS)
 
+_WEBAPP_HTML_MEMO = None
+
 async def serve_webapp_html(request):
-    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
-    if not os.path.exists(html_path):
-        return web.Response(text="<h2>Файл webapp.html еще не загружен.</h2>", content_type="text/html", headers=CORS_HEADERS)
-    with open(html_path, "r", encoding="utf-8") as f:
-        return web.Response(text=f.read(), content_type="text/html", headers=CORS_HEADERS)
+    global _WEBAPP_HTML_MEMO
+    if _WEBAPP_HTML_MEMO is None:
+        html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
+        if not os.path.exists(html_path):
+            return web.Response(text="<h2>Файл webapp.html еще не загружен.</h2>", content_type="text/html", headers=CORS_HEADERS)
+        with open(html_path, "r", encoding="utf-8") as f:
+            _WEBAPP_HTML_MEMO = f.read()
+    return web.Response(text=_WEBAPP_HTML_MEMO, content_type="text/html", headers=CORS_HEADERS)
 
 async def api_get_match_ai(request):
     l_key = request.match_info.get("league_key", "")
