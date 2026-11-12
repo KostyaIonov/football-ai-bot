@@ -6656,11 +6656,51 @@ async def api_handle_action(request):
 
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
-# Фоновый пульс БД каждые 18 секунд, исключающий засыпание сокета на Render
 _WEBAPP_HTML_MEMO = None
 
+# ИСПРАВЛЕНИЕ СИНХРОНИЗАЦИИ ПРОФИЛЯ (ТОЧНАЯ ПЕРЕДАЧА АРГУМЕНТОВ В GET_USER)
+async def _fast_get_user(user_id: int, *args, **kwargs) -> dict:
+    now_f = now_msk().timestamp()
+    if not args and not kwargs:
+        cached = RAM_USER_CACHE.get(user_id)
+        if cached and (now_f - cached["ts"] < 25.0):
+            return dict(cached["data"])
+    u = await _orig_get_user(user_id, *args, **kwargs)
+    if u:
+        u_dict = dict(u)
+        RAM_USER_CACHE[user_id] = {"data": u_dict, "ts": now_f}
+        return u_dict
+    return u
+
+db_manager.get_user = _fast_get_user
+
+def is_user_vip_active(user: dict, st: dict = None) -> bool:
+    try:
+        u_d = dict(user) if user else {}
+        if int(u_d.get("is_vip") or 0) == 1:
+            return True
+        if st is None:
+            st = parse_user_fut_state(u_d)
+        return int(st.get("vip_until_ts") or 0) > int(now_msk().timestamp())
+    except Exception:
+        return False
+
+def calculate_forbes_net_worth(user: dict, st: dict = None) -> int:
+    try:
+        u_d = dict(user) if user else {}
+        if st is None:
+            st = parse_user_fut_state(u_d)
+        bal = float(u_d.get("balance") or 0)
+        stor_val = sum(int(x.get("value") or 0) for x in st.get("startup_storage", []))
+        show_val = sum(int(x.get("value") or 0) for x in st.get("startup_showroom", []))
+        st_lvl = int(u_d.get("stadium_level") or 1)
+        arena_val = sum(int(STADIUM_LEVELS.get(l, {}).get("price", 0)) for l in range(1, st_lvl + 1))
+        return int(round(bal + stor_val + show_val + arena_val * 0.5))
+    except Exception:
+        return int(float(dict(user).get("balance") or 0)) if user else 0
+
 async def serve_webapp_html(request):
-    """Переопределяет отдачу webapp.html через RAM-кэш без правок в середине файла"""
+    """Отдает webapp.html напрямую из оперативной памяти"""
     global _WEBAPP_HTML_MEMO
     if _WEBAPP_HTML_MEMO is None:
         html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html")
@@ -6717,7 +6757,6 @@ async def db_keep_alive_worker():
 
 async def start_web_server():
     app = web.Application()
-    # Сначала регистрируем все GET и POST маршруты, а OPTIONS ставим последним (убирает ошибку 405)
     app.router.add_get("/", handle_ping)
     app.router.add_get("/db_status", handle_db_status)
     app.router.add_get("/app", serve_webapp_html)
