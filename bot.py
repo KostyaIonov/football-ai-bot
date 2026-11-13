@@ -5143,7 +5143,7 @@ async def process_stars_successful_payment(message: Message):
             f"✨ <b>ОПЛАТА STARS УСПЕШНО ЗАВЕРШЕНА!</b>\n\n<blockquote>{reward_desc}</blockquote>",
             reply_markup=minimalist_chat_menu_kb(uid), parse_mode="HTML"
         )
-        async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
+async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
     user = await db_manager.get_user(user_id)
     if user["balance"] < cost:
         return {"ok": False, "error": f"Недостаточно средств! Нужно {cost} FC."}
