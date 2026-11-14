@@ -7640,6 +7640,331 @@ async def api_handle_action(request):
     return web.json_response({"ok": False, "error": "Unknown action"}, status=400, headers=CORS_HEADERS)
 
 async def handle_db_status(request):
+    SETTLEMENT_LOCK = asyncio.Lock()
+
+async def atomic_safe_settle_bet_in_db(bet: dict, status: str, odd_or_offer: float, score_str: str) -> dict:
+    """Атомарный расчет ставки с защитой от двойного умножения и повторного начисления"""
+    bet_id = int(bet["bet_id"])
+    uid = int(bet["user_id"])
+    amount = float(bet.get("amount") or 0.0)
+    coupon_odds = float(bet.get("odds") or 1.0)
+
+    async with SETTLEMENT_LOCK:
+        # 1. Проверяем в БД, что купон еще НЕ рассчитан (защита от гонки воркеров)
+        cur_st = await db_manager.fetchval("SELECT status FROM bets WHERE bet_id = $1", bet_id)
+        if cur_st != "pending":
+            return {"ok": False, "already_settled": True, "payout": 0.0, "cashback": 0.0, "net_profit": 0.0}
+
+        # Сразу фиксируем новый статус купона в БД
+        await db_manager.exec(
+            "UPDATE bets SET status = $1, score_result = $2 WHERE bet_id = $3 AND status = 'pending'",
+            status, str(score_str or ""), bet_id
+        )
+
+        user = await db_manager.get_user(uid)
+        buffs = get_user_fut_buffs_v2(user)
+        st = buffs["full_state"]
+        vip_act = buffs["is_vip_active"]
+
+        # ВАРИАНТ А: ДОСРОЧНЫЙ ВЫКУП (CASHOUT)
+        if status == "cashout":
+            max_cashout = round(amount * coupon_odds, 1)
+            final_payout = min(max_cashout, max(0.0, round(float(odd_or_offer), 1)))
+            net_profit = round(final_payout - amount, 1)
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + $1, profit = profit + $2 WHERE user_id = $3",
+                final_payout, net_profit, uid
+            )
+            return {"ok": True, "payout": final_payout, "cashback": 0.0, "net_profit": net_profit}
+
+        # ВАРИАНТ Б: ВОЗВРАТ СТАВКИ (PUSH)
+        if status == "push":
+            final_payout = round(amount, 1)
+            await db_manager.exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", final_payout, uid)
+            return {"ok": True, "payout": final_payout, "cashback": 0.0, "net_profit": 0.0}
+
+        # ВАРИАНТ В: ПОБЕДА КУПОНА (WIN) — СТРОГИЙ КОНТРОЛЬ КОЭФФИЦИЕНТА
+        if status == "win":
+            # Если передан эффективный кэф (с учетом возвратов в экспрессе), берем его, но НЕ выше кэфа купона
+            if 1.0 <= float(odd_or_offer) <= coupon_odds:
+                eff_odd = float(odd_or_offer)
+            else:
+                eff_odd = coupon_odds
+
+            base_win = amount * eff_odd
+            raw_profit = max(0.0, base_win - amount)
+
+            # Начисляем бонус карточек FUT и Любимого клуба строго на чистую прибыль
+            pick_low = str(bet.get("pick") or "").lower()
+            if any(k in pick_low for k in ("тб", "тм", "тотал", "итб")):
+                role_pct = float(buffs.get("totals_profit_pct") or 0.0)
+            elif any(k in pick_low for k in ("фора", "обе забьют", "оз")):
+                role_pct = float(buffs.get("handicap_profit_pct") or 0.0)
+            else:
+                role_pct = float(buffs.get("outcomes_profit_pct") or 0.0)
+
+            fav_pct = 10.0 if int(bet.get("is_fav_club") or 0) == 1 else 0.0
+            total_bonus_pct = min(45.0, max(0.0, role_pct + fav_pct))
+            bonus_fc = raw_profit * (total_bonus_pct / 100.0)
+
+            final_payout = round(base_win + bonus_fc, 1)
+
+            # ЖЕСТКИЙ ПРЕДОХРАНИТЕЛЬ «АНТИ-ОВЕРФЛОУ»: выплата никогда не превысит Ставка * Кэф * 1.45
+            hard_cap = round(amount * coupon_odds * 1.45, 1)
+            if final_payout > hard_cap:
+                final_payout = round(amount * coupon_odds, 1)
+
+            net_profit = round(final_payout - amount, 1)
+            earned_pts = max(15, int(round(eff_odd * 35 + net_profit * 0.04)))
+            st["tourney_pts"] = int(st.get("tourney_pts") or 0) + earned_pts
+
+            await db_manager.exec(
+                "UPDATE users SET balance = balance + $1, wins = wins + 1, streak = streak + 1, profit = profit + $2, fut_cards = $3 WHERE user_id = $4",
+                final_payout, net_profit, dump_user_fut_state(st, vip_act), uid
+            )
+            SHARED_DB_CACHE["leaderboard_ts"] = 0
+            SHARED_DB_CACHE["tourney_ts"] = 0
+            return {
+                "ok": True, "payout": final_payout, "cashback": 0.0,
+                "net_profit": net_profit, "tourney_pts_added": earned_pts
+            }
+
+        # ВАРИАНТ Г: ПРОИГРЫШ КУПОНА (LOSS) + СТРАХОВКА 50% / КЭШБЭК ЭКСПРЕССА 5+ / КЭШБЭК ВРАТАРЯ FUT
+        cashback = 0.0
+        cashback_reason = ""
+        if bet.get("booster_used") == "insure50":
+            cashback = round(amount * 0.50, 1)
+            cashback_reason = "🛡 Страховка купона (50%)"
+        else:
+            try:
+                legs = json.loads(bet.get("legs_json") or "[]")
+            except Exception:
+                legs = []
+            if bet.get("bet_type") == "express" and len(legs) >= 5:
+                lost_legs = sum(1 for lg in legs if lg.get("final_status") == "loss")
+                won_legs = sum(1 for lg in legs if lg.get("final_status") == "win")
+                if lost_legs == 1 and won_legs >= (len(legs) - 1):
+                    cashback = round(amount * 0.50, 1)
+                    cashback_reason = f"🛡 Кэшбэк экспресса 50% (1 промах из {len(legs)})"
+
+            if cashback <= 0.0:
+                gk_pct = min(35.0, float(buffs.get("loss_cashback_pct") or 0.0))
+                if gk_pct > 0:
+                    cashback = round(amount * (gk_pct / 100.0), 1)
+                    cashback_reason = f"🧤 Кэшбэк вратаря FUT ({gk_pct}%)"
+
+        cashback = min(round(amount * 0.50, 1), max(0.0, cashback))
+        net_loss = round(amount - cashback, 1)
+
+        await db_manager.exec(
+            "UPDATE users SET balance = balance + $1, losses = losses + 1, streak = 0, profit = profit - $2 WHERE user_id = $3",
+            cashback, net_loss, uid
+        )
+        if cashback > 0 and "Кэшбэк экспресса" in cashback_reason:
+            try:
+                await bot.send_message(
+                    uid,
+                    f"🛡 <b>КЭШБЭК ЭКСПРЕССА (50%)!</b>\n\n"
+                    f"<blockquote>В твоем экспрессе <b>#{bet_id}</b> подвел всего 1 исход! "
+                    f"На баланс возвращено <b><code>+{cashback} FC</code></b>!</blockquote>",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+        return {"ok": True, "payout": 0.0, "cashback": cashback, "net_profit": -net_loss}
+
+db_manager.settle_bet_in_db = atomic_safe_settle_bet_in_db
+
+# КОМАНДЫ АДМИНА ДЛЯ МГНОВЕННОГО ИСПРАВЛЕНИЯ БАЛАНСА (/fix_last_bet и /set_balance)
+@dp.message(Command("fix_last_bet"))
+async def cmd_fix_last_bet(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    uid = message.from_user.id
+    last_win = await db_manager.fetchrow(
+        "SELECT * FROM bets WHERE user_id = $1 AND status = 'win' ORDER BY bet_id DESC LIMIT 1", uid
+    )
+    if not last_win:
+        return await message.answer("⚠️ У тебя нет рассчитанных победных ставок.")
+    b = dict(last_win)
+    amt = float(b["amount"])
+    odds = float(b["odds"])
+    correct_payout = round(amt * odds, 1)
+    correct_profit = round(correct_payout - amt, 1)
+
+    # Пересчитываем честный баланс на основе всех ставок или корректируем переплату
+    u = await db_manager.get_user(uid)
+    bugged_overpay = round((amt * amt * odds) - correct_payout, 1)
+    if u["balance"] > bugged_overpay and bugged_overpay > 0:
+        new_bal = max(1000.0, round(u["balance"] - bugged_overpay, 1))
+        new_prof = round(u["profit"] - bugged_overpay, 1)
+    else:
+        new_bal = max(1000.0, correct_payout)
+        new_prof = correct_profit
+
+    await db_manager.exec("UPDATE users SET balance = $1, profit = $2 WHERE user_id = $3", new_bal, new_prof, uid)
+    await message.answer(
+        f"✅ <b>Переплата по купону #{b['bet_id']} скорректирована!</b>\n\n"
+        f"<blockquote>💵 Ставка: <code>{amt} FC</code> × Кэф <code>{odds}</code>\n"
+        f"🎯 Правильная выплата: <b><code>{correct_payout} FC</code></b>\n"
+        f"💰 Твой актуальный баланс: <b><code>{new_bal} FC</code></b></blockquote>",
+        parse_mode="HTML"
+    )
+
+@dp.message(Command("set_balance"))
+async def cmd_admin_set_balance(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        return await message.answer("Использование: <code>/set_balance 10000</code>", parse_mode="HTML")
+    try:
+        target_bal = round(float(parts[1]), 1)
+        uid = message.from_user.id
+        await db_manager.exec("UPDATE users SET balance = $1 WHERE user_id = $2", target_bal, uid)
+        await message.answer(f"✅ Твой баланс установлен на <b><code>{target_bal} FC</code></b>!", parse_mode="HTML")
+    except Exception as e:
+        await message.answer(f"Ошибка: {e}")
+
+# ПЕРЕОПРЕДЕЛЕННЫЙ ЕДИНЫЙ ВОРКЕР (ПЕРЕДАЕТ ТОЛЬКО КОЭФФИЦИЕНТ, БЕЗ ДВОЙНОГО УМНОЖЕНИЯ)
+async def fast_unified_settlement_worker():
+    await asyncio.sleep(5)
+    while True:
+        try:
+            pending_rows = await db_manager.fetch("SELECT * FROM bets WHERE status = 'pending'")
+            if pending_rows:
+                events_to_fetch = {}
+                parsed_bets = []
+                for r in pending_rows:
+                    b = dict(r)
+                    try:
+                        legs = json.loads(b.get("legs_json") or "[]")
+                    except Exception:
+                        legs = []
+                    b["_parsed_legs"] = legs
+                    parsed_bets.append(b)
+                    for lg in legs:
+                        if lg.get("final_status") not in ("win", "loss", "push"):
+                            ev_id = str(lg.get("event_id") or "")
+                            slug = str(lg.get("league_slug") or "")
+                            if ev_id and slug:
+                                events_to_fetch[ev_id] = slug
+
+                fresh_results = {}
+                if events_to_fetch:
+                    async with aiohttp.ClientSession() as session:
+                        for ev_id, slug in list(events_to_fetch.items())[:40]:
+                            try:
+                                res_ev = await asyncio.wait_for(fetch_real_match_result(session, slug, ev_id), timeout=5.0)
+                                if res_ev and res_ev.get("ok"):
+                                    fresh_results[ev_id] = res_ev
+                            except Exception:
+                                pass
+
+                for b in parsed_bets:
+                    legs = b["_parsed_legs"]
+                    if not legs:
+                        continue
+                    legs_modified = False
+
+                    for lg in legs:
+                        if lg.get("final_status") in ("win", "loss", "push"):
+                            continue
+                        ev_id = str(lg.get("event_id") or "")
+                        fr = fresh_results.get(ev_id)
+                        if not fr:
+                            continue
+
+                        gh = int(fr.get("home_score") or 0)
+                        ga = int(fr.get("away_score") or 0)
+                        sc_str = str(fr.get("score_str") or f"{gh}:{ga}")
+                        state = str(fr.get("state") or "")
+                        det_str = str(fr.get("detail") or "")
+                        minute = parse_live_minute(det_str)
+                        p_code = str(lg.get("pick_code") or "").lower()
+
+                        if state == "in":
+                            if (p_code.startswith("tb_") or p_code.startswith("itb") or p_code in ("btts", "bh_yes")) and evaluate_leg_result(p_code, gh, ga) == "win":
+                                lg["final_status"] = "win"
+                                lg["final_score"] = sc_str
+                                lg["early_win"] = True
+                                legs_modified = True
+                            elif p_code.startswith("h1_") and (minute >= 46 or "HT" in det_str.upper() or "2ND" in det_str.upper()):
+                                h1_res = evaluate_leg_result(p_code, gh, ga)
+                                lg["final_status"] = h1_res
+                                lg["final_score"] = sc_str
+                                lg["early_win"] = (h1_res == "win")
+                                legs_modified = True
+
+                        elif state == "post":
+                            f_res = evaluate_leg_result(p_code, gh, ga)
+                            lg["final_status"] = f_res
+                            lg["final_score"] = sc_str
+                            legs_modified = True
+
+                    all_finished = all(lg.get("final_status") in ("win", "loss", "push") for lg in legs)
+                    any_lost = any(lg.get("final_status") == "loss" for lg in legs)
+
+                    if len(legs) == 1 and all_finished:
+                        lg0 = legs[0]
+                        st_final = lg0["final_status"]
+                        sc_final = lg0.get("final_score", "0:0") + (" ⚡Досрочно" if lg0.get("early_win") else "")
+                        b["legs_json"] = json.dumps(legs, ensure_ascii=False)
+                        await db_manager.exec("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", b["legs_json"], b["bet_id"])
+
+                        # Передаем строго КОЭФФИЦИЕНТ (float(b["odds"])), а не умноженную сумму!
+                        settle_info = await db_manager.settle_bet_in_db(b, st_final, float(b["odds"]), sc_final)
+                        if settle_info.get("ok") and st_final == "win":
+                            try:
+                                await bot.send_message(
+                                    b["user_id"],
+                                    f"✅ <b>КУПОН #{b['bet_id']} ЗАШЁЛ!</b>\n\n"
+                                    f"<blockquote>⚽ {b['match_title']}\n🎯 Исход: <b>{b['pick']}</b> ({sc_final})\n"
+                                    f"💰 Выплата: <b><code>+{settle_info['payout']} FC</code></b></blockquote>",
+                                    parse_mode="HTML"
+                                )
+                            except Exception:
+                                pass
+
+                    elif len(legs) > 1 and all_finished:
+                        b["legs_json"] = json.dumps(legs, ensure_ascii=False)
+                        await db_manager.exec("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", b["legs_json"], b["bet_id"])
+                        if any_lost:
+                            await db_manager.settle_bet_in_db(b, "loss", 0.0, "Экспресс завершен")
+                        else:
+                            all_push = all(lg.get("final_status") == "push" for lg in legs)
+                            if all_push:
+                                await db_manager.settle_bet_in_db(b, "push", 1.0, "Возврат экспресса")
+                            else:
+                                eff_odd = float(b["odds"])
+                                for lg in legs:
+                                    if lg.get("final_status") == "push" and float(lg.get("odds") or 1.0) > 1.0:
+                                        eff_odd = max(1.01, round(eff_odd / float(lg["odds"]), 2))
+                                # Передаем строго ЭФФЕКТИВНЫЙ КОЭФФИЦИЕНТ (eff_odd)!
+                                settle_info = await db_manager.settle_bet_in_db(b, "win", eff_odd, f"Экспресс ({len(legs)}/{len(legs)})")
+                                if settle_info.get("ok"):
+                                    try:
+                                        await bot.send_message(
+                                            b["user_id"],
+                                            f"🔥 <b>ЭКСПРЕСС #{b['bet_id']} ПОЛНОСТЬЮ ЗАШЁЛ!</b>\n\n"
+                                            f"<blockquote>⚡ Событий: <b>{len(legs)} из {len(legs)} ✅</b>\n"
+                                            f"💰 Выплата: <b><code>+{settle_info['payout']} FC</code></b></blockquote>",
+                                            parse_mode="HTML"
+                                        )
+                                    except Exception:
+                                        pass
+
+                    elif legs_modified:
+                        new_legs_str = json.dumps(legs, ensure_ascii=False)
+                        await db_manager.exec("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", new_legs_str, b["bet_id"])
+
+        except Exception as e:
+            logging.warning(f"Единый воркер расчета ставок: {e}")
+
+        await asyncio.sleep(25)
+
+async def handle_db_status(request):
     t0 = now_msk().timestamp()
     try:
         users_cnt = await db_manager.fetchval("SELECT COUNT(*) FROM users")
@@ -7726,6 +8051,7 @@ async def setup_bot_commands():
         commands = [
             BotCommand(command="start", description="🎄 Открыть игру и Профиль"),
             BotCommand(command="profile", description="👤 Личный кабинет и мой ID"),
+            BotCommand(command="fix_last_bet", description="🔧 Исправить переплату ставки (Админ)"),
             BotCommand(command="backup", description="💾 Выгрузить бэкап БД (Админ)"),
             BotCommand(command="admin", description="⚙️ Панель управления (Админ)")
         ]
@@ -7751,8 +8077,8 @@ async def main():
     await start_web_server()
     await setup_bot_commands()
     asyncio.create_task(db_keep_alive_worker())
+    # Работает СТРОГО ОДИН атомарный воркер расчета ставок!
     asyncio.create_task(fast_unified_settlement_worker())
-    asyncio.create_task(match_settlement_worker())
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("✅ Все системы активны! Запускаю поллинг Telegram...")
     await dp.start_polling(bot)
