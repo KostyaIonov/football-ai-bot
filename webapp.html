@@ -38,15 +38,17 @@
             position: relative;
         }
 
-        /* ЛЕГКИЙ АППАРАТНЫЙ СНЕГОПАД (БЕЗ НАГРУЗКИ НА GPU) */
+        /* НОВОГОДНИЙ АТМОСФЕРНЫЙ СНЕГОПАД */
         .snow-container { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
         .snowflake {
-            position: absolute; top: -24px; color: rgba(255, 255, 255, 0.28);
-            font-size: 12px; will-change: transform; animation: snowfall linear infinite;
+            position: absolute; top: -24px; color: rgba(255, 255, 255, 0.34);
+            font-size: 13px; will-change: transform; animation: snowfall linear infinite;
+            text-shadow: 0 0 8px rgba(128, 216, 255, 0.45);
         }
         @keyframes snowfall {
-            0% { transform: translate3d(0, -10px, 0); }
-            100% { transform: translate3d(8px, 104vh, 0); }
+            0% { transform: translate3d(0, -10px, 0) rotate(0deg); opacity: 0.85; }
+            50% { transform: translate3d(12px, 50vh, 0) rotate(180deg); opacity: 0.55; }
+            100% { transform: translate3d(-8px, 105vh, 0) rotate(360deg); opacity: 0.1; }
         }
 
         /* ==================== ДВУХЭТАЖНАЯ ШАПКА (0% НАЛОЖЕНИЙ НА ЛЮБОМ ЭКРАНЕ) ==================== */
@@ -57,7 +59,6 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
         }
 
-        /* ЭТАЖ 1: СЛЕВА НИК И РАНГ, СПРАВА БАНК КАППЕРА */
         .top-header-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -96,6 +97,16 @@
             cursor: pointer;
             flex-shrink: 0;
         }
+        .hot-hand-pill {
+            font-size: 9.5px;
+            font-weight: 900;
+            color: #041019;
+            background: linear-gradient(135deg, #ffca28, #ff6d00);
+            padding: 1px 6px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: none;
+        }
         .user-rank-sub {
             font-size: 10.5px;
             color: var(--text-muted);
@@ -132,11 +143,11 @@
             white-space: nowrap;
         }
 
-        /* ЭТАЖ 2: ОТДЕЛЬНАЯ ПАНЕЛЬ БЫСТРЫХ КНОПОК (ТУРНИР, LIVE, МАГАЗИН, VIP, ЧЕК) */
+        /* 2-Й ЭТАЖ: ЧИСТАЯ ПАНЕЛЬ ИЗ 4 КРУПНЫХ КНОПОК (ТУРНИР, LIVE, МАГАЗИН, VIP) */
         .quick-actions-strip {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
             padding: 4px 10px 7px;
             border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
@@ -145,8 +156,8 @@
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
             border-radius: 9px;
-            padding: 5px 2px;
-            font-size: 10px;
+            padding: 5.5px 4px;
+            font-size: 10.5px;
             font-weight: 800;
             text-align: center;
             cursor: pointer;
@@ -177,10 +188,6 @@
             color: #041019;
             font-weight: 900;
         }
-        .qa-btn.check {
-            border-color: rgba(128, 216, 255, 0.35);
-            color: var(--accent-ice);
-        }
 
         .coin-float {
             position: absolute; right: 8px; bottom: -20px; font-size: 13px; font-weight: 900;
@@ -204,7 +211,7 @@
         .bulb.y { background: #ffca28; box-shadow: 0 0 6px #ffca28; animation-delay: 1.3s; }
         @keyframes glowBulb { from { opacity: 0.45; } to { opacity: 1; } }
 
-        /* БЕСШОВНАЯ БЕГУЩАЯ СТРОКА ДОСТИЖЕНИЙ И ЗАНОСОВ (БЕЗ ОБРЫВОВ) */
+        /* БЕСШОВНАЯ БЕГУЩАЯ СТРОКА ДОСТИЖЕНИЙ И ЗАНОСОВ */
         .ticker-wrap {
             background: #081223;
             border-bottom: 1px solid rgba(255, 202, 40, 0.22);
@@ -236,7 +243,7 @@
             100% { transform: translate3d(-50%, 0, 0); }
         }
 
-        /* СЕКЦИИ ВКЛАДОК (МГНОВЕННЫЙ ПЕРЕХОД БЕЗ ТОРМОЗОВ) */
+        /* СЕКЦИИ ВКЛАДОК */
         .tab-section { display: none; padding: 11px 12px 26px; position: relative; z-index: 2; }
         .tab-section.active { display: block; }
 
@@ -284,7 +291,7 @@
             width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 800; cursor: pointer; display: none;
         }
 
-        /* ПРИВЫЧНАЯ ЛЕНТА ФУТБОЛЬНЫХ ЛИГ (ОСТАВЛЕНА БЕЗ ИЗМЕНЕНИЙ) */
+        /* УДОБНАЯ ЛЕНТА ФУТБОЛЬНЫХ ЛИГ */
         .leagues-bar { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 9px; margin-bottom: 4px; scrollbar-width: none; }
         .leagues-bar::-webkit-scrollbar { display: none; }
         .league-chip {
@@ -355,7 +362,7 @@
         .sub-nav-btn { padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 800; color: var(--text-muted); border-radius: 9px; cursor: pointer; }
         .sub-nav-btn.active { background: var(--bg-elevated); color: var(--accent-green); border: 1px solid rgba(0, 230, 118, 0.35); }
 
-        /* ==================== ДЕТАЛИЗИРОВАННЫЕ КАРТОЧКИ FUT (PAC/SHO/PAS + TOTY/ICON) ==================== */
+        /* ==================== ДЕТАЛИЗИРОВАННЫЕ КАРТОЧКИ FUT (100 ИГРОКОВ + ПРОКАЧКА ★ УР.) ==================== */
         .fut-tactical-board {
             background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 28px, transparent 28px, transparent 56px), linear-gradient(180deg, #0b4125 0%, #062816 100%);
             border: 2px solid rgba(0, 230, 118, 0.45); border-radius: 20px; padding: 14px 8px; margin-bottom: 12px; position: relative; box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.65);
@@ -392,6 +399,7 @@
         }
         .fut-shield.locked { opacity: 0.68; border-style: dashed; background: rgba(10, 18, 30, 0.82); }
         .captain-badge { position: absolute; top: -7px; right: -6px; background: var(--accent-gold); color: #041019; font-size: 8.5px; font-weight: 900; padding: 2px 5px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+        .level-star-badge { position: absolute; top: -7px; left: -6px; background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019; font-size: 8px; font-weight: 900; padding: 1.5px 5px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
         .shield-top { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: 900; padding: 0 2px; }
         .shield-ovr { font-size: 13.5px; font-weight: 900; color: var(--accent-gold); }
         .shield-club-tag {
@@ -510,16 +518,21 @@
         }
         .insure-toggle-row.active { background: rgba(0, 230, 118, 0.14); border-color: var(--accent-green); }
 
-        /* КУПОН, МОДАЛЬНЫЕ ШТОРКИ И НИЖНЕЕ МЕНЮ */
+        /* ==================== ПЛАШКА КУПОНА ПОВЕРХ ОКНА МАТЧА (Z-INDEX 250) ==================== */
         .floating-slip-bar {
-            position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 140;
+            position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 250;
             background: linear-gradient(135deg, #00e676, #00b0ff); color: #041019;
             border-radius: 15px; padding: 12px 16px; display: none; align-items: center; justify-content: space-between;
-            box-shadow: 0 8px 22px rgba(0, 230, 118, 0.38); cursor: pointer;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), 0 0 18px rgba(0, 230, 118, 0.45);
+            cursor: pointer; transition: bottom 0.2s ease;
+        }
+        .floating-slip-bar.over-modal {
+            bottom: 16px;
         }
         .drawer-overlay { position: fixed; inset: 0; z-index: 220; background: rgba(0, 0, 0, 0.82); display: none; align-items: flex-end; justify-content: center; cursor: pointer; }
         .drawer-overlay.show { display: flex; }
-        .drawer-sheet { background: #0b1322; border-top: 1.5px solid var(--border-frost); border-radius: 22px 22px 0 0; padding: 16px 14px 28px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; cursor: default; }
+        #slip-drawer { z-index: 280; }
+        .drawer-sheet { background: #0b1322; border-top: 1.5px solid var(--border-frost); border-radius: 22px 22px 0 0; padding: 16px 14px 86px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; cursor: default; }
         .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; padding-bottom: 9px; border-bottom: 1px solid var(--border-glass); }
         .close-x { background: rgba(255, 255, 255, 0.09); border: none; color: #fff; width: 30px; height: 30px; border-radius: 50%; font-size: 15px; font-weight: 800; cursor: pointer; }
         .stake-input { width: 100%; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border-glass); border-radius: 12px; padding: 10px; color: #fff; font-size: 15px; font-weight: 800; text-align: center; margin: 7px 0; outline: none; }
@@ -547,26 +560,27 @@
 </head>
 <body>
 
-    <!-- ЛЕГКИЙ НОВОГОДНИЙ СНЕГОПАД -->
+    <!-- АТМОСФЕРНЫЙ НОВОГОДНИЙ СНЕГОПАД -->
     <div class="snow-container" aria-hidden="true">
-        <span class="snowflake" style="left:8%; animation-duration:10s; animation-delay:0s;">❄️</span>
-        <span class="snowflake" style="left:28%; animation-duration:13s; animation-delay:2s;">❅</span>
-        <span class="snowflake" style="left:52%; animation-duration:11s; animation-delay:4s;">🎄</span>
-        <span class="snowflake" style="left:76%; animation-duration:14s; animation-delay:1s;">✨</span>
-        <span class="snowflake" style="left:92%; animation-duration:10.5s; animation-delay:3s;">❄️</span>
+        <span class="snowflake" style="left:6%; animation-duration:9.5s; animation-delay:0s;">❄️</span>
+        <span class="snowflake" style="left:21%; animation-duration:12s; animation-delay:2s;">❅</span>
+        <span class="snowflake" style="left:38%; animation-duration:10.5s; animation-delay:4s;">🎄</span>
+        <span class="snowflake" style="left:56%; animation-duration:11.5s; animation-delay:1.5s;">✨</span>
+        <span class="snowflake" style="left:74%; animation-duration:13s; animation-delay:1s;">❄️</span>
+        <span class="snowflake" style="left:91%; animation-duration:9.8s; animation-delay:3s;">❅</span>
     </div>
 
     <div id="toast"></div>
 
     <!-- ==================== ДВУХЭТАЖНАЯ ШАПКА БЕЗ НАЛОЖЕНИЙ ==================== -->
     <div class="sticky-top-wrap">
-        <!-- 1-Й ЭТАЖ: ПРОФИЛЬ СЛЕВА, БАНК КАППЕРА СПРАВА -->
         <header class="top-header-row">
             <div class="user-identity-box">
                 <div class="user-name-line">
                     <span id="ui-vip-crown" style="font-size:14px;">🎄</span>
                     <span class="user-name-txt" id="ui-username">Загрузка...</span>
                     <span class="id-pill" onclick="copyUserId()">ID: <span id="ui-user-id">...</span></span>
+                    <span class="hot-hand-pill" id="ui-hot-hand" title="Серия 3+ побед подряд: +0.10 к кэфу!">🔥 +0.10</span>
                 </div>
                 <div class="user-rank-sub" id="ui-rank">🏅 Синхронизация...</div>
             </div>
@@ -576,13 +590,12 @@
             </div>
         </header>
 
-        <!-- 2-Й ЭТАЖ: ПАНЕЛЬ БЫСТРЫХ РАЗДЕЛОВ (ТУРНИР КАППЕРОВ, LIVE, МАГАЗИН, VIP, ЧЕК) -->
+        <!-- 2-Й ЭТАЖ: ЧИСТАЯ ПАНЕЛЬ ИЗ 4 КНОПОК (ТУРНИР, LIVE, МАГАЗИН, VIP) -->
         <div class="quick-actions-strip">
             <div class="qa-btn tourney" onclick="openTournamentModal()">🏆 Турнир</div>
             <div class="qa-btn live" onclick="openLiveCenterWidget()">🔴 LIVE</div>
             <div class="qa-btn shop" onclick="openStarsShopModal()">⭐️ Магазин</div>
-            <div class="qa-btn vip" onclick="openVipClubModal()">👑 VIP</div>
-            <div class="qa-btn check" onclick="openShareReceiptModal()">📸 Чек</div>
+            <div class="qa-btn vip" onclick="openVipClubModal()">👑 VIP-Клуб</div>
         </div>
 
         <!-- НОВОГОДНЯЯ ГИРЛЯНДА -->
@@ -600,19 +613,18 @@
             <div class="ticker-half">
                 <span class="ticker-item">🎄 Новогодний сезон 2027 открыт! Участвуй в Еженедельном Турнире Капперов и забирай призовой фонд!</span>
                 <span class="ticker-item">🔴 Ставки в LIVE открыты с защитой VAR! Лови лучшие коэффициенты прямо по ходу матчей!</span>
-                <span class="ticker-item">💎 Ламин Ямаль получил карточку 96 OVR TOTY (+19% к прибыли на Тоталах)!</span>
+                <span class="ticker-item">💎 В коллекцию FUT добавлено 100 звезд! Прокачивай карточки дубликатами до ★ Ур. 5!</span>
             </div>
             <div class="ticker-half">
                 <span class="ticker-item">🎄 Новогодний сезон 2027 открыт! Участвуй в Еженедельном Турнире Капперов и забирай призовой фонд!</span>
                 <span class="ticker-item">🔴 Ставки в LIVE открыты с защитой VAR! Лови лучшие коэффициенты прямо по ходу матчей!</span>
-                <span class="ticker-item">💎 Ламин Ямаль получил карточку 96 OVR TOTY (+19% к прибыли на Тоталах)!</span>
+                <span class="ticker-item">💎 В коллекцию FUT добавлено 100 звезд! Прокачивай карточки дубликатами до ★ Ур. 5!</span>
             </div>
         </div>
     </div>
 
     <!-- ==================== ВКЛАДКА 1: АФИША, МАТЧ ДНЯ (+8%) И LIVE-ЛИНИЯ ==================== -->
     <section id="tab-matches" class="tab-section active">
-        <!-- Баннер Еженедельного Турнира Капперов -->
         <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.18), rgba(0,176,255,0.14), #0c1629); border-color:rgba(255,202,40,0.5); padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;" onclick="openTournamentModal()">
             <div>
                 <div style="font-size:12.5px; font-weight:900; color:var(--accent-gold);">🏆 Еженедельный Кубок Капперов</div>
@@ -629,7 +641,6 @@
             <button class="btn-main gold" style="padding:7px 12px;">Забрать</button>
         </div>
 
-        <!-- СТАРТОВЫЙ КВЕСТ НОВИЧКА -->
         <div class="rookie-card" id="rookie-quest-card" style="display:none;"></div>
 
         <div class="promo-row">
@@ -645,7 +656,7 @@
                     <span>🎯 Суперэкспресс</span>
                     <span style="color:var(--accent-gold);">10к FC</span>
                 </div>
-                <div class="promo-sub" id="ui-se-status-sub">Бесплатный тираж недели</div>
+                <div class="promo-sub" id="ui-se-status-sub">Строго до старта матчей</div>
             </div>
         </div>
 
@@ -654,7 +665,6 @@
             <button class="search-clear-btn" id="search-clear-btn" onclick="clearTeamSearch()">✕</button>
         </div>
 
-        <!-- УДОБНАЯ ЛЕНТА ФУТБОЛЬНЫХ ЛИГ -->
         <div class="leagues-bar" id="leagues-bar"></div>
 
         <div class="section-title" style="margin-top:4px;">
@@ -762,7 +772,7 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 3: FUT (60 ИГРОКОВ С PAC/SHO/PAS, ЯМАЛЬ 96 TOTY) ==================== -->
+    <!-- ==================== ВКЛАДКА 3: FUT (100 ИГРОКОВ С PAC/SHO/PAS И ПРОКАЧКОЙ ДУБЛИКАТАМИ ★) ==================== -->
     <section id="tab-fut" class="tab-section">
         <div class="section-title" style="margin-top:4px;">
             <span>👕 Тактическая схема (5 позиций)</span>
@@ -775,7 +785,7 @@
             </div>
             <div id="fut-active-buffs-summary" style="font-size:11px; color:#cbd5e1; line-height:1.45;"></div>
             <div style="font-size:10px; color:var(--accent-ice); margin-top:5px;">
-                💡 Нажми на карточку на поле, чтобы назначить <b>© Капитана (+25% к баффу)</b> или сменить игрока!
+                💡 Дубликаты карт автоматически повышают уровень игрока (<b>★ Ур. 2..5</b>) и усиливают его бонус!
             </div>
         </div>
 
@@ -786,14 +796,14 @@
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
             <button class="btn-main gold" style="padding:11px 8px; font-size:12px;" onclick="openCollectionModal('ALL')">
-                📚 Моя коллекция (<span id="fut-owned-btn-cnt">0</span>)
+                📚 Моя коллекция (<span id="fut-owned-btn-cnt">0/100</span>)
             </button>
             <button class="btn-main" id="btn-sbc-main" style="padding:11px 8px; font-size:12px;" onclick="craftFutSbc()">
                 🔄 Крафт СПК (<span id="fut-reserve-cnt">0/3</span>)
             </button>
         </div>
 
-        <div class="section-title">🃏 Витрина наборов «Winter FUT» (60 звезд)</div>
+        <div class="section-title">🃏 Витрина наборов «Winter FUT» (100 звезд)</div>
 
         <div class="pack-showcase-card">
             <div class="pack-visual-cover bronze">
@@ -802,7 +812,7 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:900; font-size:15px; margin-bottom:3px;">Базовый набор лиги</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Тюкавин, Глушенков, Батраков, Головин, Сафонов, Акинфеев, Гвардиол и др.</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Тюкавин, Глушенков, Батраков, Барко, Вендел, Угальде, Эндрик, Гакпо, Олисе, Де Йонг, Семак, Николич и др.</div>
                 <button class="btn-main" style="width:100%; padding:9px;" onclick="openFutPack('basic')">Открыть пак • 1 500 FC</button>
             </div>
         </div>
@@ -810,11 +820,11 @@
         <div class="pack-showcase-card" style="border-color:rgba(255,202,40,0.45);">
             <div class="pack-visual-cover gold">
                 <span style="font-size:9px;">GOLD TOP-5</span><span style="font-size:26px;">🥇</span>
-                <span style="font-size:10px; background:rgba(0,0,0,0.25); color:#fff; padding:1px 5px; border-radius:4px;">89-93</span>
+                <span style="font-size:10px; background:rgba(0,0,0,0.25); color:#fff; padding:1px 5px; border-radius:4px;">88-93</span>
             </div>
             <div style="flex:1;">
                 <div style="font-weight:900; font-size:15px; color:var(--accent-gold); margin-bottom:3px;">Золотой набор Топ-5</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Салах, Кейн, Сака, Вирц, Палмер, Педри, Вальверде, Хвича, Дьёкереш, Хакими + шанс TOTY!</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Салах, Кейн, Рафинья, Сака, Фоден, Райс, Вирц, Палмер, Исак, Дембеле, Флик, Слот + шанс TOTY!</div>
                 <button class="btn-main gold" style="width:100%; padding:9px;" onclick="openFutPack('gold')">Открыть пак • 5 000 FC</button>
             </div>
         </div>
@@ -826,13 +836,13 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:900; font-size:15px; color:var(--accent-gold); margin-bottom:3px;">Элитный набор ЛЧ (TOTY & ICON)</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">💎 Ламин Ямаль (96 TOTY), Винисиус (96), Родри (96), Мбаппе, Холанд, Беллингем, Роналдиньо, Зубастик!</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">💎 Ламин Ямаль (96 TOTY), Винисиус, Родри, Мбаппе, Холанд, Беллингем, Роналдиньо, Зубастик, Кафу, Мальдини!</div>
                 <button class="btn-main" style="width:100%; padding:9px;" onclick="openFutPack('elite')">Открыть пак • 15 000 FC</button>
             </div>
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 4: 12 КОНТЕЙНЕРОВ (144 ПРЕДМЕТА С СЕРТИФИКАТАМИ) ==================== -->
+    <!-- ==================== ВКЛАДКА 4: 12 КОНТЕЙНЕРОВ (144 ПРЕДМЕТА + КАССА ШОУРУМА) ==================== -->
     <section id="tab-startup" class="tab-section">
         <div class="card" style="background:linear-gradient(135deg, rgba(255,202,40,0.16), #0d1729); border-color:rgba(255,202,40,0.4); padding:11px 13px; margin-bottom:9px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -866,12 +876,10 @@
         <div id="startup-sub-p2p" style="display:none;"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 5: АРЕНА И КОНТРАКТЫ СПОНСОРОВ ==================== -->
+    <!-- ==================== ВКЛАДКА 5: АРЕНА И КОНТРАКТЫ СПОНСОРОВ (ЧИСТЫЙ ИНТЕРФЕЙС) ==================== -->
     <section id="tab-empire" class="tab-section">
         <div class="section-title">🏟 Домашний Матчдэй и Контракты</div>
         <div class="card" id="current-stadium-card"></div>
-
-        <div class="card" id="secret-bet-card" style="border-color:var(--accent-ice);"></div>
 
         <div class="section-title">🧠 ИИ-Лаборатория прогнозов</div>
         <div class="card" id="current-lab-card"></div>
@@ -880,7 +888,7 @@
         <div id="stadiums-list-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, ГАЛОЧКИ ЭКСПРЕССОВ И ТОП-10 ==================== -->
+    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, ВРЕМЯ/СЧЕТ В ЭКСПРЕССАХ И ТОП-10 ==================== -->
     <section id="tab-profile" class="tab-section">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -956,7 +964,7 @@
         <div id="prof-sub-trophies" style="display:none;"></div>
     </section>
 
-    <!-- ПЛАВАЮЩАЯ ПАНЕЛЬ БЕЗЛИМИТНОГО КУПОНА -->
+    <!-- ПЛАВАЮЩАЯ ПАНЕЛЬ КУПОНА (Z-INDEX 250 — ВСПЛЫВАЕТ ПОВЕРХ ОКНА МАТЧА СРАЗУ ПРИ ВЫБОРЕ ИСХОДА) -->
     <div class="floating-slip-bar" id="floating-slip" onclick="openSlipDrawer()">
         <div>
             <b style="font-size:14px;">🎫 Купон (<span id="slip-count">0</span>)</b>
@@ -978,9 +986,9 @@
         </div>
     </div>
 
-    <!-- БЕЗЛИМИТНЫЙ КУПОН СТАВОК С КЭШБЭКОМ 50% ПРИ 1 ПРОМАХЕ И ПРОВЕРКОЙ VAR -->
+    <!-- ШТОРКА КУПОНА СТАВОК (Z-INDEX 280 — ПОВЕРХ ВСЕХ ОКОН) -->
     <div class="drawer-overlay" id="slip-drawer" onclick="handleOverlayClick(event, 'slip-drawer')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:16px;" id="drawer-title">🎫 Купон ставок</b>
                 <span style="color:var(--accent-red); font-size:12px; font-weight:800; cursor:pointer;" onclick="clearSlip()">🗑 Очистить</span>
@@ -1021,9 +1029,9 @@
         </div>
     </div>
 
-    <!-- НОВОЕ ОКНО: ЕЖЕНЕДЕЛЬНЫЙ ТУРНИР КАППЕРОВ -->
+    <!-- ОКНО: ЕЖЕНЕДЕЛЬНЫЙ ТУРНИР КАППЕРОВ -->
     <div class="drawer-overlay" id="tournament-modal" onclick="handleOverlayClick(event, 'tournament-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold); padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:16px; color:var(--accent-gold);">🏆 Еженедельный Турнир Капперов</b>
                 <button class="close-x" onclick="document.getElementById('tournament-modal').classList.remove('show')">✕</button>
@@ -1032,9 +1040,9 @@
         </div>
     </div>
 
-    <!-- НОВОЕ ОКНО МОНЕТИЗАЦИИ: МАГАЗИН МАГНАТА (TELEGRAM STARS ⭐️) -->
+    <!-- ОКНО МОНЕТИЗАЦИИ: МАГАЗИН МАГНАТА (TELEGRAM STARS ⭐️) -->
     <div class="drawer-overlay" id="stars-shop-modal" onclick="handleOverlayClick(event, 'stars-shop-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid #e040fb;">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid #e040fb; padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:16px; color:#f3e5f5;">⭐️ Магазин Магната (Эксклюзивы)</b>
                 <button class="close-x" onclick="document.getElementById('stars-shop-modal').classList.remove('show')">✕</button>
@@ -1043,9 +1051,9 @@
         </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО: VIP-КЛУБ ПРИВИЛЕГИЙ -->
+    <!-- ОКНО: VIP-КЛУБ ПРИВИЛЕГИЙ -->
     <div class="drawer-overlay" id="vip-modal" onclick="handleOverlayClick(event, 'vip-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold); padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:16px; color:var(--accent-gold);">👑 VIP-Клуб Привилегий</b>
                 <button class="close-x" onclick="document.getElementById('vip-modal').classList.remove('show')">✕</button>
@@ -1056,7 +1064,7 @@
 
     <!-- ОБЗОР ПРОФИЛЯ ДРУГОГО ИГРОКА -->
     <div class="drawer-overlay" id="player-inspect-modal" onclick="handleOverlayClick(event, 'player-inspect-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-ice);">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-ice); padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:15px; color:var(--accent-ice);">🔍 Обзор профиля каппера</b>
                 <button class="close-x" onclick="document.getElementById('player-inspect-modal').classList.remove('show')">✕</button>
@@ -1066,9 +1074,9 @@
     </div>
 
     <div class="drawer-overlay" id="collection-modal" onclick="handleOverlayClick(event, 'collection-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
-                <b style="font-size:15px;">📚 Моя коллекция и Смена состава</b>
+                <b style="font-size:15px;">📚 Моя коллекция (100 звезд FUT)</b>
                 <button class="close-x" onclick="document.getElementById('collection-modal').classList.remove('show')">✕</button>
             </div>
             <div id="collection-sbc-banner" style="margin-bottom:10px;"></div>
@@ -1078,7 +1086,7 @@
     </div>
 
     <div class="drawer-overlay" id="live-widget-modal" onclick="handleOverlayClick(event, 'live-widget-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-red);">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-red); padding-bottom:28px;">
             <div class="sheet-header">
                 <span style="font-size:14px; font-weight:900; color:var(--accent-red);">🔴 LIVE MATCH CENTER (СТАВКИ ОТКРЫТЫ)</span>
                 <button class="close-x" onclick="document.getElementById('live-widget-modal').classList.remove('show')">✕</button>
@@ -1088,7 +1096,7 @@
     </div>
 
     <div class="drawer-overlay" id="se-modal" onclick="handleOverlayClick(event, 'se-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:15px;">🎯 Суперэкспресс недели (До 10 000 FC)</b>
                 <button class="close-x" onclick="closeSuperExpressModal()">✕</button>
@@ -1097,8 +1105,8 @@
         </div>
     </div>
 
-    <div class="drawer-overlay" id="pack-modal" style="align-items:center; padding:18px;" onclick="handleOverlayClick(event, 'pack-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:22px; text-align:center; border:2px solid var(--accent-gold);">
+    <div class="drawer-overlay" id="pack-modal" style="align-items:center; padding:18px; z-index:290;" onclick="handleOverlayClick(event, 'pack-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:22px; text-align:center; border:2px solid var(--accent-gold); padding-bottom:22px;">
             <div id="pack-modal-card-preview" style="display:flex; justify-content:center; margin:0 auto 12px;"></div>
             <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;" id="pack-modal-note"></div>
             <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">Отлично!</button>
@@ -1106,7 +1114,7 @@
     </div>
 
     <div class="drawer-overlay" id="streak-modal" onclick="handleOverlayClick(event, 'streak-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold);">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-top:2px solid var(--accent-gold); padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:15px; color:var(--accent-gold);">🎁 Серия ежедневных входов (7 дней)</b>
                 <button class="close-x" onclick="document.getElementById('streak-modal').classList.remove('show')">✕</button>
@@ -1116,7 +1124,7 @@
     </div>
 
     <div class="drawer-overlay" id="share-receipt-modal" onclick="handleOverlayClick(event, 'share-receipt-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
                 <b style="font-size:15px;">📸 Поделиться купоном или профилем</b>
                 <button class="close-x" onclick="document.getElementById('share-receipt-modal').classList.remove('show')">✕</button>
@@ -1270,7 +1278,6 @@
         let WHEEL_ROTATION = 0;
         let IS_SPINNING = false;
         let IS_OPENING_BOX = false;
-        let IS_SECRET_BET = false;
         let IS_INSURE_PAID = false;
         let FIRST_LOAD_DONE = false;
         let STREAK_POPUP_SHOWN = false;
@@ -1333,7 +1340,10 @@
                 haptic('light');
                 if (document.activeElement) document.activeElement.blur();
                 document.getElementById(modalId).classList.remove('show');
-                if (modalId === 'match-detail-modal') CURRENT_OPEN_MATCH = null;
+                if (modalId === 'match-detail-modal') {
+                    CURRENT_OPEN_MATCH = null;
+                    renderSlipUI();
+                }
             }
         }
 
@@ -1352,7 +1362,7 @@
             } else if (tabName === 'startup') {
                 renderStartupTab(u);
             } else if (tabName === 'empire') {
-                renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.secret_bet_offer, APP_STATE.stadium_sponsors || DEFAULT_SPONSORS);
+                renderEmpireTab(u, APP_STATE.stadiums_catalog || {}, APP_STATE.stadium_sponsors || DEFAULT_SPONSORS);
             } else if (tabName === 'profile') {
                 renderProfileTab(u);
             }
@@ -1533,6 +1543,9 @@
             document.getElementById('ui-rank').textContent = (u.rank || 'Новичок') + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
             document.getElementById('ui-balance').textContent = formatFC(u.balance);
 
+            const hhEl = document.getElementById('ui-hot-hand');
+            if (hhEl) hhEl.style.display = u.hot_hand ? 'inline-block' : 'none';
+
             const ct = APP_STATE.capper_tournament || { prize_pool: 60000 };
             const poolEl = document.getElementById('banner-tourney-pool');
             if (poolEl) poolEl.textContent = formatFC(ct.prize_pool);
@@ -1556,12 +1569,19 @@
             }
 
             const se = APP_STATE.superexpress;
-            if (se && se.entry) {
-                document.getElementById('ui-se-status-sub').textContent = se.entry.status === 'pending'
-                    ? '✅ Прогноз в игре'
-                    : `🏁 Угадано: ${se.entry.guessed}/6`;
-            } else {
-                document.getElementById('ui-se-status-sub').textContent = 'Бесплатный тираж недели';
+            const seSubEl = document.getElementById('ui-se-status-sub');
+            if (seSubEl) {
+                if (se && se.entry) {
+                    seSubEl.textContent = se.entry.status === 'pending'
+                        ? '✅ Прогноз в игре'
+                        : `🏁 Угадано: ${se.entry.guessed}/6`;
+                } else if (se && se.is_closed) {
+                    seSubEl.textContent = '🛑 Приём закрыт (Идут матчи)';
+                } else if (se && se.deadline_note) {
+                    seSubEl.textContent = '🕒 ' + se.deadline_note;
+                } else {
+                    seSubEl.textContent = 'Строго до старта матчей';
+                }
             }
         }
 
@@ -1569,7 +1589,6 @@
             if (!APP_STATE) return;
             renderHeaderAndBanners();
 
-            // Помечаем фоновые вкладки для ленивого рендера, а активную обновляем мгновенно!
             Object.keys(DIRTY_TABS).forEach(k => { DIRTY_TABS[k] = true; });
             renderSpecificTab(ACTIVE_TAB);
             renderSlipUI();
@@ -1599,7 +1618,7 @@
                 : [
                     '🎄 Новогодний сезон 2027 открыт! Участвуй в Еженедельном Турнире Капперов!',
                     '🔴 Ставки в LIVE открыты с защитой VAR! Лови лучшие коэффициенты по ходу матчей!',
-                    '💎 Ламин Ямаль получил карточку 96 OVR TOTY (+19% к прибыли на Тоталах)!'
+                    '💎 В коллекцию FUT добавлено 100 звезд! Прокачивай карточки дубликатами до ★ Ур. 5!'
                 ];
             const sig = list.join('||');
             if (sig === LAST_TICKER_SIGNATURE) return;
@@ -1712,7 +1731,7 @@
             }
         }
 
-        /* ==================== ОБЗОР ЧУЖОГО ПРОФИЛЯ ИГРОКА (С PAC/SHO/PAS И КЛУБОМ) ==================== */
+        /* ==================== ОБЗОР ЧУЖОГО ПРОФИЛЯ ИГРОКА (С УРОВНЯМИ КАРТ ★) ==================== */
         function inspectPlayerByInput(inputId) {
             if (document.activeElement) document.activeElement.blur();
             const inp = document.getElementById(inputId);
@@ -1752,8 +1771,10 @@
                 }
                 const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
                 const shortName = c.name.split(' ').slice(1).join(' ') || c.name;
+                const lvlBadge = (c.level && c.level > 1) ? `<span class="level-star-badge" style="font-size:6.5px; padding:1px 3px;">★${c.level}</span>` : '';
                 return `
                     <div class="fut-shield ${tierCls}" style="width:100%; padding:6px 3px;">
+                        ${lvlBadge}
                         ${isCap ? '<span class="captain-badge" style="font-size:7px; padding:1px 4px;">© КАП</span>' : ''}
                         <div class="shield-top" style="font-size:8px;"><span>${rKey}</span><span class="shield-ovr" style="font-size:10px;">${c.ovr || 85}</span></div>
                         <div style="font-size:16px; margin:1px 0;">${c.nation || '⚽'}</div>
@@ -1799,7 +1820,7 @@
 
                 <div class="card" style="padding:10px 11px; margin-bottom:9px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; font-size:12px;">
-                        <b>👕 Состав FUT (${p.owned_cards_count} карт)</b>
+                        <b>👕 Состав FUT (${p.owned_cards_count}/100 карт)</b>
                         <span style="color:var(--accent-green); font-weight:800;">⚡ Сыгранность: ${p.chemistry}%</span>
                     </div>
                     <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px;">
@@ -1988,7 +2009,7 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (144 ПРЕДМЕТА + СЕРТИФИКАТЫ + ЗОЛОТОЙ КЛЮЧ) ==================== */
+        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» (144 ПРЕДМЕТА + КАССА ШОУРУМА) ==================== */
         function renderStartupTab(u) {
             const isVip = Boolean(u && u.is_vip);
             const maxStorage = isVip ? 12 : 8;
@@ -1999,7 +2020,7 @@
             const wrEl = document.getElementById('st-wrenches-cnt');
             if (wrEl) wrEl.textContent = wrenchesCnt + ' шт.';
 
-            const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
+            const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], can_claim_showroom: false, profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
             const rawCat = (APP_STATE && APP_STATE.containers_catalog && Object.keys(APP_STATE.containers_catalog).length)
                 ? APP_STATE.containers_catalog
                 : DEFAULT_CONTAINERS_CATALOG;
@@ -2070,6 +2091,13 @@
                         </div>
                     `;
                 }).join('');
+
+                let showroomClaimBtn = '';
+                if (st.showroom.length > 0) {
+                    showroomClaimBtn = st.can_claim_showroom
+                        ? `<button class="btn-main gold btn-block" style="margin-top:9px; padding:9px; font-size:11.5px;" onclick="claimShowroomRevenue()">🏛 Забрать доход Шоурума (+${formatFC(st.showroom_daily_fc)})</button>`
+                        : `<button class="btn-main disabled btn-block" style="margin-top:9px; padding:8px; font-size:11px;">✅ Доход Шоурума за сегодня получен (+${formatFC(st.showroom_daily_fc)}/день)</button>`;
+                }
 
                 const rarNames = { 1: '🔩 Б/У Груз', 2: '📦 Стандарт', 3: '🔹 Редкий лот', 4: '🟣 Эпический', 5: '👑 Легендарный Артефакт' };
                 const storageHtml = st.storage.length === 0
@@ -2159,6 +2187,7 @@
                             <span style="font-size:11px; color:var(--accent-green); font-weight:800;">+${st.showroom_daily_fc} FC/д • +${st.showroom_odd_boost} к кэфам</span>
                         </div>
                         <div class="collection-grid" style="grid-template-columns:repeat(${maxShowroom}, 1fr);">${showroomSlots}</div>
+                        ${showroomClaimBtn}
                     </div>
                     <div class="section-title" style="font-size:13px;">🔧 Находки на складе (${st.storage.length}/${maxStorage})</div>
                     ${storageHtml}
@@ -2200,6 +2229,13 @@
                     }).join('');
                 }
             }
+        }
+
+        async function claimShowroomRevenue() {
+            haptic('medium');
+            const res = await apiAction({ action: 'claim_showroom' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
         }
 
         async function openContainerBox(containerId, boxName = 'Контейнер', boxIco = '📦') {
@@ -2395,7 +2431,10 @@
         }
 
         function extractLiveMinuteClient(detailStr) {
-            const m = String(detailStr || '').match(/(\d+)/);
+            const s = String(detailStr || '').toUpperCase();
+            if (s.includes('HT') || s.includes('ПЕРЕРЫВ') || s.includes('HALF')) return 45;
+            if (s.includes('FT') || s.includes('ЗАВЕРШ')) return 90;
+            const m = s.match(/(\d+)/);
             return m ? parseInt(m[1], 10) : 45;
         }
 
@@ -2463,7 +2502,7 @@
                                 <div class="team-name away">${m.away_team}</div>
                             </div>
                             <div class="match-open-bar">
-                                <span>🤖 Прогноз ИИ: <b>${m.best_score}</b> (${m.exp_goals} xG)</span>
+                                <span>${m.is_live ? `🔴 Табло: <b>${m.live_score}</b> (${m.live_detail})` : `🤖 Прогноз ИИ: <b>${m.best_score}</b> (${m.exp_goals} xG)`}</span>
                                 <span>📊 ${m.is_live ? 'LIVE-Роспись ➔' : 'Роспись (45+) ➔'}</span>
                             </div>
                         </div>
@@ -2546,7 +2585,7 @@
             `;
         }
 
-        /* ==================== ВНУТРЕННИЙ ЭКРАН МАТЧА (СТАВКИ ОТКРЫТЫ И В ПРЕМАТЧЕ, И В LIVE!) ==================== */
+        /* ==================== ВНУТРЕННИЙ ЭКРАН МАТЧА (ЖИВОЙ ИИ В LIVE + ВСПЛЫВАЮЩИЙ КУПОН СНИЗУ) ==================== */
         async function openMatchDetail(leagueKey, eventId) {
             haptic('light');
             const m = (APP_STATE.matches || []).find(x => x.league_key === leagueKey && String(x.event_id) === String(eventId));
@@ -2554,8 +2593,9 @@
             CURRENT_OPEN_MATCH = m;
 
             document.getElementById('md-league').textContent = m.league_title + ' • ' + (m.is_live ? '🔴 LIVE (VAR-Защита)' : m.date);
-            renderMatchDetailBody(m, MATCH_AI_CACHE[m.event_id] || '🧠 <i>ИИ-скауты анализируют тактику команд...</i>');
+            renderMatchDetailBody(m, MATCH_AI_CACHE[m.event_id] || '🧠 <i>ИИ-скауты оценивают ход игры и тактику команд...</i>');
             document.getElementById('match-detail-modal').classList.add('show');
+            renderSlipUI();
 
             try {
                 const resp = await fetch(`/api/match_ai/${leagueKey}/${eventId}`);
@@ -2564,6 +2604,7 @@
                     MATCH_AI_CACHE[m.event_id] = data.ai_analysis;
                     if (data.live_score) m.live_score = data.live_score;
                     if (data.live_detail) m.live_detail = data.live_detail;
+                    if (data.is_live !== undefined) m.is_live = Boolean(data.is_live);
                     if (CURRENT_OPEN_MATCH && CURRENT_OPEN_MATCH.event_id === m.event_id) {
                         renderMatchDetailBody(m, data.ai_analysis);
                     }
@@ -2578,14 +2619,21 @@
             const safeH = escQuotes(m.home_team);
             const safeA = escQuotes(m.away_team);
             const battle = m.ai_battle || {};
-            const radar = m.radar || {};
             const liveMin = m.is_live ? extractLiveMinuteClient(m.live_detail) : 0;
 
             const scoreHeader = m.is_live
                 ? `<div style="font-size:22px; font-weight:900; color:var(--accent-red); margin:3px 0;">${m.live_score}</div>
                    <div style="font-size:10px; color:var(--accent-red); font-weight:800;">🔴 LIVE (${m.live_detail}) • VAR-ЗАЩИТА</div>`
-                : `<div style="font-size:14px; font-weight:900; color:var(--text-muted); margin:3px 0;">VS</div>
+                : `<div style="font-size:14px; font-weight:900; color:var(--text-muted); margin:3px 0;">🕒 ${m.short_date}</div>
                    <div style="font-size:11px; color:var(--accent-gold); font-weight:700;">🤖 Прогноз ИИ: ${m.best_score}</div>`;
+
+            const pulseList = m.pulse_bets || [];
+            const pulseHtml = pulseList.length > 0
+                ? `<div class="card" style="padding:9px 11px; margin-bottom:10px; background:rgba(0,230,118,0.06); border-color:rgba(0,230,118,0.3);">
+                     <div style="font-size:10.5px; font-weight:900; color:var(--accent-green); margin-bottom:4px;">👥 Пульс трибун (Последние ставки капперов на этот матч):</div>
+                     ${pulseList.map(pb => `<div style="font-size:10.5px; color:#e2e8f0; padding:2px 0;">• <b>${pb.user}</b> зарядил <b>${formatFC(pb.amount)}</b> на <span style="color:var(--accent-ice);">${pb.pick} (кэф ${pb.odds})</span></div>`).join('')}
+                   </div>`
+                : '';
 
             let marketsHtml = '';
             if (m.is_live && liveMin >= 85) {
@@ -2617,23 +2665,29 @@
                     </div>
                 ` : '';
 
-                const totalsRows = (m.totals_markets || []).map(t => `
-                    <div class="odd-btn ${isOddSelected(m.event_id, t.tb_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tb_code}','${escQuotes(t.tb_label)}','${t.tb_odd}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">${t.tb_label}</span><span class="k">${t.tb_odd}</span>
-                    </div>
-                    <div class="odd-btn ${isOddSelected(m.event_id, t.tm_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tm_code}','${escQuotes(t.tm_label)}','${t.tm_odd}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">${t.tm_label}</span><span class="k">${t.tm_odd}</span>
-                    </div>
-                `).join('');
+                const totalsRows = (m.totals_markets || []).map(t => {
+                    const btnTb = t.tb_code ? `
+                        <div class="odd-btn ${isOddSelected(m.event_id, t.tb_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tb_code}','${escQuotes(t.tb_label)}','${t.tb_odd}','${safeTeams}', ${m.is_live})">
+                            <span class="mkt">${t.tb_label}</span><span class="k">${t.tb_odd}</span>
+                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТБ ${t.line}</span><span class="k">🔒</span></div>`;
+                    const btnTm = t.tm_code ? `
+                        <div class="odd-btn ${isOddSelected(m.event_id, t.tm_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tm_code}','${escQuotes(t.tm_label)}','${t.tm_odd}','${safeTeams}', ${m.is_live})">
+                            <span class="mkt">${t.tm_label}</span><span class="k">${t.tm_odd}</span>
+                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТМ ${t.line}</span><span class="k">🔒</span></div>`;
+                    return btnTb + btnTm;
+                }).join('');
 
-                const itbRows = (m.itb_markets || []).map(it => `
-                    <div class="odd-btn ${isOddSelected(m.event_id, it.itb1_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb1_code}','${escQuotes(it.itb1_label)}','${it.itb1_odd}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">${it.itb1_odd}</span>
-                    </div>
-                    <div class="odd-btn ${isOddSelected(m.event_id, it.itb2_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb2_code}','${escQuotes(it.itb2_label)}','${it.itb2_odd}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">${it.itb2_odd}</span>
-                    </div>
-                `).join('');
+                const itbRows = (m.itb_markets || []).map(it => {
+                    const b1 = it.itb1_code ? `
+                        <div class="odd-btn ${isOddSelected(m.event_id, it.itb1_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb1_code}','${escQuotes(it.itb1_label)}','${it.itb1_odd}','${safeTeams}', ${m.is_live})">
+                            <span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">${it.itb1_odd}</span>
+                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">🔒</span></div>`;
+                    const b2 = it.itb2_code ? `
+                        <div class="odd-btn ${isOddSelected(m.event_id, it.itb2_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb2_code}','${escQuotes(it.itb2_label)}','${it.itb2_odd}','${safeTeams}', ${m.is_live})">
+                            <span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">${it.itb2_odd}</span>
+                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">🔒</span></div>`;
+                    return b1 + b2;
+                }).join('');
 
                 const halfRows = (m.half_markets || []).map(hm => `
                     <div class="odd-btn ${isOddSelected(m.event_id, hm.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${hm.pick_code}','${escQuotes(hm.label)}','${hm.odds}','${safeTeams}', ${m.is_live})">
@@ -2701,11 +2755,12 @@
                     </div>
                 </div>
 
-                <div class="card" style="border-color:rgba(128,216,255,0.35); background:rgba(128,216,255,0.05); font-size:12px; line-height:1.45;">
-                    <div style="font-weight:800; color:var(--accent-ice); margin-bottom:4px;">🤖 Тактический разбор скаутов ИИ:</div>
+                <div class="card" style="border-color:rgba(128,216,255,0.35); background:rgba(128,216,255,0.05); font-size:12px; line-height:1.45; white-space:pre-line;">
+                    <div style="font-weight:800; color:var(--accent-ice); margin-bottom:4px;">${m.is_live ? '🔴 Живая оценка ИИ по текущему ходу матча:' : '🤖 Тактический разбор скаутов ИИ:'}</div>
                     <div>${aiHtml}</div>
                 </div>
 
+                ${pulseHtml}
                 ${marketsHtml}
             `;
         }
@@ -2713,9 +2768,10 @@
         function closeMatchDetail() {
             CURRENT_OPEN_MATCH = null;
             document.getElementById('match-detail-modal').classList.remove('show');
+            renderSlipUI();
         }
 
-        /* ==================== БЕЗЛИМИТНЫЙ ЭКСПРЕСС + 50% КЭШБЭК ОТ 1 ПРОМАХА (5+ МАТЧЕЙ) ==================== */
+        /* ==================== БЕЗЛИМИТНЫЙ ЭКСПРЕСС + МГНОВЕННОЕ ВСПЛЫТИЕ КУПОНА ==================== */
         function getClientExpressBoost(count) {
             if (count >= 10) return { mult: 1.50, pct: 50, nextTxt: '🔥 Мега-Экспресс (+50% к кэфу) + 🛡 Кэшбэк 50% при 1 промахе!' };
             if (count >= 8) return { mult: 1.35, pct: 35, nextTxt: '🔥 Буст +35% к кэфу + 🛡 Кэшбэк 50% при 1 промахе!' };
@@ -2776,11 +2832,20 @@
 
         function renderSlipUI() {
             const bar = document.getElementById('floating-slip');
+            if (!bar) return;
             if (!SLIP_ITEMS.length) {
                 bar.style.display = 'none';
+                bar.classList.remove('over-modal');
                 return;
             }
             bar.style.display = 'flex';
+            const matchModalOpen = document.getElementById('match-detail-modal').classList.contains('show');
+            if (matchModalOpen) {
+                bar.classList.add('over-modal');
+            } else {
+                bar.classList.remove('over-modal');
+            }
+
             document.getElementById('slip-count').textContent = SLIP_ITEMS.length;
             document.getElementById('slip-total-odd').textContent = calculateSlipOdd().toFixed(2);
             const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
@@ -2838,7 +2903,6 @@
 
         function clearSlip() {
             SLIP_ITEMS = [];
-            IS_SECRET_BET = false;
             IS_INSURE_PAID = false;
             closeSlipDrawer();
             renderMatchesFeed();
@@ -2902,7 +2966,6 @@
                     action: 'submit_slip',
                     items: SLIP_ITEMS,
                     stake: stake,
-                    is_secret: IS_SECRET_BET,
                     insure_paid: IS_INSURE_PAID
                 });
                 if (!res.ok) return showToast(res.error, true);
@@ -2941,25 +3004,34 @@
             showToast('⚡ Экспресс дня (+25% буст + 50% кэшбэк от 1 промаха) загружен в купон!');
         }
 
-        /* ==================== ДЕТАЛИЗИРОВАННЫЕ КАРТОЧКИ FUT (60 ИГРОКОВ, ЯМАЛЬ 96 TOTY) ==================== */
+        /* ==================== 100 КАРТОЧЕК FUT С ПРОКАЧКОЙ ДУБЛИКАТАМИ (★ УР. 2..5) ==================== */
+        function getUserCardLevel(cid) {
+            if (!APP_STATE || !APP_STATE.user || !APP_STATE.user.card_levels) return 1;
+            return Math.max(1, Math.min(5, parseInt(APP_STATE.user.card_levels[cid] || 1, 10)));
+        }
+
         function buildDetailedFutCardHtml(c, isCap = false, onclickAttr = '', bottomBadgeHtml = '', topBadgeHtml = '') {
+            const lvl = c.level || getUserCardLevel(c.id);
+            const effOvr = Math.min(99, (c.ovr || 85) + (lvl - 1));
             const tierCls = c.tier >= 4 ? 'tier-4' : (c.tier === 3 ? 'tier-3' : (c.tier === 2 ? 'tier-2' : ''));
             const shortName = c.name.split(' ').slice(1).join(' ') || c.name;
             const s1Lbl = c.role === 'GK' ? 'DIV' : (c.role === 'COACH' ? 'TAC' : 'PAC');
             const s2Lbl = c.role === 'GK' ? 'REF' : (c.role === 'COACH' ? 'MOT' : 'SHO');
-            const s3Lbl = c.role === 'GK' ? 'POS' : (c.role === 'COACH' ? 'iq' : 'PAS');
+            const s3Lbl = c.role === 'GK' ? 'POS' : (c.role === 'COACH' ? 'IQ' : 'PAS');
+            const lvlStarHtml = lvl > 1 ? `<span class="level-star-badge">★ Ур.${lvl}</span>` : '';
 
             return `
                 <div class="fut-shield ${tierCls}" ${onclickAttr ? `onclick="${onclickAttr}"` : ''}>
+                    ${lvlStarHtml}
                     ${topBadgeHtml || (isCap ? '<span class="captain-badge">© КАПИТАН x1.25</span>' : '')}
-                    <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${c.ovr || 85}</span></div>
+                    <div class="shield-top"><span>${c.role}</span><span class="shield-ovr">${effOvr}</span></div>
                     <div class="shield-club-tag">${c.nation || '⚽'} ${c.club || 'Клуб'}</div>
                     <div class="shield-avatar">${c.tier >= 3 ? '💎' : (c.tier === 2 ? '🥇' : '🥉')}</div>
                     <div class="shield-name">${shortName}</div>
                     <div class="shield-stats-row">
-                        <span>${s1Lbl} <b>${c.pac || 88}</b></span>
-                        <span>${s2Lbl} <b>${c.sho || 87}</b></span>
-                        <span>${s3Lbl} <b>${c.pas || 86}</b></span>
+                        <span>${s1Lbl} <b>${Math.min(99, (c.pac || 88) + lvl - 1)}</b></span>
+                        <span>${s2Lbl} <b>${Math.min(99, (c.sho || 87) + lvl - 1)}</b></span>
+                        <span>${s3Lbl} <b>${Math.min(99, (c.pas || 86) + lvl - 1)}</b></span>
                     </div>
                     ${bottomBadgeHtml || `<div class="shield-buff">${c.desc}</div>`}
                 </div>
@@ -2968,7 +3040,7 @@
 
         function showCardPreviewModal(c, noteText) {
             const html = buildDetailedFutCardHtml(c, false, '');
-            document.getElementById('pack-modal-card-preview').innerHTML = html.replace('class="fut-shield', 'style="width:155px;" class="fut-shield reveal-pop');
+            document.getElementById('pack-modal-card-preview').innerHTML = html.replace('class="fut-shield', 'style="width:158px;" class="fut-shield reveal-pop');
             document.getElementById('pack-modal-note').textContent = noteText;
             document.getElementById('pack-modal').classList.add('show');
         }
@@ -3002,7 +3074,7 @@
 
             document.getElementById('fut-chem-label').textContent = `⚡ Сыгранность: ${chem}%`;
             document.getElementById('fut-chem-bar').style.width = `${chem}%`;
-            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length} карт`;
+            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length}/100`;
             document.getElementById('fut-reserve-cnt').textContent = `${reserveIds.length}/3`;
 
             const sbcBtn = document.getElementById('btn-sbc-main');
@@ -3065,7 +3137,7 @@
             }
 
             const roles = [
-                { k: 'ALL', lbl: `Мои карты (${ownedIds.length})` },
+                { k: 'ALL', lbl: `Мои карты (${ownedIds.length}/100)` },
                 { k: 'FW', lbl: '⚡ FW' },
                 { k: 'MID', lbl: '🎯 MID' },
                 { k: 'DEF', lbl: '🛡 DEF' },
@@ -3154,8 +3226,8 @@
             haptic('success');
         }
 
-        /* ==================== АРЕНА И КОНТРАКТЫ СПОНСОРОВ ==================== */
-        function renderEmpireTab(u, catalog, secretOffer, sponsorsList) {
+        /* ==================== АРЕНА И КОНТРАКТЫ СПОНСОРОВ (ЧИСТЫЙ ИНТЕРФЕЙС) ==================== */
+        function renderEmpireTab(u, catalog, sponsorsList) {
             const st = u.stadium_info || { name: 'Дворовая Коробка', cap: '500 зрителей', income: 100 };
             const prefs = u.stadium_prefs || { ticket: 'optimal', sponsor: 'sp_1', deposit_paid: false, quest_done: false };
             const showroomInc = (u.startup && u.startup.showroom_daily_fc) ? u.startup.showroom_daily_fc : 0;
@@ -3217,19 +3289,6 @@
                 ${claimBtn}
             `;
 
-            const secBox = document.getElementById('secret-bet-card');
-            if (secretOffer) {
-                secBox.style.display = 'block';
-                secBox.innerHTML = `
-                    <div style="font-size:11px; color:var(--accent-ice); font-weight:800;">🕵️‍♂️ СЕКРЕТНАЯ СТАВКА ДНЯ ОТ ИИ</div>
-                    <div style="font-size:14px; font-weight:800; margin:4px 0;">${secretOffer.teams} <span style="font-size:11px; color:var(--text-muted);">(${secretOffer.date})</span></div>
-                    <div style="font-size:12px; color:var(--accent-green); margin-bottom:8px;">🎯 ${secretOffer.pick_label} • Кэф <b>${secretOffer.odds}</b> (${secretOffer.exp_goals} xG)</div>
-                    <button class="btn-main btn-block" onclick="togglePickAndMarkSecret('${secretOffer.league_key}','${secretOffer.event_id}','${secretOffer.pick_code}','${escQuotes(secretOffer.pick_label)}','${secretOffer.odds}','${escQuotes(secretOffer.teams)}')">➕ Добавить Секретную ставку в купон</button>
-                `;
-            } else {
-                secBox.style.display = 'none';
-            }
-
             const lab = u.lab_info || { name: 'Блокнот скаута', odd_bonus: 0, desc: '' };
             const labBtn = u.next_lab
                 ? `<button class="btn-main btn-block" onclick="upgradeBuilding('lab')">🧠 Улучшить до Ур.${u.lab_level + 1} (${formatFC(u.next_lab.price)})</button>`
@@ -3269,7 +3328,7 @@
             }).join('');
         }
 
-        /* ==================== ГРАМОТНЫЙ ШАБЛОН ШЕРИНГА (ПРОФИЛЬ, АКТИВНАЯ СТАВКА ИЛИ ВЫИГРЫШ) ==================== */
+        /* ==================== ГРАМОТНЫЙ ШАБЛОН ШЕРИНГА ==================== */
         function openShareReceiptModal(betId = 0, isPendingBet = false) {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
@@ -3352,7 +3411,7 @@
             else window.open(shareUrl, '_blank');
         }
 
-        /* ==================== ПРОФИЛЬ + ГАЛОЧКИ ЗАХОДА МАТЧЕЙ В АКТИВНЫХ ЭКСПРЕССАХ ==================== */
+        /* ==================== ПРОФИЛЬ + ВРЕМЯ СТАРТА / LIVE-СЧЕТ / ГАЛОЧКИ В АКТИВНЫХ СТАВКАХ ==================== */
         function renderProfileTab(u) {
             document.getElementById('p-username').textContent = (u.is_vip ? '👑 ' : '') + u.username;
             document.getElementById('p-id-val').textContent = u.user_id;
@@ -3368,9 +3427,12 @@
             document.getElementById('p-refs').textContent = u.referrals_count || 0;
 
             const bLine = document.getElementById('p-booster-line');
-            if (u.active_booster_name) {
+            if (u.active_booster_name || u.hot_hand) {
                 bLine.style.display = 'block';
-                bLine.textContent = '🚀 Активный бустер: ' + u.active_booster_name;
+                const parts = [];
+                if (u.active_booster_name) parts.push('🚀 Бустер: ' + u.active_booster_name);
+                if (u.hot_hand) parts.push('🔥 Горячая рука (+0.10 к кэфам за 3+ победы подряд)');
+                bLine.textContent = parts.join(' • ');
             } else {
                 bLine.style.display = 'none';
             }
@@ -3380,7 +3442,6 @@
                 `<option value="${c}" ${c === u.favorite_club ? 'selected' : ''}>${c === u.favorite_club ? '⭐ ' + c : c}</option>`
             ).join('');
 
-            // Активные купоны с живыми галочками захода каждого матча в экспрессе!
             const actBox = document.getElementById('prof-sub-active');
             const actList = APP_STATE.active_bets || [];
             if (!actList.length) {
@@ -3397,17 +3458,22 @@
                         : '';
 
                     const legsHtml = legs.map((lg, idx) => {
-                        const stColor = lg.status === 'win' ? 'var(--accent-green)' : (lg.status === 'live' ? 'var(--accent-red)' : (lg.status === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)'));
-                        const rowBg = lg.status === 'win' ? 'background:rgba(0,230,118,0.07);' : '';
-                        const checkIco = lg.status === 'win' ? '✅' : (lg.status === 'live' ? '🔴' : (lg.status === 'loss' ? '❌' : '⏳'));
+                        const stColor = lg.status === 'win'
+                            ? 'var(--accent-green)'
+                            : (lg.status === 'live' ? 'var(--accent-red)' : (lg.status === 'loss' ? 'var(--accent-red)' : 'var(--accent-ice)'));
+                        const rowBg = lg.status === 'win'
+                            ? 'background:rgba(0,230,118,0.08);'
+                            : (lg.status === 'live' ? 'background:rgba(255,82,82,0.08);' : '');
+                        const checkIco = lg.status === 'win' ? '✅' : (lg.status === 'live' ? '🔴' : (lg.status === 'loss' ? '❌' : '⚽'));
+
                         return `
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 7px; border-radius:8px; border-top:1px solid rgba(255,255,255,0.06); font-size:11px; gap:8px; ${rowBg}">
-                                <div style="flex:1;">
-                                    <div style="font-weight:800; color:#f8fafc;">${checkIco} ${idx + 1}. ${lg.teams}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; border-radius:9px; border-top:1px solid rgba(255,255,255,0.06); font-size:11px; gap:8px; ${rowBg}">
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-weight:800; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${checkIco} ${idx + 1}. ${lg.teams}</div>
                                     <div style="color:var(--text-muted);">🎯 ${lg.pick_label} (кэф ${lg.odds})</div>
                                 </div>
-                                <div style="text-align:right; white-space:nowrap;">
-                                    <span style="color:${stColor}; font-weight:800; font-size:10.5px;">${lg.badge}</span>
+                                <div style="text-align:right; white-space:nowrap; flex-shrink:0;">
+                                    <span style="color:${stColor}; font-weight:900; font-size:10.5px; background:rgba(255,255,255,0.05); padding:3px 7px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);">${lg.badge}</span>
                                 </div>
                             </div>
                         `;
@@ -3446,7 +3512,6 @@
 
                     const legsRows = (b.legs_detailed || []).map(lg => {
                         const stColor = lg.status === 'win' ? 'var(--accent-green)' : (lg.status === 'push' ? 'var(--accent-gold)' : 'var(--accent-red)');
-                        const scoreStr = lg.score ? `<b style="color:#fff;">[${lg.score}]</b> ` : '';
                         return `
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid rgba(255,255,255,0.06); font-size:11px; gap:8px;">
                                 <div style="flex:1;">
@@ -3454,7 +3519,7 @@
                                     <div style="color:var(--text-muted);">🎯 ${lg.pick_label} (кэф ${lg.odds})</div>
                                 </div>
                                 <div style="text-align:right; white-space:nowrap;">
-                                    ${scoreStr}<span style="color:${stColor}; font-weight:800;">${lg.badge}</span>
+                                    <span style="color:${stColor}; font-weight:800;">${lg.badge}</span>
                                 </div>
                             </div>
                         `;
@@ -3522,7 +3587,7 @@
             }).join('');
         }
 
-        /* ==================== PVP, ЧЕРНЫЙ РЫНОК И РУЛЕТКА ==================== */
+        /* ==================== PVP, ЧЕРНЫЙ РЫНОК, РУЛЕТКА И ДЕДЛАЙН СУПЕРЭКСПРЕССА ==================== */
         function renderGamesTab() {
             const u = APP_STATE.user;
             document.getElementById('ui-pvp-wins').textContent = u.pvp_wins || 0;
@@ -3699,7 +3764,25 @@
                         <div style="font-size:12px; color:var(--accent-green); font-weight:800;">Выбор: ${p.pick_label}</div>
                     </div>
                 `).join('');
-                body.innerHTML = `<div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Прогноз зафиксирован на эту неделю!</div>${picksHtml}`;
+                body.innerHTML = `<div style="font-size:12px; color:var(--accent-green); font-weight:800; margin-bottom:10px;">✅ Твой прогноз зафиксирован до начала матчей!</div>${picksHtml}`;
+                document.getElementById('se-modal').classList.add('show');
+                return;
+            }
+
+            if (se.is_closed) {
+                const closedRows = se.matches.map((m, idx) => `
+                    <div class="stadium-row" style="opacity:0.65;">
+                        <div style="font-size:12px;"><b>${idx + 1}. ${m.teams}</b></div>
+                        <div style="font-size:11px; color:var(--accent-red); font-weight:800;">🔒 В игре</div>
+                    </div>
+                `).join('');
+                body.innerHTML = `
+                    <div class="card" style="border-color:var(--accent-red); background:rgba(255,82,82,0.1); text-align:center; padding:12px; margin-bottom:10px;">
+                        <b style="color:var(--accent-red); font-size:13px;">🛑 Приём прогнозов на этот тираж закрыт!</b>
+                        <div style="font-size:11px; color:#cbd5e1; margin-top:4px;">Прогнозы на Суперэкспресс принимаются строго до стартового свистка первого матча тиража.</div>
+                    </div>
+                    ${closedRows}
+                `;
                 document.getElementById('se-modal').classList.add('show');
                 return;
             }
@@ -3718,7 +3801,7 @@
                 `;
             }).join('');
 
-            body.innerHTML = `<div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Угадай 6 исходов бесплатно!</div>${rows}<button class="btn-main gold btn-block" onclick="submitSuperExpress()">🔥 Зафиксировать купон недели</button>`;
+            body.innerHTML = `<div style="font-size:11px; color:var(--accent-ice); font-weight:700; margin-bottom:8px;">🕒 Дедлайн тиража: ${se.deadline_note || 'До старта 1-го матча'} • Угадай 6 исходов бесплатно!</div>${rows}<button class="btn-main gold btn-block" onclick="submitSuperExpress()">🔥 Зафиксировать купон недели</button>`;
             document.getElementById('se-modal').classList.add('show');
         }
 
@@ -3762,12 +3845,6 @@
             showToast(res.message);
         }
 
-        function togglePickAndMarkSecret(lk, ev, pc, lbl, odd, tm) {
-            IS_SECRET_BET = true;
-            togglePick(lk, ev, pc, lbl, odd, tm, false);
-            showToast('🕵️‍♂️ Секретная ставка добавлена в купон!');
-        }
-
         async function cashoutBet(betId) {
             const res = await apiAction({ action: 'cashout_bet', bet_id: betId });
             if (!res.ok) return showToast(res.error, true);
@@ -3801,7 +3878,7 @@
                 '🎄 Залетай в новогодний AI_BET_BOT (Winter 2027)!\n' +
                 '⚽ Ставки в LIVE и безлимитные экспрессы с кэшбэком 50%\n' +
                 '📦 12 Контейнеров (144 предмета с сертификатами) и P2P-Биржа\n' +
-                '👕 Сборка состава FUT (Ламин Ямаль 96 TOTY, Мбаппе, Винисиус)\n\n' +
+                '👕 Сборка состава из 100 звезд FUT (Ламин Ямаль 96 TOTY, Мбаппе, Винисиус)\n\n' +
                 '🎁 Забирай стартовый банк + 1 000 FC по моей ссылке:'
             );
         }
@@ -3810,7 +3887,7 @@
             renderStartupTab({});
             fetch('/', { method: 'GET', cache: 'no-store' }).catch(() => {});
             loadAppState();
-            setInterval(() => loadAppState(true), 45000);
+            setInterval(() => loadAppState(true), 35000);
         });
     </script>
 </body>
