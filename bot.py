@@ -5981,7 +5981,7 @@ async def fetch_espn_match_details(session: aiohttp.ClientSession, league_slug: 
             tag = " (пен.)" if ev.get("penaltyKick") else (" (авт.)" if ev.get("ownGoal") else "")
             scorers.append({"side": side, "minute": clk, "player": player_name + tag})
 
-           if period_num == 1 or (period_num == 0 and clk and parse_live_minute(clk) <= 45):
+            if period_num == 1 or (period_num == 0 and clk and parse_live_minute(clk) <= 45):
                 if side == "home":
                     calc_h1_h += 1
                 else:
