@@ -487,9 +487,9 @@
         .shield-stats-row b { color: #fff; }
         .shield-buff { font-size: 8px; font-weight: 700; color: var(--accent-green); background: var(--accent-green-dim); padding: 2px 4px; border-radius: 5px; }
         .qs-mini-btn {
-            width: 100%; margin-top: 3px; background: rgba(239, 68, 68, 0.14); color: #fca5a5;
-            border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 5px;
-            font-size: 7.5px; font-weight: 800; padding: 2.5px 2px; cursor: pointer;
+            width: 100%; margin-top: 5px; background: rgba(239, 68, 68, 0.14); color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 7px;
+            font-size: 10px; font-weight: 800; padding: 5px 4px; cursor: pointer;
         }
 
         .pack-showcase-card { background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 16px; padding: 13px; margin-bottom: 11px; display: flex; align-items: center; gap: 13px; }
@@ -497,7 +497,7 @@
         .pack-visual-cover.bronze { background: #3b2514; border: 1.5px solid #a16207; color: #fef3c7; }
         .pack-visual-cover.gold { background: #422c09; border: 1.5px solid var(--accent-gold); color: #fef3c7; }
         .pack-visual-cover.elite { background: #172554; border: 1.5px solid var(--accent-blue); color: #e0f2fe; }
-        .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+        .collection-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .collection-grid .fut-shield { width: 100%; }
 
         /* ==================== КОНТЕЙНЕРЫ ==================== */
@@ -579,7 +579,7 @@
 
         /* ==================== ПЛАШКА КУПОНА И МОДАЛЬНЫЕ ОКНА ==================== */
         .floating-slip-bar {
-            position: fixed; bottom: 72px; left: 14px; right: 14px; z-index: 270;
+            position: fixed; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; z-index: 270;
             background: var(--accent-green); color: #041019;
             border-radius: 14px; padding: 12px 16px; display: none; align-items: center; justify-content: space-between;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
@@ -604,7 +604,7 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-top: 1px solid var(--border-glass);
-            display: grid; grid-template-columns: repeat(6, 1fr); padding: 8px 4px 14px;
+            display: grid; grid-template-columns: repeat(6, 1fr); padding: 8px 4px calc(12px + env(safe-area-inset-bottom, 0px));
         }
         .nav-item {
             position: relative;
@@ -650,7 +650,6 @@
                     <span id="ui-vip-crown" style="font-size:13px;">⚽</span>
                     <span class="clan-tag-pill" id="ui-clan-tag" onclick="openClansModal()">[КЛАН]</span>
                     <span class="user-name-txt" id="ui-username">Загрузка...</span>
-                    <span class="id-pill" onclick="copyUserId()">ID: <span id="ui-user-id">...</span></span>
                     <span class="hot-hand-pill" id="ui-hot-hand" title="Серия 3+ побед: +0.10 к кэфу">🔥 +0.10</span>
                 </div>
                 <div class="user-rank-sub" id="ui-rank">Синхронизация...</div>
@@ -1236,7 +1235,7 @@
             <span class="ico">👕</span><span>FUT</span>
         </div>
         <div class="nav-item" id="nav-btn-startup" onclick="switchTab('startup', this)">
-            <span class="ico">📦<span class="nav-dot" id="nav-dot-startup"></span></span><span>Контейнеры</span>
+            <span class="ico">📦<span class="nav-dot" id="nav-dot-startup"></span></span><span>Порт</span>
         </div>
         <div class="nav-item" onclick="switchTab('empire', this)">
             <span class="ico">🏟<span class="nav-dot" id="nav-dot-empire"></span></span><span>Арена</span>
@@ -1655,7 +1654,8 @@
             const crownEl = document.getElementById('ui-vip-crown');
             if (crownEl) crownEl.textContent = u.is_vip ? '👑' : '⚽';
             document.getElementById('ui-username').textContent = u.username || 'Каппер';
-            document.getElementById('ui-user-id').textContent = u.user_id || CURRENT_UID;
+            const uidEl = document.getElementById('ui-user-id');
+            if (uidEl) uidEl.textContent = u.user_id || CURRENT_UID;
             document.getElementById('ui-rank').textContent = (u.rank || 'Новичок') + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
             document.getElementById('ui-balance').textContent = formatFC(u.balance);
 
@@ -2611,28 +2611,35 @@
                                     ${restoreBtns}
                                 </div>
 
-                                <button class="btn-main ghost btn-block" style="margin:0 0 8px; padding:7px; font-size:10.5px;" onclick="toShowroomItem('${it.uid}')">
-                                    🏛 Выставить в Шоурум (+${it.show_inc} FC/день и +${it.show_odd} к кэфам)
-                                </button>
-
-                                <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px; margin-bottom:8px;">
-                                    <div style="font-size:10px; font-weight:700; color:var(--text-muted); margin-bottom:5px;">Продать скупщику в порту:</div>
-                                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
-                                        <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','base')">
-                                            По оценке<br><b style="color:var(--accent-green);">${formatFC(it.value)}</b>
-                                        </button>
-                                        <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','push25')">
-                                            Торг +25%<br><b style="color:var(--accent-ice);">${formatFC(Math.round(it.value*1.25))}</b>
-                                        </button>
-                                        <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','bluff65')">
-                                            Блеф +65%<br><b style="color:var(--accent-gold);">${formatFC(Math.round(it.value*1.65))}</b>
-                                        </button>
-                                    </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                                    <button class="btn-main ghost" style="padding:8px 6px; font-size:10.5px;" onclick="toShowroomItem('${it.uid}')">
+                                        🏛 В Шоурум (+${it.show_inc}/д)
+                                    </button>
+                                    <button class="btn-main ghost" style="padding:8px 6px; font-size:10.5px; color:var(--accent-green);" onclick="toggleStorageSellPanel('${it.uid}')">
+                                        💰 Продать / P2P ▾
+                                    </button>
                                 </div>
 
-                                <div style="display:flex; gap:6px; align-items:center;">
-                                    <input type="number" id="p2p-price-${it.uid}" class="stake-input" style="margin:0; padding:7px; font-size:12px; flex:1;" value="${Math.round(it.value * 1.15)}" placeholder="P2P (до ${maxP2pPrice})">
-                                    <button class="btn-main ghost" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="listStartupItemP2P('${it.uid}')">🌐 На P2P</button>
+                                <div id="sell-panel-${it.uid}" style="display:none; margin-top:8px;">
+                                    <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px; margin-bottom:8px;">
+                                        <div style="font-size:10px; font-weight:700; color:var(--text-muted); margin-bottom:5px;">Продать скупщику в порту:</div>
+                                        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
+                                            <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','base')">
+                                                По оценке<br><b style="color:var(--accent-green);">${formatFC(it.value)}</b>
+                                            </button>
+                                            <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','push25')">
+                                                Торг +25%<br><b style="color:var(--accent-ice);">${formatFC(Math.round(it.value*1.25))}</b>
+                                            </button>
+                                            <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','bluff65')">
+                                                Блеф +65%<br><b style="color:var(--accent-gold);">${formatFC(Math.round(it.value*1.65))}</b>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="p2p-price-${it.uid}" class="stake-input" style="margin:0; padding:7px; font-size:12px; flex:1;" value="${Math.round(it.value * 1.15)}" placeholder="P2P (до ${maxP2pPrice})">
+                                        <button class="btn-main ghost" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="listStartupItemP2P('${it.uid}')">🌐 На P2P</button>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -2802,6 +2809,11 @@
             const res = await apiAction({ action: 'startup_restore_item', item_uid: itemUid, use_wrench: useWrench });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
+        }
+        function toggleStorageSellPanel(itemUid) {
+            haptic('light');
+            const el = document.getElementById('sell-panel-' + itemUid);
+            if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
         }
 
         async function sellStartupItemNpc(itemUid, tactic) {
@@ -3906,10 +3918,10 @@
                         : `<div class="shield-buff" style="background:var(--accent-blue); color:#041019;" onclick="event.stopPropagation(); setFutCaptain('${c.role}')">Дать © Капитана</div>`;
                 } else {
                     actionBtn = `
-                        <div class="shield-buff" style="background:var(--accent-green); color:#041019; margin-bottom:3px;" onclick="event.stopPropagation(); equipFutCard('${cid}')">В состав</div>
-                        <div style="display:flex; gap:2px;" onclick="event.stopPropagation()">
-                            <input type="number" id="p2p-card-price-${cid}" value="${recPrice}" max="${maxAllowed}" style="width:58%; background:#070b14; border:1px solid rgba(255,255,255,0.18); color:#fff; font-size:8px; border-radius:4px; text-align:center;">
-                            <button style="flex:1; background:var(--accent-gold); color:#041019; border:none; border-radius:4px; font-size:7.5px; font-weight:800; padding:2px;" onclick="listFutCardP2P('${cid}')">P2P</button>
+                        <div class="shield-buff" style="background:var(--accent-green); color:#041019; padding:5px; font-size:10px; margin-bottom:5px;" onclick="event.stopPropagation(); equipFutCard('${cid}')">👕 В состав</div>
+                        <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                            <input type="number" id="p2p-card-price-${cid}" value="${recPrice}" max="${maxAllowed}" style="width:60%; background:#070b14; border:1px solid rgba(255,255,255,0.18); color:#fff; font-size:11px; padding:4px 2px; border-radius:6px; text-align:center;">
+                            <button style="flex:1; background:var(--accent-gold); color:#041019; border:none; border-radius:6px; font-size:10px; font-weight:800; padding:4px 2px;" onclick="listFutCardP2P('${cid}')">P2P</button>
                         </div>
                         <button class="qs-mini-btn" onclick="event.stopPropagation(); quicksellFutCard('${cid}')">💸 Продать +${qsPayout}</button>
                     `;
@@ -4560,7 +4572,11 @@
             renderStartupTab({});
             fetch('/', { method: 'GET', cache: 'no-store' }).catch(() => {});
             loadAppState();
-            setInterval(() => loadAppState(true), 35000);
+            setInterval(() => {
+                const active = document.activeElement;
+                if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
+                loadAppState(true);
+            }, 35000);
         });
     </script>
 </body>
