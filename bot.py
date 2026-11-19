@@ -5981,8 +5981,7 @@ async def fetch_espn_match_details(session: aiohttp.ClientSession, league_slug: 
             tag = " (пен.)" if ev.get("penaltyKick") else (" (авт.)" if ev.get("ownGoal") else "")
             scorers.append({"side": side, "minute": clk, "player": player_name + tag})
 
-            if period_num == 1 or (period_num == 0 and parse_live_minute(clk) <= 45 and "45+" in clk or parse_live_minute(clk) <= 45):
-                if side == "home":
+            if period_num == 1 or (period_num == 0 and clk and parse_live_minute(clk) <= 45):
                     calc_h1_h += 1
                 else:
                     calc_h1_a += 1
@@ -6107,10 +6106,17 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
     is_live = bool(match.get("is_live"))
     gh, ga, minute = 0, 0, 0
     if is_live:
+        is_live_supported = (
+            code in ("p1", "x", "p2", "1x", "x2", "f10", "f20")
+            or code.startswith(("tb_", "tm_", "itb1_", "itb2_", "cs_"))
+        )
+        if not is_live_supported:
+            return None
         gh, ga = parse_live_score_pair(match.get("live_score", "0:0"))
         minute = parse_live_minute(match.get("live_detail", "45'"))
         if minute >= 85 or is_market_already_decided_in_live(code, gh, ga, minute):
             return None
+        
         rem_ratio = max(0.08, (91.0 - minute) / 90.0)
         lam_h = max(0.10, lam_h_pre * rem_ratio)
         lam_a = max(0.10, lam_a_pre * rem_ratio)
@@ -6521,7 +6527,7 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
     specials_list = []
     for sp_code in [
         "1x_tb15", "1x_tm35", "x2_tb15", "x2_tm35", "p1_btts", "p2_btts",
-        "win_nil_1", "win_nil_2", "p1_tb25", "p2_tb25", "late_goal_yes", "odd_goals", "even_goals"
+        "win_nil_1", "win_nil_2", "p1_tb25", "p2_tb25", "odd_goals", "even_goals"
     ]:
         sp_m = evaluate_custom_market(m, sp_code)
         if sp_m:
@@ -7737,7 +7743,6 @@ async def api_handle_action(request):
 
             if not any(int(m["user_id"]) == uid for m in c_obj["members"]):
                 c_obj["members"].append({"user_id": uid, "name": user["username"], "role": "Участник"})
-            c_obj["points"] = int(c_obj.get("points") or 0) + int(st.get("tourney_pts") or 0)
             await save_clan_to_db(c_obj)
 
             st["clan_id"] = target_cid
@@ -7750,7 +7755,31 @@ async def api_handle_action(request):
             c_obj = CLANS_REGISTRY.get(cur_cid)
             if c_obj:
                 c_obj["members"] = [m for m in c_obj.get("members", []) if int(m["user_id"]) != uid]
-                await save_clan_to_db(c_obj)
+                if not c_obj["members"]:
+                    CLANS_REGISTRY.pop(cur_cid, None)
+                    try:
+                        if db_manager.use_pg:
+                            await db_manager.exec("DELETE FROM clans WHERE clan_id = $1", cur_cid)
+                        else:
+                            async with aiosqlite.connect(db_manager.sqlite_path) as db:
+                                await db.execute("DELETE FROM clans WHERE clan_id = ?", (cur_cid,))
+                                await db.commit()
+                    except Exception:
+                        pass
+                else:
+                    if int(c_obj.get("leader_id") or 0) == uid:
+                        new_leader = c_obj["members"][0]
+                        new_leader["role"] = "Глава"
+                        c_obj["leader_id"] = int(new_leader["user_id"])
+                        c_obj["leader_name"] = new_leader["name"]
+                        try:
+                            await db_manager.exec(
+                                "UPDATE clans SET leader_id = $1, leader_name = $2 WHERE clan_id = $3",
+                                c_obj["leader_id"], c_obj["leader_name"], cur_cid
+                            )
+                        except Exception:
+                            pass
+                    await save_clan_to_db(c_obj)
             st["clan_id"] = 0
             await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
             return await _fast_delta_response(uid, {"message": "Ты покинул Синдикат."})
@@ -7777,7 +7806,10 @@ async def api_handle_action(request):
             c_obj = CLANS_REGISTRY.get(cur_cid)
             if not c_obj:
                 return web.json_response({"ok": False, "error": "Ты не состоишь в Клане!"}, headers=CORS_HEADERS)
+            if int(c_obj.get("leader_id") or 0) != uid:
+                return web.json_response({"ok": False, "error": "Улучшать Штаб из общей казны может только Глава Синдиката!"}, headers=CORS_HEADERS)
             next_lvl = int(c_obj["hq_level"]) + 1
+
             next_cfg = CLAN_HQ_LEVELS.get(next_lvl)
             if not next_cfg:
                 return web.json_response({"ok": False, "error": "Штаб Синдиката уже на максимальном 5-м уровне!"}, headers=CORS_HEADERS)
@@ -7847,7 +7879,7 @@ async def api_handle_action(request):
             max_rar = max(int(x.get("rarity") or 1) for x in sacrificed)
             new_rar = min(5, max_rar + 1)
 
-            target_val = max(1200, int(round(sum_val * random.uniform(1.18, 1.55), -1)))
+            target_val = max(150, int(round(sum_val * random.uniform(0.62, 1.35), -1)))
             all_tpls = []
             for c_box in CONTAINERS_CATALOG.values():
                 for tpl in c_box["items"]:
