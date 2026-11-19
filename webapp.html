@@ -33,7 +33,7 @@
             background: var(--bg-dark);
             color: var(--text-main);
             min-height: 100vh;
-            padding-bottom: 145px;
+            padding-bottom: calc(145px + env(safe-area-inset-bottom, 0px));
             overflow-x: hidden;
             position: relative;
         }
@@ -585,12 +585,12 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
             cursor: pointer; transition: bottom 0.2s ease;
         }
-        .floating-slip-bar.over-modal { bottom: 16px; }
+        .floating-slip-bar.over-modal { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
         .drawer-overlay { position: fixed; inset: 0; z-index: 220; background: rgba(3, 7, 18, 0.8); display: none; align-items: flex-end; justify-content: center; cursor: pointer; }
         .drawer-overlay.show { display: flex; }
         #all-markets-modal { z-index: 245; }
         #slip-drawer { z-index: 295; }
-        .drawer-sheet { background: #0f172a; border-top: 1px solid var(--border-frost); border-radius: 20px 20px 0 0; padding: 16px 15px 86px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; cursor: default; }
+        .drawer-sheet { background: #0f172a; border-top: 1px solid var(--border-frost); border-radius: 20px 20px 0 0; padding: 16px 15px calc(86px + env(safe-area-inset-bottom, 0px)); width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; cursor: default; }
         .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-glass); }
         .close-x { background: rgba(255, 255, 255, 0.08); border: none; color: #fff; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; font-weight: 700; cursor: pointer; }
         .stake-input { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); border-radius: 11px; padding: 10px; color: #fff; font-size: 14px; font-weight: 700; text-align: center; margin: 7px 0; outline: none; }
@@ -604,7 +604,8 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-top: 1px solid var(--border-glass);
-            display: grid; grid-template-columns: repeat(6, 1fr); padding: 8px 4px calc(12px + env(safe-area-inset-bottom, 0px));
+            display: grid; grid-template-columns: repeat(6, 1fr);
+            padding: 8px 4px calc(12px + env(safe-area-inset-bottom, 0px));
         }
         .nav-item {
             position: relative;
@@ -680,7 +681,7 @@
         </div>
     </div>
 
-    <!-- ==================== ВКЛАДКА 1: АФИША (СРАЗУ БЛИЖАЙШИЕ МАТЧИ И LIVE) ==================== -->
+    <!-- ==================== ВКЛАДКА 1: АФИША ==================== -->
     <section id="tab-matches" class="tab-section active">
         <div class="card" id="bonus-banner" style="display:none; align-items:center; justify-content:space-between; padding:11px 13px; border-color:rgba(245,158,11,0.4); cursor:pointer;" onclick="openStreakCalendarModal()">
             <div>
@@ -724,7 +725,7 @@
         <div id="matches-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 2: КЛУБ (СИГНАЛЫ, КЛАНЫ, ТУРНИР, РУЛЕТКА И РЫНОК) ==================== -->
+    <!-- ==================== ВКЛАДКА 2: КЛУБ ==================== -->
     <section id="tab-games" class="tab-section">
         <div class="sub-nav" style="grid-template-columns:repeat(4, 1fr);">
             <div class="sub-nav-btn active" onclick="switchClubSub('signals', this)">📡 Сигналы</div>
@@ -777,7 +778,7 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 3: FUT (100 ИГРОКОВ + ДЕНЬ МАТЧА 🔥 + КЛУБНЫЕ СЕТЫ) ==================== -->
+    <!-- ==================== ВКЛАДКА 3: FUT ==================== -->
     <section id="tab-fut" class="tab-section">
         <div class="section-title" style="margin-top:2px;">
             <span>👕 Стартовый состав (5 позиций)</span>
@@ -850,7 +851,7 @@
         </div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 4: 12 КОНТЕЙНЕРОВ (144 ПРЕДМЕТА + КОНТРАКТ 3➔1 + P2P) ==================== -->
+    <!-- ==================== ВКЛАДКА 4: ПОРТ (КОНТЕЙНЕРЫ, СКЛАД, P2P) ==================== -->
     <section id="tab-startup" class="tab-section">
         <div class="card" style="padding:12px 14px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -884,7 +885,7 @@
         <div id="startup-sub-p2p" style="display:none;"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 5: АРЕНА И КОНТРАКТЫ СПОНСОРОВ ==================== -->
+    <!-- ==================== ВКЛАДКА 5: АРЕНА ==================== -->
     <section id="tab-empire" class="tab-section">
         <div class="section-title" style="margin-top:2px;">🏟 Домашний Матчдэй и Контракты</div>
         <div class="card" id="current-stadium-card"></div>
@@ -899,7 +900,7 @@
         <div id="stadiums-list-container"></div>
     </section>
 
-    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ, ЛЕСЕНКА КАППЕРА, КУПОНЫ И ТОП-10 ==================== -->
+    <!-- ==================== ВКЛАДКА 6: ПРОФИЛЬ ==================== -->
     <section id="tab-profile" class="tab-section">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
@@ -996,7 +997,6 @@
         </div>
     </div>
 
-    <!-- ОТДЕЛЬНОЕ ОКНО ВСЕХ КОТИРОВОК: ТОТАЛЫ ДО 6.5, ИТБ, ФОРЫ И BET BUILDER (Z-INDEX 245) -->
     <div class="drawer-overlay" id="all-markets-modal" onclick="handleOverlayClick(event, 'all-markets-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:92px;">
             <div class="sheet-header">
@@ -1013,7 +1013,6 @@
         </div>
     </div>
 
-    <!-- ШТОРКА КУПОНА СТАВОК (Z-INDEX 295) -->
     <div class="drawer-overlay" id="slip-drawer" onclick="handleOverlayClick(event, 'slip-drawer')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1056,18 +1055,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: КЛАНЫ -->
-    <div class="drawer-overlay" id="clans-modal" onclick="handleOverlayClick(event, 'clans-modal')">
-        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
-            <div class="sheet-header">
-                <b style="font-size:15px;">🛡️ Футбольные Синдикаты (Кланы)</b>
-                <button class="close-x" onclick="document.getElementById('clans-modal').classList.remove('show')">✕</button>
-            </div>
-            <div id="clans-modal-body"></div>
-        </div>
-    </div>
-
-    <!-- ОКНО: ЛЕНТА СИГНАЛОВ -->
     <div class="drawer-overlay" id="signals-modal" onclick="handleOverlayClick(event, 'signals-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1078,7 +1065,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: КЛУБНЫЕ СЕТЫ -->
     <div class="drawer-overlay" id="club-sets-modal" onclick="handleOverlayClick(event, 'club-sets-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1089,7 +1075,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: НАСТРОЙКИ ПРОФИЛЯ + ПРОМОКОД -->
     <div class="drawer-overlay" id="profile-settings-modal" onclick="handleOverlayClick(event, 'profile-settings-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1119,7 +1104,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: ЕЖЕНЕДЕЛЬНЫЙ ТУРНИР -->
     <div class="drawer-overlay" id="tournament-modal" onclick="handleOverlayClick(event, 'tournament-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1130,7 +1114,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: МАГАЗИН МАГНАТА -->
     <div class="drawer-overlay" id="stars-shop-modal" onclick="handleOverlayClick(event, 'stars-shop-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1141,7 +1124,6 @@
         </div>
     </div>
 
-    <!-- ОКНО: VIP-КЛУБ -->
     <div class="drawer-overlay" id="vip-modal" onclick="handleOverlayClick(event, 'vip-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1152,7 +1134,6 @@
         </div>
     </div>
 
-    <!-- ОБЗОР ПРОФИЛЯ ИГРОКА -->
     <div class="drawer-overlay" id="player-inspect-modal" onclick="handleOverlayClick(event, 'player-inspect-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1223,7 +1204,7 @@
         </div>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ (6 ЧИСТЫХ ВКЛАДОК С ТОЧКАМИ-ИНДИКАТОРАМИ) -->
+    <!-- НИЖНЕЕ МЕНЮ (6 ЧИСТЫХ ВКЛАДОК С SAFE-AREA И ИНДИКАТОРАМИ) -->
     <nav class="bottom-nav">
         <div class="nav-item active" onclick="switchTab('matches', this)">
             <span class="ico">⚽</span><span>Афиша</span>
@@ -1244,6 +1225,7 @@
             <span class="ico">👤</span><span>Профиль</span>
         </div>
     </nav>
+
     <script>
         const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
         if (tg) {
@@ -1255,7 +1237,6 @@
             } catch (e) {}
         }
 
-        // Автоматическое скрытие мобильной клавиатуры при касании свободной области
         document.addEventListener('touchstart', function(e) {
             const active = document.activeElement;
             if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
@@ -1448,7 +1429,6 @@
             }
         }
 
-        /* ==================== МГНОВЕННОЕ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ==================== */
         function renderSpecificTab(tabName) {
             if (!APP_STATE) return;
             const u = APP_STATE.user || {};
@@ -1534,7 +1514,6 @@
             }
         }
 
-        /* ==================== ЗАПРОСЫ К СЕРВЕРУ С ЖЕСТКОЙ ПОДПИСЬЮ INIT_DATA ==================== */
         async function apiAction(payload, skipAutoRender = false) {
             const hasLiveCheck = (payload.action === 'submit_slip');
             const timeoutMs = hasLiveCheck ? 18000 : 12000;
@@ -1654,8 +1633,6 @@
             const crownEl = document.getElementById('ui-vip-crown');
             if (crownEl) crownEl.textContent = u.is_vip ? '👑' : '⚽';
             document.getElementById('ui-username').textContent = u.username || 'Каппер';
-            const uidEl = document.getElementById('ui-user-id');
-            if (uidEl) uidEl.textContent = u.user_id || CURRENT_UID;
             document.getElementById('ui-rank').textContent = (u.rank || 'Новичок') + (u.favorite_club ? ' • ⭐ ' + u.favorite_club : '');
             document.getElementById('ui-balance').textContent = formatFC(u.balance);
 
@@ -1715,7 +1692,6 @@
 
             if (document.getElementById('vip-modal').classList.contains('show')) renderVipClubModalBody();
             if (document.getElementById('tournament-modal').classList.contains('show')) renderTournamentModalBody();
-            if (document.getElementById('clans-modal').classList.contains('show')) renderClansModalBody();
             if (document.getElementById('signals-modal').classList.contains('show')) renderCopySignalsModalBody();
             if (document.getElementById('club-sets-modal').classList.contains('show')) renderClubSetsModalBody();
         }
@@ -1726,7 +1702,6 @@
             if (document.getElementById('live-widget-modal').classList.contains('show')) {
                 renderLiveCenterWidgetBody();
             }
-            // Авто-синхронизация открытого окна LIVE-матча при фоновом обновлении
             if (CURRENT_OPEN_MATCH && document.getElementById('match-detail-modal').classList.contains('show')) {
                 const freshM = (APP_STATE.matches || []).find(
                     x => x.league_key === CURRENT_OPEN_MATCH.league_key && String(x.event_id) === String(CURRENT_OPEN_MATCH.event_id)
@@ -1759,8 +1734,7 @@
             const itemsHtml = list.map(t => `<span class="ticker-item">${t}</span>`).join('');
             bar.innerHTML = `<div class="ticker-half">${itemsHtml}</div><div class="ticker-half">${itemsHtml}</div>`;
         }
-
-        /* ==================== ВКЛАДКА «🏆 КЛУБ» (СИГНАЛЫ, КЛАНЫ, ТУРНИР, РУЛЕТКА, ЧЕРНЫЙ РЫНОК) ==================== */
+       /* ==================== ВКЛАДКА «🏆 КЛУБ» (СИГНАЛЫ, КЛАНЫ, ТУРНИР, РУЛЕТКА, ЧЕРНЫЙ РЫНОК) ==================== */
         function buildCopySignalsHtml() {
             const signals = (APP_STATE && APP_STATE.copy_signals) ? APP_STATE.copy_signals : [];
             const sigHtml = signals.length === 0
@@ -1978,13 +1952,12 @@
             }
         }
 
-       function openClansModal() {
+        function openClansModal() {
             haptic('light');
             switchTab('games');
             const clanBtn = document.querySelectorAll('#tab-games .sub-nav-btn')[1];
             switchClubSub('clans', clanBtn);
         }
-        function renderClansModalBody() {}
 
         function openCopySignalsModal() {
             haptic('light');
@@ -2448,13 +2421,19 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== ВКЛАДКА «📦 КОНТЕЙНЕРЫ» + ФИЛЬТРЫ P2P ==================== */
+        /* ==================== ВКЛАДКА «📦 ПОРТ» (КОНТЕЙНЕРЫ, СВОРАЧИВАЕМАЯ ПРОДАЖА, P2P) ==================== */
         function setP2PFilter(filterKey) {
             haptic('light');
             P2P_FILTER = filterKey;
             if (APP_STATE && APP_STATE.user) {
                 renderStartupTab(APP_STATE.user);
             }
+        }
+
+        function toggleStorageSellPanel(itemUid) {
+            haptic('light');
+            const el = document.getElementById('sell-panel-' + itemUid);
+            if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
         }
 
         function renderStartupTab(u) {
@@ -2810,11 +2789,6 @@
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
         }
-        function toggleStorageSellPanel(itemUid) {
-            haptic('light');
-            const el = document.getElementById('sell-panel-' + itemUid);
-            if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-        }
 
         async function sellStartupItemNpc(itemUid, tactic) {
             haptic('medium');
@@ -2872,7 +2846,7 @@
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
         }
-        // === КОНЕЦ ЧАСТИ 1 ЭТАПА 4 ===
+
         /* ==================== АФИША, ЖИВАЯ СТАТИСТИКА ESPN И СТРОГАЯ ХРОНОЛОГИЯ ==================== */
         function onSearchTeamInput() {
             const inp = document.getElementById('team-search-input');
@@ -3319,7 +3293,7 @@
                         </div>
                     </div>
 
-                   <div class="section-title" style="font-size:13px;">${m.is_live ? 'Двойной шанс и Фора (0)' : 'Двойной шанс, Фора (0) и Обе забьют'}</div>
+                    <div class="section-title" style="font-size:13px;">${m.is_live ? 'Двойной шанс и Фора (0)' : 'Двойной шанс, Фора (0) и Обе забьют'}</div>
                     <div class="odds-grid ${m.is_live ? 'cols-2' : 'cols-3'}" style="margin-bottom:6px;">
                         <div class="odd-btn ${isOddSelected(m.event_id, '1x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','1x','1Х (${safeH})','${o['1x']}','${safeTeams}', ${m.is_live})">
                             <span class="mkt">1Х</span><span class="k">${o['1x']}</span>
@@ -3724,7 +3698,7 @@
             showToast('⚡ Экспресс дня загружен в купон!');
         }
 
-        /* ==================== 100 КАРТОЧЕК FUT + QUICK-SELL + «🔥 В ФОРМЕ (+25%)» ==================== */
+        /* ==================== 100 КАРТОЧЕК FUT + QUICK-SELL (2 КОЛОНКИ) ==================== */
         function getUserCardLevel(cid) {
             if (!APP_STATE || !APP_STATE.user || !APP_STATE.user.card_levels) return 1;
             return Math.max(1, Math.min(5, parseInt(APP_STATE.user.card_levels[cid] || 1, 10)));
@@ -3914,8 +3888,8 @@
                 let actionBtn = '';
                 if (isEquipped) {
                     actionBtn = isCap
-                        ? `<div class="shield-buff" style="background:var(--accent-gold); color:#041019;">© Капитан</div>`
-                        : `<div class="shield-buff" style="background:var(--accent-blue); color:#041019;" onclick="event.stopPropagation(); setFutCaptain('${c.role}')">Дать © Капитана</div>`;
+                        ? `<div class="shield-buff" style="background:var(--accent-gold); color:#041019; padding:5px; font-size:10px;">© Капитан</div>`
+                        : `<div class="shield-buff" style="background:var(--accent-blue); color:#041019; padding:5px; font-size:10px;" onclick="event.stopPropagation(); setFutCaptain('${c.role}')">Дать © Капитана</div>`;
                 } else {
                     actionBtn = `
                         <div class="shield-buff" style="background:var(--accent-green); color:#041019; padding:5px; font-size:10px; margin-bottom:5px;" onclick="event.stopPropagation(); equipFutCard('${cid}')">👕 В состав</div>
@@ -4581,3 +4555,4 @@
     </script>
 </body>
 </html>
+        
