@@ -1978,15 +1978,13 @@
             }
         }
 
-        function openClansModal() {
+       function openClansModal() {
             haptic('light');
-            renderClansModalBody();
-            document.getElementById('clans-modal').classList.add('show');
+            switchTab('games');
+            const clanBtn = document.querySelectorAll('#tab-games .sub-nav-btn')[1];
+            switchClubSub('clans', clanBtn);
         }
-        function renderClansModalBody() {
-            const box = document.getElementById('clans-modal-body');
-            if (box) box.innerHTML = buildClansSectionHtml();
-        }
+        function renderClansModalBody() {}
 
         function openCopySignalsModal() {
             haptic('light');
@@ -3309,26 +3307,22 @@
                         </div>
                     </div>
 
-                    <div class="section-title" style="font-size:13px;">Двойной шанс, Фора (0) и Обе забьют</div>
-                    <div class="odds-grid cols-3" style="margin-bottom:6px;">
+                   <div class="section-title" style="font-size:13px;">${m.is_live ? 'Двойной шанс и Фора (0)' : 'Двойной шанс, Фора (0) и Обе забьют'}</div>
+                    <div class="odds-grid ${m.is_live ? 'cols-2' : 'cols-3'}" style="margin-bottom:6px;">
                         <div class="odd-btn ${isOddSelected(m.event_id, '1x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','1x','1Х (${safeH})','${o['1x']}','${safeTeams}', ${m.is_live})">
                             <span class="mkt">1Х</span><span class="k">${o['1x']}</span>
                         </div>
                         <div class="odd-btn ${isOddSelected(m.event_id, 'x2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x2','Х2 (${safeA})','${o['x2']}','${safeTeams}', ${m.is_live})">
                             <span class="mkt">Х2</span><span class="k">${o['x2']}</span>
                         </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'btts') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts','Обе забьют: Да','${o.btts}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">ОЗ: Да</span><span class="k">${o.btts}</span>
-                        </div>
+                        ${!m.is_live ? `<div class="odd-btn ${isOddSelected(m.event_id, 'btts') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts','Обе забьют: Да','${o.btts}','${safeTeams}', false)"><span class="mkt">ОЗ: Да</span><span class="k">${o.btts}</span></div>` : ''}
                         <div class="odd-btn ${isOddSelected(m.event_id, 'f10') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f10','Фора 1 (0)','${o.f10}','${safeTeams}', ${m.is_live})">
                             <span class="mkt">Фора 1 (0)</span><span class="k">${o.f10}</span>
                         </div>
                         <div class="odd-btn ${isOddSelected(m.event_id, 'f20') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f20','Фора 2 (0)','${o.f20}','${safeTeams}', ${m.is_live})">
                             <span class="mkt">Фора 2 (0)</span><span class="k">${o.f20}</span>
                         </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'btts_no') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts_no','Обе забьют: Нет','${o.btts_no}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">ОЗ: Нет</span><span class="k">${o.btts_no}</span>
-                        </div>
+                        ${!m.is_live ? `<div class="odd-btn ${isOddSelected(m.event_id, 'btts_no') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts_no','Обе забьют: Нет','${o.btts_no}','${safeTeams}', false)"><span class="mkt">ОЗ: Нет</span><span class="k">${o.btts_no}</span></div>` : ''}
                     </div>
 
                     <div class="section-title" style="font-size:13px;">Популярные Тоталы</div>
@@ -3441,10 +3435,9 @@
                         </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">Фора 2</span><span class="k">🔒</span></div>`;
                     return b1 + b2;
                 }).join('');
-                box.innerHTML = `
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Линейка Фор (от -2.5 до +2.5):</div>
-                    <div class="odds-grid cols-2">${rows}</div>
-                `;
+                box.innerHTML = rows
+                    ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Линейка Фор (от -2.5 до +2.5):</div><div class="odds-grid cols-2">${rows}</div>`
+                    : `<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted); padding:18px;">Форы доступны до стартового свистка. В LIVE открыты Тоталы до 6.5 и ИТБ.</div>`;
             } else {
                 const rows = (m.specials_markets || []).map(sp => `
                     <div class="odd-btn ${isOddSelected(m.event_id, sp.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${sp.pick_code}','${escQuotes(sp.label)}','${sp.odds}','${safeTeams}', ${m.is_live})">
@@ -3456,12 +3449,14 @@
                         <span class="mkt">${hm.label}</span><span class="k">${hm.odds}</span>
                     </div>
                 `).join('');
-                box.innerHTML = `
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Конструктор (Bet Builder) и спец-исходы:</div>
-                    <div class="odds-grid cols-2" style="margin-bottom:10px;">${rows}</div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Таймы (Точный расчёт по счёту тайма):</div>
-                    <div class="odds-grid cols-2">${bhRows}</div>
-                `;
+                box.innerHTML = (rows || bhRows)
+                    ? `
+                        <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Конструктор (Bet Builder) и спец-исходы:</div>
+                        <div class="odds-grid cols-2" style="margin-bottom:10px;">${rows}</div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Таймы (Точный расчёт по счёту тайма):</div>
+                        <div class="odds-grid cols-2">${bhRows}</div>
+                      `
+                    : `<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted); padding:18px;">Комбо и таймы доступны до старта матча. В LIVE открыты Тоталы до 6.5 и ИТБ.</div>`;
             }
         }
 
