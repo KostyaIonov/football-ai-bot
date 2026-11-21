@@ -262,7 +262,18 @@
 
         .section-title {
             font-size: 13.5px; font-weight: 800; color: #f1f5f9;
-            margin: 14px 0 9px; display: flex; align-items: center; justify-content: space-between;
+            margin: 14px 0 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .info-q-btn {
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #bae6fd;
+            border-radius: 99px;
+            padding: 3px 9px;
+            font-size: 10.5px;
+            font-weight: 800;
+            cursor: pointer;
+            white-space: nowrap;
         }
         .card {
             background: linear-gradient(180deg, #182742 0%, #132037 100%);
@@ -273,7 +284,6 @@
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 6px 18px rgba(4, 10, 24, 0.35);
         }
 
-        /* МОРОЗНЫЙ БЛИК НА ПРАЗДНИЧНЫХ И ПРОМО-БЛОКАХ */
         .frost-accent {
             position: relative;
             overflow: hidden;
@@ -315,7 +325,7 @@
         .scorers-col.away { text-align: right; }
         .scorer-line { margin-bottom: 2px; }
 
-        /* СТАРТОВЫЙ КВЕСТ НОВИЧКА */
+        /* СТАРТОВЫЙ КВЕСТ НОВИЧКА И ЕЖЕДНЕВНЫЕ ЗАДАНИЯ КАППЕРА */
         .rookie-card {
             background: linear-gradient(180deg, rgba(16, 185, 129, 0.14) 0%, #152138 100%);
             border: 1px solid rgba(52, 211, 153, 0.42);
@@ -323,10 +333,18 @@
             padding: 13px; margin-bottom: 12px;
             box-shadow: inset 0 1px 0 rgba(167, 243, 208, 0.18), 0 6px 18px rgba(4, 10, 24, 0.3);
         }
+        .daily-quest-card {
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.14) 0%, #15223a 100%);
+            border: 1px solid rgba(56, 189, 248, 0.38);
+            border-radius: 16px;
+            padding: 12px 13px; margin-bottom: 12px;
+            box-shadow: inset 0 1px 0 rgba(186, 230, 253, 0.18), 0 6px 16px rgba(4, 10, 24, 0.3);
+        }
         .rookie-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 9px 0; }
         .rk-step {
             background: rgba(25, 39, 68, 0.85); border: 1px solid rgba(148, 163, 184, 0.26);
-            border-radius: 10px; padding: 8px 5px; text-align: center; font-size: 10.5px; font-weight: 700; cursor: pointer;
+            border-radius: 10px; padding: 8px 5px; text-align: center; font-size: 10px; font-weight: 700; cursor: pointer;
+            line-height: 1.25;
         }
         .rk-step.done { border-color: #34d399; background: rgba(16, 185, 129, 0.22); color: #6ee7b7; }
 
@@ -533,7 +551,6 @@
             border-color: rgba(253, 164, 175, 0.55);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px rgba(225, 29, 72, 0.28);
         }
-        /* ЕДИНАЯ КНОПКА ПОКУПКИ ДЛЯ ВСЕХ 12 КОНТЕЙНЕРОВ В ПОРТУ */
         .btn-port-buy {
             width: 100%;
             background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
@@ -599,7 +616,6 @@
         .pitch-row { display: flex; justify-content: center; gap: 11px; margin-bottom: 11px; position: relative; z-index: 2; }
         .pitch-row:last-child { margin-bottom: 0; }
 
-        /* КОЛЛЕКЦИОННЫЙ ЩИТ FUT В СТИЛЕ EA FC */
         .fut-shield {
             background: linear-gradient(155deg, #4b392b 0%, #2a201b 52%, #191413 100%);
             border: 1.5px solid rgba(214, 168, 122, 0.65);
@@ -755,7 +771,32 @@
         .collection-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .collection-grid .fut-shield { width: 100%; }
 
-        /* ==================== ПОРТ (12 КОНТЕЙНЕРОВ С ЕДИНОЙ ЦВЕТНОЙ КНОПКОЙ) ==================== */
+        /* АККУРАТНЫЕ СЕТКИ ШОУРУМА (3 В РЯД И 2×2 ДЛЯ VIP) */
+        .showroom-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+        .showroom-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+        .showroom-grid-3 .fut-shield, .showroom-grid-4 .fut-shield { width: 100%; }
+
+        /* 3-УРОВНЕВЫЙ СПК + ТАБЛИЦА ШАНСОВ ДРОПА + ТАЙМЕР ЧЁРНОГО РЫНКА */
+        .sbc-tier-card {
+            background: linear-gradient(180deg, #1b2c4c 0%, #142139 100%);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 14px; padding: 12px; margin-bottom: 10px;
+        }
+        .sbc-tier-card.gold { border-color: rgba(251, 191, 36, 0.48); }
+        .sbc-tier-card.elite { border-color: rgba(56, 189, 248, 0.55); }
+        .rate-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 7px 0; border-bottom: 1px solid var(--border-glass); font-size: 12px;
+        }
+        .rate-row:last-child { border-bottom: none; }
+        .bm-timer-pill {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 10.5px; font-weight: 800; color: #fde68a;
+            background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(251, 191, 36, 0.42);
+            padding: 3px 8px; border-radius: 99px;
+        }
+
+        /* ==================== ПОРТ ==================== */
         .demand-banner {
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), #15223a);
             border: 1px solid rgba(52, 211, 153, 0.42); border-radius: 13px;
@@ -1002,14 +1043,14 @@
     <div class="ticker-wrap">
         <div class="ticker-track" id="live-ticker-bar">
             <div class="ticker-half">
-                <span class="ticker-item">🎄 Зимний Сезон 2027 • Забирай новогодние подарки из Адвент-календаря каждый день</span>
-                <span class="ticker-item">⚽ Правило «+2 Гола = Досрочная победа П1/П2» активно • В росписи Тоталы до 6.5 и Bet Builder</span>
-                <span class="ticker-item">📡 Во вкладке «Клуб» доступны Сигналы капперов (5% роялти), Кланы и Турнир</span>
+                <span class="ticker-item">🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня</span>
+                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером</span>
+                <span class="ticker-item">👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта</span>
             </div>
             <div class="ticker-half">
-                <span class="ticker-item">🎄 Зимний Сезон 2027 • Забирай новогодние подарки из Адвент-календаря каждый день</span>
-                <span class="ticker-item">⚽ Правило «+2 Гола = Досрочная победа П1/П2» активно • В росписи Тоталы до 6.5 и Bet Builder</span>
-                <span class="ticker-item">📡 Во вкладке «Клуб» доступны Сигналы капперов (5% роялти), Кланы и Турнир</span>
+                <span class="ticker-item">🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня</span>
+                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером</span>
+                <span class="ticker-item">👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта</span>
             </div>
         </div>
     </div>
@@ -1025,6 +1066,7 @@
         </div>
 
         <div class="rookie-card frost-accent" id="rookie-quest-card" style="display:none;"></div>
+        <div class="daily-quest-card frost-accent" id="daily-quests-card" style="display:none;"></div>
 
         <div class="search-box-wrap">
             <input type="text" id="team-search-input" class="search-input" placeholder="🔎 Поиск команды или турнира..." oninput="onSearchTeamInput()">
@@ -1106,8 +1148,11 @@
                 <button class="btn-main btn-block" id="btn-spin-wheel" onclick="spinWheel()">🎲 Крутить барабан</button>
             </div>
 
-            <div class="section-title">🔨 Аукцион Чёрного рынка (99 OVR)</div>
-            <div class="card" id="black-market-card"></div>
+            <div class="section-title">
+                <span>🔨 Чёрный рынок (12 легенд 98–99 OVR)</span>
+                <span class="bm-timer-pill" id="bm-timer-pill">⏳ --:--:--</span>
+            </div>
+            <div class="card frost-accent" id="black-market-card"></div>
         </div>
     </section>
 
@@ -1134,6 +1179,10 @@
             <div id="fut-pitch-formation"></div>
         </div>
 
+        <button class="btn-main btn-block" style="margin:0 0 8px; padding:10px; font-size:12px;" onclick="autoBestFutSquad()">
+            ⚡ Авто-подбор: Лучший состав на сегодня
+        </button>
+
         <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-bottom:14px;">
             <button class="btn-main blue" style="padding:10px 4px; font-size:11px;" onclick="openCollectionModal('ALL')">
                 📚 Коллекция (<span id="fut-owned-btn-cnt">0/100</span>)
@@ -1141,21 +1190,24 @@
             <button class="btn-main gold" style="padding:10px 4px; font-size:11px;" onclick="openClubSetsModal()">
                 👑 Сеты Клубов
             </button>
-            <button class="btn-main" id="btn-sbc-main" style="padding:10px 4px; font-size:11px;" onclick="craftFutSbc()">
-                🔄 СПК (<span id="fut-reserve-cnt">0/3</span>)
+            <button class="btn-main purple" id="btn-sbc-main" style="padding:10px 4px; font-size:11px;" onclick="openSbcModal()">
+                🔄 СПК (<span id="fut-reserve-cnt">0</span>)
             </button>
         </div>
 
-        <div class="section-title">🃏 Зимние наборы карточек (100 футболистов)</div>
+        <div class="section-title">
+            <span>🃏 Зимние наборы карточек (100 карт)</span>
+            <button class="info-q-btn" onclick="openDropRatesModal('fut')">? Шансы</button>
+        </div>
 
         <div class="pack-showcase-card">
             <div class="pack-visual-cover bronze">
                 <span style="font-size:9px;">BASIC</span><span style="font-size:24px;">🥉</span>
-                <span style="font-size:10px;">84-90</span>
+                <span style="font-size:10px;">84-87</span>
             </div>
             <div style="flex:1;">
                 <div style="font-weight:800; font-size:14.5px; margin-bottom:3px;">Базовый набор лиги</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Тюкавин, Глушенков, Батраков, Барко, Вендел, Эндрик, Гакпо, Олисе, Де Йонг, Семак, Николич и др.</div>
+                <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;"><b>85%</b> Базовые (84–87) • <b>15%</b> Золотые (88–93). Тюкавин, Глушенков, Батраков, Эндрик, Гакпо, Олисе и др.</div>
                 <button class="btn-main" style="width:100%; padding:9px;" onclick="openFutPack('basic')">Открыть • 1 500 FC</button>
             </div>
         </div>
@@ -1167,7 +1219,7 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:800; font-size:14.5px; color:#fde68a; margin-bottom:3px;">Золотой набор Топ-5</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Салах, Кейн, Рафинья, Сака, Фоден, Райс, Вирц, Палмер, Исак, Дембеле, Флик, Слот + шанс TOTY</div>
+                <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;"><b>93%</b> Золотые (88–93) • <b>7%</b> Элитные TOTY/ICON (94–97). Салах, Кейн, Рафинья, Сака, Фоден, Палмер, Вирц</div>
                 <button class="btn-main gold" style="width:100%; padding:9px;" onclick="openFutPack('gold')">Открыть • 5 000 FC</button>
             </div>
         </div>
@@ -1179,7 +1231,7 @@
             </div>
             <div style="flex:1;">
                 <div style="font-weight:800; font-size:14.5px; color:#7dd3fc; margin-bottom:3px;">Элитный набор ЛЧ (TOTY & ICON)</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Ламин Ямаль (96), Винисиус, Родри, Мбаппе, Холанд, Беллингем, Роналдиньо, Зубастик, Кафу, Мальдини</div>
+                <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;"><b>100% гарантия 94–97 OVR!</b> Ламин Ямаль, Винисиус, Родри, Мбаппе, Холанд, Беллингем, Зубастик, Мальдини</div>
                 <button class="btn-main blue" style="width:100%; padding:9px;" onclick="openFutPack('elite')">Открыть • 15 000 FC</button>
             </div>
         </div>
@@ -1188,10 +1240,13 @@
     <!-- ==================== ВКЛАДКА 4: ПОРТ ==================== -->
     <section id="tab-startup" class="tab-section">
         <div class="card frost-accent" style="padding:12px 14px; margin-bottom:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <div>
-                    <div style="font-size:14px; font-weight:800;">📦 Зимний Порт (144 предмета)</div>
-                    <div style="font-size:11px; color:#cbd5e1; margin-top:2px;">🔧 Ключей 100% реставрации: <b style="color:#fde68a;" id="st-wrenches-cnt">0 шт.</b> <span style="color:var(--accent-blue); cursor:pointer; font-weight:700;" onclick="openStarsShopModal()">[+ Пополнить]</span></div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:14px; font-weight:800;">📦 Зимний Порт</span>
+                        <button class="info-q-btn" onclick="openDropRatesModal('port')">? Шансы</button>
+                    </div>
+                    <div style="font-size:11px; color:#cbd5e1; margin-top:3px;">🔧 Ключей 100% реставрации: <b style="color:#fde68a;" id="st-wrenches-cnt">0 шт.</b> <span style="color:var(--accent-blue); cursor:pointer; font-weight:700;" onclick="openStarsShopModal()">[+ Пополнить]</span></div>
                 </div>
                 <div style="text-align:right;">
                     <span style="font-size:10px; color:var(--text-muted); display:block;">Чистый профит</span>
@@ -1389,6 +1444,28 @@
         </div>
     </div>
 
+    <!-- НОВЫЙ МОДАЛ: 3-УРОВНЕВЫЙ СПК (КРАФТ КАРТОЧЕК FUT) -->
+    <div class="drawer-overlay" id="sbc-modal" onclick="handleOverlayClick(event, 'sbc-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
+            <div class="sheet-header">
+                <b style="font-size:15px;">🔄 СПК-Крафт (Обмен по редкости)</b>
+                <button class="close-x" onclick="document.getElementById('sbc-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="sbc-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- НОВЫЙ МОДАЛ: ШАНСЫ ДРОПА (?) -->
+    <div class="drawer-overlay" id="drop-rates-modal" onclick="handleOverlayClick(event, 'drop-rates-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
+            <div class="sheet-header">
+                <b style="font-size:15px;" id="drop-rates-title">🎲 Шансы выпадения</b>
+                <button class="close-x" onclick="document.getElementById('drop-rates-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="drop-rates-body"></div>
+        </div>
+    </div>
+
     <div class="drawer-overlay" id="signals-modal" onclick="handleOverlayClick(event, 'signals-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1514,7 +1591,9 @@
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="border-radius:20px; text-align:center; padding-bottom:22px;">
             <div class="pack-burst-wrap" id="pack-modal-card-preview"></div>
             <div style="font-size:12px; color:#cbd5e1; margin:10px 0 14px; line-height:1.4;" id="pack-modal-note"></div>
-            <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">Забрать в коллекцию</button>
+            <div id="pack-modal-actions">
+                <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">Готово</button>
+            </div>
         </div>
     </div>
 
@@ -1599,18 +1678,18 @@
         const INITIAL_VIEW = urlParams.get('view') || '';
 
         const DEFAULT_CONTAINERS_CATALOG = {
-            c_1: { id: 'c_1', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, забытый инструмент и гаражные находки', max_win: '3 500 FC' },
-            c_2: { id: 'c_2', name: '🧳 Карго-Бокс Аэропорта', price: 2500, ico: '✈️', desc: 'Невостребованный багаж международных авиарейсов', max_win: '8 800 FC' },
-            c_3: { id: 'c_3', name: '⚓ Таможня Роттердама', price: 5000, ico: '🚢', desc: 'Конфискат европейского порта: техника, байки и бренды', max_win: '17 500 FC' },
-            c_4: { id: 'c_4', name: '🎸 Студия Abbey Road (Лондон)', price: 10000, ico: '🎙️', desc: 'Музыкальные реликвии, редкий винил и коллекционные гитары', max_win: '35 000 FC' },
-            c_5: { id: 'c_5', name: '⚽ Раздевалка Легенд Футбола', price: 20000, ico: '🏟️', desc: 'Музейные реликвии Чемпионатов Мира и финалов Лиги Чемпионов', max_win: '70 000 FC' },
-            c_6: { id: 'c_6', name: '🏎 Паддок Монако Гран-При', price: 35000, ico: '🏁', desc: 'Гоночные болиды, карбоновые узлы и трофеи пилотов Формулы-1', max_win: '122 000 FC' },
-            c_7: { id: 'c_7', name: '💻 Бункер Кремниевой Долины', price: 60000, ico: '🛰️', desc: 'Квантовые серверы, нейрочипы и забытые крипто-кошельки', max_win: '210 000 FC' },
-            c_8: { id: 'c_8', name: '🖼️ Закрытый Аукцион Сотбис', price: 95000, ico: '🏛️', desc: 'Музейные шедевры, яйца Фаберже и королевские драгоценности', max_win: '330 000 FC' },
-            c_9: { id: 'c_9', name: '👑 Золотой Борт Шейха (Дубай)', price: 135000, ico: '🛩️', desc: 'Гиперкары из пустыни, слитки 999 пробы и люксовые яхты', max_win: '470 000 FC' },
-            c_10: { id: 'c_10', name: '🏦 Швейцарское Крипто-Хранилище', price: 180000, ico: '🔐', desc: 'Альпийский бункер с холодными кошельками и банковскими резервами', max_win: '630 000 FC' },
-            c_11: { id: 'c_11', name: '🛸 Секретный Сектор «Зона-51»', price: 240000, ico: '👽', desc: 'Засекреченные военные разработки и внеземные артефакты', max_win: '840 000 FC' },
-            c_12: { id: 'c_12', name: '🌌 Орбитальный Ковчег Миллиардеров', price: 300000, ico: '🚀', desc: 'Финальный контейнер игры: космические станции, острова и сверхразум', max_win: '1 050 000 FC' }
+            c_1: { id: 'c_1', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, забытый инструмент и гаражные находки', max_win: '3 200 FC' },
+            c_2: { id: 'c_2', name: '🧳 Карго-Бокс Аэропорта', price: 2500, ico: '✈️', desc: 'Невостребованный багаж международных авиарейсов', max_win: '8 000 FC' },
+            c_3: { id: 'c_3', name: '⚓ Таможня Роттердама', price: 5000, ico: '🚢', desc: 'Конфискат европейского порта: техника, байки и бренды', max_win: '16 000 FC' },
+            c_4: { id: 'c_4', name: '🎸 Студия Abbey Road (Лондон)', price: 10000, ico: '🎙️', desc: 'Музыкальные реликвии, редкий винил и коллекционные гитары', max_win: '32 000 FC' },
+            c_5: { id: 'c_5', name: '⚽ Раздевалка Легенд Футбола', price: 20000, ico: '🏟️', desc: 'Музейные реликвии Чемпионатов Мира и финалов Лиги Чемпионов', max_win: '64 000 FC' },
+            c_6: { id: 'c_6', name: '🏎 Паддок Монако Гран-При', price: 35000, ico: '🏁', desc: 'Гоночные болиды, карбоновые узлы и трофеи пилотов Формулы-1', max_win: '112 000 FC' },
+            c_7: { id: 'c_7', name: '💻 Бункер Кремниевой Долины', price: 60000, ico: '🛰️', desc: 'Квантовые серверы, нейрочипы и забытые крипто-кошельки', max_win: '192 000 FC' },
+            c_8: { id: 'c_8', name: '🖼️ Закрытый Аукцион Сотбис', price: 95000, ico: '🏛️', desc: 'Музейные шедевры, яйца Фаберже и королевские драгоценности', max_win: '304 000 FC' },
+            c_9: { id: 'c_9', name: '👑 Золотой Борт Шейха (Дубай)', price: 135000, ico: '🛩️', desc: 'Гиперкары из пустыни, слитки 999 пробы и люксовые яхты', max_win: '432 000 FC' },
+            c_10: { id: 'c_10', name: '🏦 Швейцарское Крипто-Хранилище', price: 180000, ico: '🔐', desc: 'Альпийский бункер с холодными кошельками и банковскими резервами', max_win: '576 000 FC' },
+            c_11: { id: 'c_11', name: '🛸 Секретный Сектор «Зона-51»', price: 240000, ico: '👽', desc: 'Засекреченные военные разработки и внеземные артефакты', max_win: '768 000 FC' },
+            c_12: { id: 'c_12', name: '🌌 Орбитальный Ковчег Миллиардеров', price: 300000, ico: '🚀', desc: 'Финальный контейнер игры: космические станции, острова и сверхразум', max_win: '960 000 FC' }
         };
 
         const DEFAULT_STREAK_CALENDAR = [
@@ -1632,7 +1711,7 @@
         const DEFAULT_VIP_BENEFITS = [
             '⚡ <b>+0.15 к коэффициенту</b> каждого Ординара и Экспресса автоматически',
             '📦 <b>Скидка 10% на покупку всех 12 Контейнеров</b> в Портовом Аукционе',
-            '🔧 <b>Шанс успешной реставрации 65%</b> (вместо 55%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>',
+            '🔧 <b>Шанс успешной реставрации 55%</b> (вместо 45%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>',
             '🌐 <b>0% комиссии на P2P-Бирже</b> (предметы и карты FUT) + <b>Бесплатное создание Клана</b>',
             '🏟 <b>Подписание любых спонсоров без залога</b> — максимальная касса Арены без рисков',
             '👑 <b>Золотая корона VIP</b> рядом с твоим ником в Топ-10 и Турнире Капперов'
@@ -1698,6 +1777,7 @@
         let FIRST_LOAD_DONE = false;
         let STREAK_POPUP_SHOWN = false;
         let IS_LOADING_STATE = false;
+        let BM_END_TS = 0;
 
         function haptic(type = 'light') {
             if (!tg || !tg.HapticFeedback) return;
@@ -1763,12 +1843,28 @@
             }
         }
 
+        function updateBmTimerTick() {
+            const el = document.getElementById('bm-timer-pill');
+            if (!el || !BM_END_TS) return;
+            const left = Math.max(0, BM_END_TS - Math.floor(Date.now() / 1000));
+            if (left <= 0) {
+                el.textContent = '🔄 Обновление лота...';
+                return;
+            }
+            const hrs = Math.floor(left / 3600);
+            const mins = Math.floor((left % 3600) / 60);
+            const secs = left % 60;
+            const pad = n => String(n).padStart(2, '0');
+            el.textContent = `⏳ ${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+        }
+
         /* ==================== МГНОВЕННОЕ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ==================== */
         function renderSpecificTab(tabName) {
             if (!APP_STATE) return;
             const u = APP_STATE.user || {};
             if (tabName === 'matches') {
                 renderRookieQuestCard(u);
+                renderDailyQuestsCard(u);
                 renderLeaguesBar();
                 renderMatchesFeed();
             } else if (tabName === 'games') {
@@ -2031,6 +2127,7 @@
             if (document.getElementById('tournament-modal').classList.contains('show')) renderTournamentModalBody();
             if (document.getElementById('signals-modal').classList.contains('show')) renderCopySignalsModalBody();
             if (document.getElementById('club-sets-modal').classList.contains('show')) renderClubSetsModalBody();
+            if (document.getElementById('sbc-modal').classList.contains('show')) renderSbcModalBody();
         }
 
         function renderAll() {
@@ -2060,9 +2157,9 @@
             const list = (APP_STATE.live_ticker && APP_STATE.live_ticker.length)
                 ? APP_STATE.live_ticker
                 : [
-                    '🎄 Зимний Сезон 2027 • Забирай новогодние подарки из Адвент-календаря каждый день',
-                    '⚽ Правило «+2 Гола = Досрочная победа П1/П2» активно • В росписи Тоталы до 6.5 и Bet Builder',
-                    '📡 Во вкладке «Клуб» доступны Сигналы капперов (5% роялти), Кланы и Турнир'
+                    '🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня',
+                    '🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером',
+                    '👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта'
                 ];
             const sig = list.join('||');
             if (sig === LAST_TICKER_SIGNATURE) return;
@@ -2072,7 +2169,7 @@
             bar.innerHTML = `<div class="ticker-half">${itemsHtml}</div><div class="ticker-half">${itemsHtml}</div>`;
         }
 
-        /* ==================== ВКЛАДКА «🏆 КЛУБ» ==================== */
+        /* ==================== ВКЛАДКА «🏆 КЛУБ» + ЧЁРНЫЙ РЫНОК V2 ==================== */
         function buildCopySignalsHtml() {
             const signals = (APP_STATE && APP_STATE.copy_signals) ? APP_STATE.copy_signals : [];
             const sigHtml = signals.length === 0
@@ -2241,6 +2338,24 @@
             `;
         }
 
+        function adjustBmBidInput(addVal) {
+            haptic('light');
+            const inp = document.getElementById('bm-bid-input');
+            if (!inp) return;
+            const cur = parseInt(inp.value || '0', 10) || 0;
+            inp.value = cur + addVal;
+        }
+
+        async function submitBlackMarketCustomBid() {
+            if (document.activeElement) document.activeElement.blur();
+            const inp = document.getElementById('bm-bid-input');
+            const amount = parseInt((inp && inp.value) || '0', 10);
+            if (!amount || amount < 500) return showToast('Введи корректную сумму ставки!', true);
+            const res = await apiAction({ action: 'bm_bid', amount });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+        }
+
         function renderGamesTab() {
             if (!APP_STATE) return;
             const u = APP_STATE.user || {};
@@ -2255,29 +2370,52 @@
             if (tourneyBox) tourneyBox.innerHTML = buildTournamentSectionHtml();
 
             const bm = APP_STATE.black_market || {};
+            if (bm.end_ts) {
+                BM_END_TS = bm.end_ts;
+                updateBmTimerTick();
+            }
             const bmBox = document.getElementById('black-market-card');
             if (bmBox && bm.card) {
                 const leaderClick = bm.leader_id ? `onclick="inspectPlayer('${bm.leader_id}')"` : '';
+                const ovrVal = bm.card.ovr || 99;
+                const isMeLeader = (bm.leader_id && u.user_id && bm.leader_id === u.user_id);
+
                 bmBox.innerHTML = `
                     <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-                        <div class="fut-shield tier-4" style="width:94px; flex-shrink:0;">
+                        <div class="fut-shield tier-4" style="width:98px; flex-shrink:0;">
                             <div class="shield-holo-layer"></div>
                             <div class="shield-head-grid">
-                                <div class="shield-rating-col"><span class="shield-ovr" style="font-size:14px;">99</span><span class="shield-pos">${bm.card.role}</span></div>
+                                <div class="shield-rating-col"><span class="shield-ovr" style="font-size:14px;">${ovrVal}</span><span class="shield-pos">${bm.card.role}</span></div>
                                 <div class="shield-kit-wrap" style="height:28px;">${buildFutKitSvg(bm.card.role, 4)}</div>
                             </div>
+                            <div class="shield-club-tag">${bm.card.club || 'Легенда'}</div>
                             <div class="shield-name" style="font-size:9px; min-height:20px;">${bm.card.name}</div>
                         </div>
                         <div style="flex:1;">
-                            <div style="font-size:10.5px; color:#fde68a; font-weight:800;">ЭКСКЛЮЗИВНЫЙ ЛОТ 99 OVR</div>
+                            <div style="font-size:10.5px; color:#fde68a; font-weight:800;">ЭКСКЛЮЗИВНЫЙ ЛОТ ${ovrVal} OVR • ПУЛ ${bm.pool_count || 12} ЛЕГЕНД</div>
                             <div style="font-size:14.5px; font-weight:800; margin:2px 0;">${bm.card.name}</div>
-                            <div style="font-size:11px; color:#6ee7b7; font-weight:700;">⚡ ${bm.card.desc}</div>
+                            <div style="font-size:11px; color:#6ee7b7; font-weight:700; margin-bottom:4px;">⚡ ${bm.card.desc}</div>
+                            <div style="font-size:10px; color:#cbd5e1;">🔔 Если твою ставку перебьют — бот пришлёт уведомление и вернёт FC.</div>
                         </div>
                     </div>
-                    <div style="font-size:12px; color:#cbd5e1; margin-bottom:10px;">
-                        Текущая ставка: <b style="color:#fff;">${formatFC(bm.highest_bid)}</b> • Лидер: <b class="${bm.leader_id ? 'player-link' : ''}" style="color:var(--accent-blue);" ${leaderClick}>${bm.leader_name}</b>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(10,18,34,0.55); border:1px solid var(--border-glass); padding:8px 10px; border-radius:10px; font-size:11.5px; margin-bottom:9px;">
+                        <span>Текущая: <b style="color:#fde68a;">${formatFC(bm.highest_bid)}</b></span>
+                        <span>Лидер: <b class="${bm.leader_id ? 'player-link' : ''}" style="color:var(--accent-blue);" ${leaderClick}>${bm.leader_name}</b></span>
                     </div>
-                    <button class="btn-main gold btn-block" onclick="placeBlackMarketBid(${bm.min_next_bid})">🔨 Перебить ставку (${formatFC(bm.min_next_bid)})</button>
+                    ${isMeLeader
+                        ? `<button class="btn-main disabled btn-block" style="margin-top:0;">👑 Ты лидируешь в торгах (${formatFC(bm.highest_bid)})</button>`
+                        : `
+                            <div style="display:flex; gap:6px; align-items:center; margin-bottom:7px;">
+                                <input type="number" id="bm-bid-input" class="stake-input" style="margin:0; padding:9px; font-size:13.5px; flex:1;" value="${bm.min_next_bid}" min="${bm.min_next_bid}" placeholder="Сумма ставки">
+                                <button class="btn-main gold" style="padding:10px 13px; font-size:12px; white-space:nowrap;" onclick="submitBlackMarketCustomBid()">🔨 Поставить</button>
+                            </div>
+                            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px;">
+                                <button class="chip-btn" onclick="adjustBmBidInput(1000)">+1 000 FC</button>
+                                <button class="chip-btn" onclick="adjustBmBidInput(5000)">+5 000 FC</button>
+                                <button class="chip-btn" style="color:#fde68a;" onclick="adjustBmBidInput(15000)">+15 000 FC</button>
+                            </div>
+                          `
+                    }
                 `;
             }
 
@@ -2400,7 +2538,56 @@
             showToast(`🔄 Сигнал от ${sig.author_name} загружен в купон!`);
         }
 
-        /* ==================== КЛУБНЫЕ СЕТЫ, МАГАЗИН STARS, VIP И ОБЗОР ИГРОКА ==================== */
+        /* ==================== КЛУБНЫЕ СЕТЫ, ШАНСЫ ДРОПА (?), МАГАЗИН STARS, VIP И ОБЗОР ИГРОКА ==================== */
+        function openDropRatesModal(mode = 'fut') {
+            haptic('light');
+            const titleEl = document.getElementById('drop-rates-title');
+            const bodyEl = document.getElementById('drop-rates-body');
+            if (!titleEl || !bodyEl) return;
+
+            if (mode === 'fut') {
+                titleEl.textContent = '🃏 Шансы дропа в наборах FUT';
+                bodyEl.innerHTML = `
+                    <div class="card">
+                        <div style="font-size:12.5px; font-weight:800; color:#e2e8f0; margin-bottom:6px;">🥉 Базовый набор лиги (1 500 FC)</div>
+                        <div class="rate-row"><span>Базовые карточки (84–87 OVR)</span><b style="color:#cbd5e1;">85%</b></div>
+                        <div class="rate-row"><span>Золотые Топ-5 (88–93 OVR)</span><b style="color:#fde68a;">15%</b></div>
+                    </div>
+                    <div class="card" style="border-color:rgba(251,191,36,0.45);">
+                        <div style="font-size:12.5px; font-weight:800; color:#fde68a; margin-bottom:6px;">🥇 Золотой набор Топ-5 (5 000 FC)</div>
+                        <div class="rate-row"><span>Золотые Топ-5 (88–93 OVR)</span><b style="color:#fde68a;">93%</b></div>
+                        <div class="rate-row"><span>Элитные TOTY & ICON (94–97 OVR)</span><b style="color:#7dd3fc;">7%</b></div>
+                    </div>
+                    <div class="card" style="border-color:rgba(56,189,248,0.5);">
+                        <div style="font-size:12.5px; font-weight:800; color:#7dd3fc; margin-bottom:6px;">💎 Элитный набор ЛЧ (15 000 FC)</div>
+                        <div class="rate-row"><span>Элитные TOTY & ICON (94–97 OVR)</span><b style="color:#6ee7b7;">100% гарантия</b></div>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); text-align:center;">
+                        Дубликаты автоматически прокачивают ★ уровень карты (+12% к силе баффа) и возвращают 35% кэшбэка.
+                    </div>
+                `;
+            } else {
+                titleEl.textContent = '📦 Шансы дропа и экономика Порта';
+                bodyEl.innerHTML = `
+                    <div class="card">
+                        <div style="font-size:12.5px; font-weight:800; color:#bae6fd; margin-bottom:6px;">Вероятность находок в каждом контейнере:</div>
+                        <div class="rate-row"><span><span class="rarity-pill rarity-1">Б/У Груз</span> (0.22×–0.62× цены)</span><b style="color:#cbd5e1;">72.0%</b></div>
+                        <div class="rate-row"><span><span class="rarity-pill rarity-2">Стандарт</span> (0.78×–1.04× цены)</span><b style="color:#6ee7b7;">21.0%</b></div>
+                        <div class="rate-row"><span><span class="rarity-pill rarity-3">Редкий лот</span> (1.25×–1.48× цены)</span><b style="color:#7dd3fc;">4.5%</b></div>
+                        <div class="rate-row"><span><span class="rarity-pill rarity-4">Эпический</span> (до 2.00× цены)</span><b style="color:#e9d5ff;">1.5%</b></div>
+                        <div class="rate-row"><span><span class="rarity-pill rarity-5">Легендарный</span> (до 3.20× цены)</span><b style="color:#fde68a;">1.0%</b></div>
+                    </div>
+                    <div class="card" style="font-size:11.5px; color:#cbd5e1; line-height:1.5;">
+                        • <b>Реставрация:</b> шанс успеха <b>45%</b> (для 👑 VIP — <b>55%</b>), либо <b>100%</b> с Золотым Ключом.<br>
+                        • <b>Быстрая продажа скупщику:</b> 90% от рыночной оценки.<br>
+                        • <b>Торг +25%:</b> шанс 42% • <b>Блеф +65%:</b> шанс 20%.<br>
+                        • <b>Спрос дня:</b> +15% к оценке предметов выбранной категории.
+                    </div>
+                `;
+            }
+            document.getElementById('drop-rates-modal').classList.add('show');
+        }
+
         function openClubSetsModal() {
             haptic('light');
             renderClubSetsModalBody();
@@ -2558,9 +2745,10 @@
             }).join('');
 
             const showroomList = p.showroom || [];
+            const showGridCls = showroomList.length >= 4 ? 'showroom-grid-4' : 'showroom-grid-3';
             const showroomHtml = showroomList.length === 0
                 ? `<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">В Шоуруме пока нет выставленных артефактов</div>`
-                : `<div class="collection-grid" style="grid-template-columns:repeat(${Math.min(4, Math.max(2, showroomList.length))}, 1fr);">
+                : `<div class="${showGridCls}">
                     ${showroomList.map(it => `
                         <div class="fut-shield tier-4" style="width:100%; padding:8px 5px;">
                             <div style="font-size:20px;">${it.ico}</div>
@@ -2711,6 +2899,51 @@
             }
         }
 
+        function renderDailyQuestsCard(u) {
+            const box = document.getElementById('daily-quests-card');
+            if (!box) return;
+            const dq = u.daily_quests;
+            if (!dq || dq.claimed === 1) {
+                box.style.display = 'none';
+                return;
+            }
+            box.style.display = 'block';
+            const doneCnt = dq.done_count || 0;
+            const betsDone = (dq.bets || 0) >= 2;
+            const expDone = (dq.exp || 0) >= 1;
+            const portDone = (dq.port || 0) >= 1;
+
+            const claimBtn = doneCnt >= 3
+                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimDailyQuests()">🎁 Открыть сундук дня (+500 FC + Бустер)</button>`
+                : `<div style="font-size:10px; color:#cbd5e1; text-align:center;">Обновляются в 00:00 МСК • Награда: <b>+500 FC + Бустер</b> (или +750 FC)</div>`;
+
+            box.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:12.5px; color:#bae6fd;">🎯 Задания дня (${doneCnt}/3)</b>
+                    <span style="font-size:10.5px; font-weight:800; color:#fde68a;">🎁 Сундук дня</span>
+                </div>
+                <div class="rookie-steps">
+                    <div class="rk-step ${betsDone ? 'done' : ''}" onclick="window.scrollTo({top:280, behavior:'smooth'})">
+                        ${betsDone ? '✅' : `${dq.bets || 0}/2`}<br>2 ставки
+                    </div>
+                    <div class="rk-step ${expDone ? 'done' : ''}" onclick="loadDailyExpressToSlip()">
+                        ${expDone ? '✅' : '0/1'}<br>Экспресс 3+
+                    </div>
+                    <div class="rk-step ${portDone ? 'done' : ''}" onclick="switchTab('startup')">
+                        ${portDone ? '✅' : '0/1'}<br>Порт / Спин
+                    </div>
+                </div>
+                ${claimBtn}
+            `;
+        }
+
+        async function claimDailyQuests() {
+            haptic('medium');
+            const res = await apiAction({ action: 'claim_daily_quests' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+        }
+
         function openStreakCalendarModal() {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
@@ -2763,7 +2996,7 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== ВКЛАДКА «📦 ПОРТ» (ЕДИНЫЕ КНОПКИ ПОКУПКИ + СВОРАЧИВАЕМАЯ ПРОДАЖА) ==================== */
+        /* ==================== ВКЛАДКА «📦 ПОРТ» (СЕТКА 2×2 ДЛЯ 4 ВИТРИН, БЕЗ РЕДИРЕКТА, БЫСТРАЯ ПРОДАЖА) ==================== */
         function setP2PFilter(filterKey) {
             haptic('light');
             P2P_FILTER = filterKey;
@@ -2782,7 +3015,7 @@
             const isVip = Boolean(u && u.is_vip);
             const maxStorage = isVip ? 12 : 8;
             const maxShowroom = isVip ? 4 : 3;
-            const restoreChance = isVip ? 65 : 55;
+            const restoreChance = isVip ? 55 : 45;
             const wrenchesCnt = (u && u.golden_wrenches) ? u.golden_wrenches : 0;
 
             const wrEl = document.getElementById('st-wrenches-cnt');
@@ -2838,23 +3071,24 @@
             const storBox = document.getElementById('startup-sub-storage');
             if (storBox) {
                 const slotIndices = isVip ? [0, 1, 2, 3] : [0, 1, 2];
+                const showroomGridClass = isVip ? 'showroom-grid-4' : 'showroom-grid-3';
                 const showroomSlots = slotIndices.map(idx => {
                     const item = st.showroom[idx];
                     if (!item) {
                         return `
                             <div class="fut-shield locked" style="width:100%; padding:10px 6px;">
                                 <div style="font-size:9px; color:#bae6fd; font-weight:700;">ВИТРИНА #${idx + 1}</div>
-                                <div style="font-size:20px; margin:6px 0;">🏛</div>
-                                <div style="font-size:9px; color:var(--text-muted);">Свободно</div>
+                                <div style="font-size:22px; margin:7px 0;">🏛</div>
+                                <div style="font-size:9.5px; color:var(--text-muted);">Свободно</div>
                             </div>
                         `;
                     }
                     return `
-                        <div class="fut-shield tier-4" style="width:100%; padding:9px 6px;" onclick="fromShowroomItem('${item.uid}')">
-                            <div style="font-size:8.5px; color:#fde68a; font-weight:800;">ЭКСПОНАТ</div>
-                            <div style="font-size:20px; margin:4px 0;">${item.ico}</div>
-                            <div style="font-size:10px; font-weight:700; line-height:1.15; min-height:22px; color:#fff;">${item.name}</div>
-                            <div class="shield-buff" style="margin-top:4px;">+${item.show_inc} FC/д • +${item.show_odd} кэф</div>
+                        <div class="fut-shield tier-4" style="width:100%; padding:10px 7px;" onclick="fromShowroomItem('${item.uid}')">
+                            <div style="font-size:8.5px; color:#fde68a; font-weight:800;">ЭКСПОНАТ #${idx + 1}</div>
+                            <div style="font-size:22px; margin:5px 0;">${item.ico}</div>
+                            <div style="font-size:10.5px; font-weight:700; line-height:1.2; min-height:24px; color:#fff;">${item.name}</div>
+                            <div class="shield-buff" style="margin-top:5px;">+${item.show_inc} FC/д • +${item.show_odd} кэф</div>
                         </div>
                     `;
                 }).join('');
@@ -2886,6 +3120,7 @@
                         const starsStr = '⭐'.repeat(Math.min(5, Math.max(1, rar)));
                         const canRestore = (it.restored_count || 0) < 1;
                         const expVal = it.expected_restore || Math.round(it.value * 1.52);
+                        const qsBasePrice = it.quick_sell_price || Math.max(40, Math.round(it.value * 0.90));
                         const maxP2pPrice = Math.max(500, Math.round(it.value * 2.5));
                         const demandBadge = it.is_in_demand
                             ? `<span class="rarity-pill rarity-2" style="margin-left:4px;">Спрос +15%</span>`
@@ -2946,7 +3181,7 @@
                                         <div style="font-size:10px; font-weight:700; color:#cbd5e1; margin-bottom:5px;">Продать скупщику в порту:</div>
                                         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
                                             <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','base')">
-                                                По оценке<br><b style="color:#6ee7b7;">${formatFC(it.value)}</b>
+                                                Сразу (90%)<br><b style="color:#6ee7b7;">${formatFC(qsBasePrice)}</b>
                                             </button>
                                             <button class="chip-btn" style="padding:7px 2px; font-size:10px;" onclick="sellStartupItemNpc('${it.uid}','push25')">
                                                 Торг +25%<br><b style="color:#7dd3fc;">${formatFC(Math.round(it.value*1.25))}</b>
@@ -2972,7 +3207,7 @@
                             <b style="font-size:13px;">🏛 Личный Шоурум (${st.showroom.length}/${maxShowroom})</b>
                             <span style="font-size:11px; color:#6ee7b7; font-weight:700;">+${st.showroom_daily_fc} FC/д • +${st.showroom_odd_boost} к кэфам</span>
                         </div>
-                        <div class="collection-grid" style="grid-template-columns:repeat(${maxShowroom}, 1fr);">${showroomSlots}</div>
+                        <div class="${showroomGridClass}">${showroomSlots}</div>
                         ${showroomClaimBtn}
                     </div>
                     ${contractBanner}
@@ -3048,6 +3283,14 @@
             }
         }
 
+        async function quickSellDroppedItem(itemUid) {
+            haptic('medium');
+            const res = await apiAction({ action: 'startup_sell_npc', item_uid: itemUid, tactic: 'base' });
+            document.getElementById('pack-modal').classList.remove('show');
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+        }
+
         async function craftStartup3to1() {
             haptic('medium');
             const res = await apiAction({ action: 'startup_craft_3to1' });
@@ -3057,6 +3300,7 @@
                 const it = res.found_item;
                 const rar = it.rarity || 2;
                 const tierCls = rar >= 5 ? 'tier-4' : (rar >= 3 ? 'tier-3' : 'tier-2');
+                const qsPrice = it.quick_sell_price || Math.max(40, Math.round(it.value * 0.90));
                 document.getElementById('pack-modal-card-preview').innerHTML = `
                     <div class="fut-shield ${tierCls} reveal-pop" style="width:176px; padding:12px 9px;">
                         <div class="shield-holo-layer"></div>
@@ -3068,6 +3312,10 @@
                     </div>
                 `;
                 document.getElementById('pack-modal-note').innerHTML = `<b>${res.message}</b>`;
+                document.getElementById('pack-modal-actions').innerHTML = `
+                    <button class="btn-main gold btn-block" style="margin-top:0;" onclick="quickSellDroppedItem('${it.uid}')">💸 Продать сразу (+${formatFC(qsPrice)})</button>
+                    <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">📦 Оставить на складе</button>
+                `;
                 document.getElementById('pack-modal').classList.add('show');
             }
         }
@@ -3089,12 +3337,13 @@
                 <b style="color:#fff; font-size:13.5px;">Открываем «${boxName}»...</b><br>
                 <span style="font-size:11px; color:var(--text-muted);">Оценка состояния и серийного номера</span>
             `;
+            document.getElementById('pack-modal-actions').innerHTML = '';
             document.getElementById('pack-modal').classList.add('show');
 
             const tStart = Date.now();
             const res = await apiAction({ action: 'startup_open_container', container_id: containerId }, true);
             const elapsed = Date.now() - tStart;
-            const waitLeft = Math.max(0, 950 - elapsed);
+            const waitLeft = Math.max(0, 900 - elapsed);
 
             setTimeout(() => {
                 IS_OPENING_BOX = false;
@@ -3108,6 +3357,7 @@
                     haptic('success');
                     const rar = it.rarity || 1;
                     const tierCls = rar >= 5 ? 'tier-4' : (rar >= 3 ? 'tier-3' : (rar === 2 ? 'tier-2' : ''));
+                    const qsPrice = it.quick_sell_price || Math.max(40, Math.round(it.value * 0.90));
                     document.getElementById('pack-modal-card-preview').innerHTML = `
                         <div class="fut-shield ${tierCls} reveal-pop" style="width:176px; padding:12px 9px;">
                             <div class="shield-holo-layer"></div>
@@ -3120,9 +3370,12 @@
                     `;
                     document.getElementById('pack-modal-note').innerHTML = `
                         <b>${res.message}</b><br>
-                        <span style="font-size:11px; color:var(--text-muted);">Предмет добавлен на склад</span>
+                        <span style="font-size:11px; color:var(--text-muted);">Можно сразу сдать скупщику или оставить на складе</span>
                     `;
-                    switchStartupSub('storage', document.getElementById('st-nav-storage'));
+                    document.getElementById('pack-modal-actions').innerHTML = `
+                        <button class="btn-main gold btn-block" style="margin-top:0;" onclick="quickSellDroppedItem('${it.uid}')">💸 Продать сразу (+${formatFC(qsPrice)})</button>
+                        <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">📦 Оставить на складе</button>
+                    `;
                 }
             }, waitLeft);
         }
@@ -4043,7 +4296,7 @@
             showToast('⚡ Экспресс дня загружен в купон!');
         }
 
-        /* ==================== КОЛЛЕКЦИОННЫЕ КАРТОЧКИ FUT (ВЕКТОРНЫЕ ДЖЕРСИ + ЩИТЫ) ==================== */
+        /* ==================== КОЛЛЕКЦИОННЫЕ КАРТОЧКИ FUT + 3-УРОВНЕВЫЙ СПК + АВТО-ПОДБОР ==================== */
         function buildFutKitSvg(role, tier) {
             const palettes = {
                 1: { main: '#c68b59', dark: '#6d4425', trim: '#fde68a' },
@@ -4137,6 +4390,9 @@
             const html = buildDetailedFutCardHtml(c, false, '');
             document.getElementById('pack-modal-card-preview').innerHTML = html.replace('class="fut-shield', 'style="width:168px;" class="fut-shield reveal-pop');
             document.getElementById('pack-modal-note').textContent = noteText;
+            document.getElementById('pack-modal-actions').innerHTML = `
+                <button class="btn-main btn-block" onclick="document.getElementById('pack-modal').classList.remove('show')">Забрать в коллекцию</button>
+            `;
             document.getElementById('pack-modal').classList.add('show');
         }
 
@@ -4170,7 +4426,7 @@
             document.getElementById('fut-chem-label').textContent = `⚡ Сыгранность: ${chem}%`;
             document.getElementById('fut-chem-bar').style.width = `${chem}%`;
             document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length}/100`;
-            document.getElementById('fut-reserve-cnt').textContent = `${reserveIds.length}/3`;
+            document.getElementById('fut-reserve-cnt').textContent = `${reserveIds.length}`;
 
             document.getElementById('fut-active-buffs-summary').innerHTML = `
                 • Форвард (Тоталы): <b style="color:#6ee7b7;">+${buffs.totals_profit_pct || 0}%</b> | Плеймейкер (1Х2): <b style="color:#6ee7b7;">+${buffs.outcomes_profit_pct || 0}%</b><br>
@@ -4192,6 +4448,84 @@
             `;
         }
 
+        async function autoBestFutSquad() {
+            haptic('medium');
+            const res = await apiAction({ action: 'auto_best_fut_squad' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+        }
+
+        function openSbcModal() {
+            haptic('light');
+            renderSbcModalBody();
+            document.getElementById('sbc-modal').classList.add('show');
+        }
+
+        function renderSbcModalBody() {
+            const box = document.getElementById('sbc-modal-body');
+            if (!box || !APP_STATE || !APP_STATE.user) return;
+            const rbt = APP_STATE.user.reserve_by_tier || { '1': 0, '2': 0, '3': 0 };
+            const c1 = Number(rbt['1'] || 0);
+            const c2 = Number(rbt['2'] || 0);
+            const c3 = Number(rbt['3'] || 0);
+
+            box.innerHTML = `
+                <div style="font-size:11.5px; color:#cbd5e1; margin-bottom:10px; line-height:1.4;">
+                    В СПК участвуют <b>только резервные карты</b> выбранной редкости — стартовый состав и более редкие карты защищены от случайного сжигания.
+                </div>
+
+                <div class="sbc-tier-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <b style="font-size:13px; color:#f1f5f9;">🥉 Бронзовый СПК</b>
+                        <span style="font-size:11px; font-weight:800; color:${c1 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c1}/3</span>
+                    </div>
+                    <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
+                        Сдаёшь: <b>3 Базовые карты (84–87)</b> ➔ Получаешь: <b style="color:#fde68a;">1 гарантированную Золотую (88–93)</b>
+                    </div>
+                    <button class="btn-main ${c1 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(1)">
+                        🔄 Обменять 3×84–87 ➔ Золотую (88–93)
+                    </button>
+                </div>
+
+                <div class="sbc-tier-card gold">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <b style="font-size:13px; color:#fde68a;">🥇 Золотой СПК</b>
+                        <span style="font-size:11px; font-weight:800; color:${c2 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c2}/3</span>
+                    </div>
+                    <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
+                        Сдаёшь: <b>3 Золотые карты (88–93)</b> ➔ Получаешь: <b style="color:#7dd3fc;">1 гарантированную Элитную TOTY/ICON (94–97)</b>
+                    </div>
+                    <button class="btn-main gold ${c2 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(2)">
+                        🔄 Обменять 3×88–93 ➔ Элитную (94–97)
+                    </button>
+                </div>
+
+                <div class="sbc-tier-card elite">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <b style="font-size:13px; color:#7dd3fc;">💎 Элитный СПК (Топ ICON & TOTY)</b>
+                        <span style="font-size:11px; font-weight:800; color:${c3 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c3}/3</span>
+                    </div>
+                    <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
+                        Сдаёшь: <b>3 Элитные карты (94–97)</b> ➔ Получаешь: <b style="color:#6ee7b7;">Топ-легенду 96–97 OVR + возврат 5 000 FC</b>
+                    </div>
+                    <button class="btn-main blue ${c3 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(3)">
+                        🔄 Обменять 3×94–97 ➔ Топ 96–97 + 5 000 FC
+                    </button>
+                </div>
+            `;
+        }
+
+        async function craftFutSbc(tierNum = 1) {
+            haptic('medium');
+            const res = await apiAction({ action: 'craft_fut_pack', sbc_tier: tierNum });
+            if (!res.ok) return showToast(res.error, true);
+
+            document.getElementById('sbc-modal').classList.remove('show');
+            document.getElementById('collection-modal').classList.remove('show');
+            showCardPreviewModal(res.card, res.status_note);
+            haptic('success');
+        }
+
         function openCollectionModal(roleFilter = 'ALL') {
             haptic('light');
             COLLECTION_FILTER = roleFilter;
@@ -4206,25 +4540,26 @@
             const qsMap = APP_STATE.fut_quicksell_prices || DEFAULT_FUT_QUICKSELL;
             const maxP2pMap = APP_STATE.fut_p2p_max_prices || DEFAULT_FUT_P2P_MAX;
             const ownedIds = u.owned_cards || [];
-            const reserveIds = u.reserve_cards || [];
+            const rbt = u.reserve_by_tier || { '1': 0, '2': 0, '3': 0 };
+            const anySbcReady = (Number(rbt['1'] || 0) >= 3 || Number(rbt['2'] || 0) >= 3 || Number(rbt['3'] || 0) >= 3);
             const eqCards = u.equipped_cards || {};
             const capRole = u.captain_role || 'FW';
 
             const sbcBanner = document.getElementById('collection-sbc-banner');
-            if (reserveIds.length >= 3) {
+            if (anySbcReady) {
                 sbcBanner.innerHTML = `
                     <div class="card" style="padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; border-color:rgba(251,191,36,0.45);">
                         <div style="font-size:11px;">
-                            <b style="color:#fde68a;">🔄 Обмен СПК готов</b><br>
-                            <span style="color:#cbd5e1;">В резерве ${reserveIds.length} карт. Обменяй 3 резервные карты на Золотой Пак</span>
+                            <b style="color:#fde68a;">🔄 Доступен обмен СПК по редкости</b><br>
+                            <span style="color:#cbd5e1;">Резерв: 🥉 ${rbt['1'] || 0} • 🥇 ${rbt['2'] || 0} • 💎 ${rbt['3'] || 0}</span>
                         </div>
-                        <button class="btn-main gold" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="craftFutSbc()">Обменять 3➔1</button>
+                        <button class="btn-main gold" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="document.getElementById('collection-modal').classList.remove('show'); openSbcModal()">Открыть СПК</button>
                     </div>
                 `;
             } else {
                 sbcBanner.innerHTML = `
                     <div style="font-size:11px; color:#cbd5e1; background:rgba(15,23,42,0.55); border:1px solid var(--border-glass); padding:8px 11px; border-radius:10px;">
-                        Резервную карту можно продать на P2P, сдать клубу за FC (Quick-Sell) или обменять 3 карты в СПК (${reserveIds.length}/3).
+                        Резервную карту можно продать на P2P, сдать клубу (Quick-Sell) или обменять 3 карты одной редкости в СПК.
                     </div>
                 `;
             }
@@ -4320,16 +4655,6 @@
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
             renderCollectionModalContent();
-        }
-
-        async function craftFutSbc() {
-            haptic('medium');
-            const res = await apiAction({ action: 'craft_fut_pack' });
-            if (!res.ok) return showToast(res.error, true);
-
-            document.getElementById('collection-modal').classList.remove('show');
-            showCardPreviewModal(res.card, res.status_note);
-            haptic('success');
         }
 
         async function openFutPack(type) {
@@ -4930,7 +5255,7 @@
                 '🎄 Залетай в Зимний Сезон AI_BET_BOT!\n' +
                 '📊 Тоталы до 6.5, Bet Builder, живая статистика ESPN и правило «+2 Гола = Победа»\n' +
                 '🛡️ Футбольные Синдикаты (Кланы), Копи-Беттинг (5% роялти) и Контракты 3➔1\n' +
-                '👕 100 коллекционных карточек FUT с трансферами между игроками!\n\n' +
+                '👕 100 коллекционных карточек FUT + 12 легенд 98–99 OVR на Чёрном рынке!\n\n' +
                 '🎁 Забирай стартовый банк + 1 000 FC по моей ссылке:'
             );
         }
@@ -4939,6 +5264,7 @@
             renderStartupTab({});
             fetch('/', { method: 'GET', cache: 'no-store' }).catch(() => {});
             loadAppState();
+            setInterval(updateBmTimerTick, 1000);
             setInterval(() => {
                 const active = document.activeElement;
                 if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
@@ -4948,5 +5274,4 @@
     </script>
 </body>
 </html>
-    
         
