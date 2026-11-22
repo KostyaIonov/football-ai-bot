@@ -4169,7 +4169,7 @@ async def process_admin_gift_exec(message: Message, state: FSMContext):
             parse_mode="HTML"
         )
 
-# ================= ВЕБ-СЕРВЕР + ЯДРО 2027: БАЛАНС ПОРТА, 12 ЛЕГЕНД ЧР, 3-УРОВНЕВЫЙ СПК, КВЕСТЫ ДНЯ И LIVE-СТАТИСТИКА =================
+# ================= ВЕБ-СЕРВЕР + ЯДРО 2027 FINAL: 2D-LIVE ПУАССОН, FAST POLLER, GOAL ALERTS, АНТИ-АБУЗ И ЧР V3 =================
 import hmac
 import hashlib
 from urllib.parse import parse_qsl
@@ -4196,10 +4196,13 @@ HIDDEN_FROM_TOPS_IDS = set()
 if ADMIN_ID:
     HIDDEN_FROM_TOPS_IDS.add(int(ADMIN_ID))
 
-# ЛИМИТЫ ЗАЩИТЫ ЭКОНОМИКИ (P2P И QUICK-SELL)
+# ЛИМИТЫ ЗАЩИТЫ ЭКОНОМИКИ
 FUT_QUICKSELL_PRICES = {1: 750, 2: 2200, 3: 6500, 4: 18000}
 FUT_P2P_MAX_PRICES = {1: 6000, 2: 20000, 3: 60000, 4: 150000}
 MIN_BETS_FOR_SOCIAL_ECONOMY = 3
+MIN_ODD_FOR_BONUSES = 1.35
+CASHOUT_LOCK_SECONDS = 120
+MAX_PROFILE_PROFIT_PCT = 30.0
 
 # 1. ЗАЩИТА TELEGRAM INIT_DATA + RATE LIMITER + ЛЕНТА СИГНАЛОВ (КОПИ-БЕТТИНГ)
 USER_RATE_LIMITS = defaultdict(list)
@@ -4236,13 +4239,10 @@ def prune_expired_copy_signals():
             ev_id = str(lg.get("event_id") or "")
             m_obj = live_lookup.get(ev_id)
             st_ts = int(lg.get("start_ts") or (m_obj.get("start_ts") if m_obj else 0) or 0)
-            if not m_obj:
+            if not m_obj or m_obj.get("is_finished") or m_obj.get("is_live"):
                 valid = False
                 break
-            if not m_obj.get("is_live") and st_ts > 0 and st_ts <= now_ts:
-                valid = False
-                break
-            if m_obj.get("is_live"):
+            if st_ts > 0 and st_ts <= now_ts:
                 valid = False
                 break
         if valid:
@@ -4678,7 +4678,7 @@ async def _fast_get_user(user_id: int, *args, **kwargs) -> dict:
     now_f = now_msk().timestamp()
     if not args and not kwargs:
         cached = RAM_USER_CACHE.get(user_id)
-        if cached and (now_f - cached["ts"] < 25.0):
+        if cached and (now_f - cached["ts"] < 20.0):
             return dict(cached["data"])
     u = await _orig_get_user(user_id, *args, **kwargs)
     if u:
@@ -4701,12 +4701,14 @@ _CLAN_ID_SEQ = 10
 TOURNAMENT_PRIZE_POOL_BONUS = 0
 
 CLAN_HQ_LEVELS = {
-    1: {"lvl": 1, "name": "Штаб-квартира Ур.1", "price": 0, "odd_boost": 0.05, "arena_pct": 5, "max_members": 15},
-    2: {"lvl": 2, "name": "Аналитический Центр Ур.2", "price": 25000, "odd_boost": 0.10, "arena_pct": 8, "max_members": 20},
-    3: {"lvl": 3, "name": "Небоскреб Синдиката Ур.3", "price": 65000, "odd_boost": 0.15, "arena_pct": 12, "max_members": 25},
-    4: {"lvl": 4, "name": "Башня Уолл-Стрит Ур.4", "price": 140000, "odd_boost": 0.20, "arena_pct": 16, "max_members": 30},
-    5: {"lvl": 5, "name": "Империя Капперов Ур.5", "price": 300000, "odd_boost": 0.25, "arena_pct": 20, "max_members": 40}
+    1: {"lvl": 1, "name": "Штаб-квартира Ур.1", "price": 0, "profit_pct": 2, "arena_pct": 5, "max_members": 15},
+    2: {"lvl": 2, "name": "Аналитический Центр Ур.2", "price": 25000, "profit_pct": 3, "arena_pct": 8, "max_members": 20},
+    3: {"lvl": 3, "name": "Небоскреб Синдиката Ур.3", "price": 65000, "profit_pct": 4, "arena_pct": 12, "max_members": 25},
+    4: {"lvl": 4, "name": "Башня Уолл-Стрит Ур.4", "price": 140000, "profit_pct": 5, "arena_pct": 16, "max_members": 30},
+    5: {"lvl": 5, "name": "Империя Капперов Ур.5", "price": 300000, "profit_pct": 6, "arena_pct": 20, "max_members": 40}
 }
+
+LAB_PROFIT_PCT_MAP = {1: 0, 2: 2, 3: 4, 4: 6, 5: 8}
 
 def get_current_tourney_week_key() -> str:
     dt = now_msk()
@@ -4865,7 +4867,7 @@ async def db_delete_p2p_lot(lot_id: int):
     except Exception as e:
         logging.warning(f"Ошибка удаления P2P-лота: {e}")
 
-# 6. 12 КОНТЕЙНЕРОВ ПО 12 ПРЕДМЕТОВ В КАЖДОМ = 144 ПРЕДМЕТА (УЖЕСТОЧЕННЫЙ РЕБАЛАНС ШАНСОВ)
+# 6. 12 КОНТЕЙНЕРОВ ПО 12 ПРЕДМЕТОВ = 144 ПРЕДМЕТА (РЕБАЛАНС + % К ПРИБЫЛИ ШОУРУМА)
 DEMAND_CATEGORIES = {
     "tech": {"key": "tech", "title": "💻 Электроника и ИИ", "ico": "💻"},
     "auto": {"key": "auto", "title": "🏎 Авто и Болиды", "ico": "🏎"},
@@ -4965,10 +4967,11 @@ _CONTAINER_SPECS = [
     ])
 ]
 
-# Ребаланс Порта: 72% Б/У груз (ниже цены бокса), 21% Стандарт, 4.5% Редкий, 1.5% Эпический, 1.0% Легендарный
+# Ребаланс Порта: 72% Б/У груз, 21% Стандарт, 4.5% Редкий, 1.5% Эпик, 1.0% Легенда
 _ITEM_MULTS = [0.22, 0.30, 0.40, 0.50, 0.62, 0.78, 0.90, 1.04, 1.25, 1.48, 2.00, 3.20]
 _ITEM_RARITIES = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5]
 CONTAINER_ITEM_WEIGHTS = [200, 175, 145, 110, 90, 85, 70, 55, 28, 17, 15, 10]
+_RARITY_PROFIT_PCT = {1: 0.5, 2: 1.0, 3: 1.5, 4: 2.5, 5: 3.5}
 
 CONTAINERS_CATALOG = {}
 for cid, cname, cprice, cico, cdesc, cmax, raw_items in _CONTAINER_SPECS:
@@ -4978,7 +4981,7 @@ for cid, cname, cprice, cico, cdesc, cmax, raw_items in _CONTAINER_SPECS:
         rar = _ITEM_RARITIES[idx]
         base_val = max(100, int(round(cprice * mult, -1)))
         show_inc = max(25, int(round((cprice ** 0.72) * (0.45 + idx * 0.18))))
-        show_odd = round(min(0.40, 0.01 * rar + (cprice / 2500000.0) * (idx + 1)), 2)
+        show_pct = _RARITY_PROFIT_PCT.get(rar, 1.0)
         built_items.append({
             "id": f"{cid}_i{idx+1}",
             "name": iname,
@@ -4987,7 +4990,7 @@ for cid, cname, cprice, cico, cdesc, cmax, raw_items in _CONTAINER_SPECS:
             "base": base_val,
             "rarity": rar,
             "show_inc": show_inc,
-            "show_odd": show_odd
+            "show_pct": show_pct
         })
     CONTAINERS_CATALOG[cid] = {
         "id": cid, "name": cname, "price": cprice, "ico": cico,
@@ -5002,7 +5005,7 @@ VIP_PLANS_FC = {
 }
 
 VIP_BENEFITS_LIST = [
-    "⚡ <b>+0.15 к коэффициенту</b> каждого Ординара и Экспресса автоматически",
+    "⚡ <b>+8% к чистой прибыли</b> каждого выигранного купона (при кэфе от 1.35)",
     "📦 <b>Скидка 10% на покупку всех 12 Контейнеров</b> в Портовом Аукционе",
     "🔧 <b>Шанс успешной реставрации 55%</b> (вместо 45%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>",
     "🌐 <b>0% комиссии на P2P-Бирже</b> (предметы и карточки FUT) + <b>Бесплатное создание Клана</b>",
@@ -5034,10 +5037,10 @@ STARS_SHOP_CATALOG = {
 }
 
 LIVE_TICKER_FEED = [
-    "🎄 Зимний Сезон 2027 открыт! Выполняй 3 Ежедневных задания каппера и забирай сундук дня",
-    "🔨 На Чёрном рынке теперь 12 легендарных GOAT-карт (98–99 OVR) с прямыми ставками и таймером",
-    "⚽ Правило «+2 Гола = Досрочная победа П1/П2» активно на всех матчах линии",
-    "👕 В Элитном паке FUT падают строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта!",
+    "🎄 Зимний Сезон 2027 • Все подарки, квесты дня и Адвент-календарь собраны в «Центре наград»",
+    "🔴 Быстрые LIVE-обновления каждые 18 сек + честная 2D-линия Пуассона и Гол-уведомления в чат",
+    "🔨 На Чёрном рынке 12 легенд (98–99 OVR) с анти-снайпингом (+2 мин) и историей ставок",
+    "👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта!",
     "🔥 Карточки FUT получают +25% к баффу в дни реальных матчей своего клуба!"
 ]
 
@@ -5049,11 +5052,11 @@ def push_live_ticker(event_text: str):
 
 # 8. КОНТРАКТЫ СПОНСОРОВ, НОВОГОДНИЙ КАЛЕНДАРЬ ВХОДА И ЛЕСЕНКА КАППЕРА
 STADIUM_SPONSORS = [
-    {"id": "sp_1", "name": "🟢 Winter Cup Energy", "min_lvl": 1, "deposit": 0, "bonus": 350, "task_code": "any_bet", "task": "Сделать минимум 1 любую ставку сегодня (Без риска)"},
-    {"id": "sp_2", "name": "🔵 Gazprom Media Sport", "min_lvl": 2, "deposit": 150, "bonus": 850, "task_code": "bet_500_or_pvp", "task": "Активная ставка от 500 FC в игре (Залог 150 FC)"},
-    {"id": "sp_3", "name": "🟡 CyberBet Syndicate", "min_lvl": 4, "deposit": 400, "bonus": 1900, "task_code": "express_bet", "task": "Иметь в игре Экспресс минимум из 2 матчей (Залог 400 FC)"},
-    {"id": "sp_4", "name": "🟣 Qatar Airways VIP", "min_lvl": 6, "deposit": 1000, "bonus": 4500, "task_code": "streak_or_fut", "task": "Серия от 1 победы ИЛИ собранный состав FUT (Залог 1 000 FC)"},
-    {"id": "sp_5", "name": "👑 Rolex Champions Club", "min_lvl": 8, "deposit": 2500, "bonus": 9800, "task_code": "showroom_and_bet", "task": "Активная ставка + минимум 1 экспонат в Шоуруме (Залог 2 500 FC)"}
+    {"id": "sp_1", "name": "🟢 Winter Cup Energy", "min_lvl": 1, "deposit": 0, "bonus": 350, "task_code": "any_bet", "task": "Сделать минимум 1 ставку с кэфом от 1.35 (Без риска)"},
+    {"id": "sp_2", "name": "🔵 Gazprom Media Sport", "min_lvl": 2, "deposit": 150, "bonus": 850, "task_code": "bet_500_or_pvp", "task": "Активная ставка от 500 FC (кэф ≥ 1.35, Залог 150 FC)"},
+    {"id": "sp_3", "name": "🟡 CyberBet Syndicate", "min_lvl": 4, "deposit": 400, "bonus": 1900, "task_code": "express_bet", "task": "Иметь в игре Экспресс от 2 матчей (Залог 400 FC)"},
+    {"id": "sp_4", "name": "🟣 Qatar Airways VIP", "min_lvl": 6, "deposit": 1000, "bonus": 4500, "task_code": "streak_or_fut", "task": "Серия от 1 победы ИЛИ состав FUT от 3 карт (Залог 1 000 FC)"},
+    {"id": "sp_5", "name": "👑 Rolex Champions Club", "min_lvl": 8, "deposit": 2500, "bonus": 9800, "task_code": "showroom_and_bet", "task": "Активная ставка (≥ 1.35) + экспонат в Шоуруме (Залог 2 500 FC)"}
 ]
 
 STREAK_CALENDAR = [
@@ -5061,7 +5064,7 @@ STREAK_CALENDAR = [
     {"day": 2, "coins": 350, "booster": "", "label": "+350 FC"},
     {"day": 3, "coins": 550, "booster": "", "label": "+550 FC"},
     {"day": 4, "coins": 850, "booster": "", "label": "+850 FC"},
-    {"day": 5, "coins": 1300, "booster": "boost035", "label": "+1 300 FC + ⚡ Буст +0.35"},
+    {"day": 5, "coins": 1300, "booster": "boost035", "label": "+1 300 FC + ⚡ Буст +15%"},
     {"day": 6, "coins": 2000, "booster": "", "label": "+2 000 FC"},
     {"day": 7, "coins": 3500, "booster": "insure50", "label": "🎁 +3 500 FC + 🛡 Страховка 50%"}
 ]
@@ -5072,7 +5075,7 @@ STREAK_LADDER_TIERS = [
     {"step": 7, "coins": 15000, "pack": "elite", "title": "👑 7 побед подряд: +15 000 FC + 💎 Элитный Пак ЛЧ"}
 ]
 
-# 9. 100 КАРТОЧЕК FUT ИЗ НАБОРОВ + 12 ЭКСКЛЮЗИВНЫХ ЛЕГЕНД ЧЁРНОГО РЫНКА (98–99 OVR)
+# 9. 100 КАРТОЧЕК FUT ИЗ НАБОРОВ + 12 ЭКСКЛЮЗИВНЫХ ЛЕГЕНД ЧЁРНОГО РЫНКА (ВСЕГО 112 КАРТ)
 def _mk_card(cid, role, tier, ovr, nation, club, name, val, desc, pack, pac, sho, pas):
     return {
         "id": cid, "role": role, "tier": tier, "ovr": ovr, "nation": nation, "club": club,
@@ -5175,17 +5178,17 @@ FUT_CARDS.update({
     "gk_3": _mk_card("gk_3", "GK", 3, 95, "🇧🇪", "Реал Мадрид", "💎 Тибо Куртуа (TOTY)", 20, "20% кэшбэк при проигрыше", "Элитный ЛЧ", 94, 96, 89),
     "gk_6": _mk_card("gk_6", "GK", 3, 96, "🇮🇹", "Легенда", "💎 Джанлуиджи Буффон (ICON)", 21, "21% кэшбэк при проигрыше", "Элитный ЛЧ", 95, 96, 92),
 
-    # ТРЕНЕРЫ (COACH — 10 КАРТ)
-    "co_7": _mk_card("co_7", "COACH", 1, 85, "🇷🇺", "Зенит", "🥉 Сергей Семак", 0.08, "+0.08 к кэфу Экспресса", "Базовый", 85, 84, 86),
-    "co_8": _mk_card("co_8", "COACH", 1, 85, "🇷🇸", "ЦСКА", "🥉 Марко Николич", 0.09, "+0.09 к кэфу Экспресса", "Базовый", 86, 85, 85),
-    "co_1": _mk_card("co_1", "COACH", 1, 86, "🇪🇸", "Арсенал", "🥉 Микель Артета", 0.10, "+0.10 к кэфу Экспресса", "Базовый", 86, 85, 88),
-    "co_9": _mk_card("co_9", "COACH", 2, 90, "🇳🇱", "Ливерпуль", "🥇 Арне Слот", 0.15, "+0.15 к кэфу Экспресса", "Золотой", 90, 89, 91),
-    "co_10": _mk_card("co_10", "COACH", 2, 91, "🇩🇪", "Барселона", "🥇 Ханси Флик", 0.17, "+0.17 к кэфу Экспресса", "Золотой", 92, 91, 90),
-    "co_4": _mk_card("co_4", "COACH", 2, 91, "🇪🇸", "Байер", "🥇 Хаби Алонсо", 0.16, "+0.16 к кэфу Экспресса", "Золотой", 90, 91, 93),
-    "co_5": _mk_card("co_5", "COACH", 2, 91, "🇵🇹", "Фенербахче", "🥇 Жозе Моуринью", 0.18, "+0.18 к кэфу Экспресса", "Золотой", 88, 92, 91),
-    "co_2": _mk_card("co_2", "COACH", 2, 93, "🇩🇪", "Легенда", "🥇 Юрген Клопп", 0.22, "+0.22 к кэфу Экспресса", "Золотой", 94, 93, 92),
-    "co_3": _mk_card("co_3", "COACH", 3, 96, "🇮🇹", "Реал Мадрид", "💎 Карло Анчелотти (ICON)", 0.32, "+0.32 к кэфу Экспресса", "Элитный ЛЧ", 95, 96, 97),
-    "co_6": _mk_card("co_6", "COACH", 3, 97, "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Легенда", "💎 Сэр Алекс Фергюсон (ICON)", 0.36, "+0.36 к кэфу Экспресса", "Элитный ЛЧ", 97, 98, 97),
+    # ТРЕНЕРЫ (COACH — 10 КАРТ: % К ПРИБЫЛИ ЭКСПРЕССОВ)
+    "co_7": _mk_card("co_7", "COACH", 1, 85, "🇷🇺", "Зенит", "🥉 Сергей Семак", 4, "+4% к прибыли Экспресса", "Базовый", 85, 84, 86),
+    "co_8": _mk_card("co_8", "COACH", 1, 85, "🇷🇸", "ЦСКА", "🥉 Марко Николич", 5, "+5% к прибыли Экспресса", "Базовый", 86, 85, 85),
+    "co_1": _mk_card("co_1", "COACH", 1, 86, "🇪🇸", "Арсенал", "🥉 Микель Артета", 6, "+6% к прибыли Экспресса", "Базовый", 86, 85, 88),
+    "co_9": _mk_card("co_9", "COACH", 2, 90, "🇳🇱", "Ливерпуль", "🥇 Арне Слот", 8, "+8% к прибыли Экспресса", "Золотой", 90, 89, 91),
+    "co_10": _mk_card("co_10", "COACH", 2, 91, "🇩🇪", "Барселона", "🥇 Ханси Флик", 9, "+9% к прибыли Экспресса", "Золотой", 92, 91, 90),
+    "co_4": _mk_card("co_4", "COACH", 2, 91, "🇪🇸", "Байер", "🥇 Хаби Алонсо", 9, "+9% к прибыли Экспресса", "Золотой", 90, 91, 93),
+    "co_5": _mk_card("co_5", "COACH", 2, 91, "🇵🇹", "Фенербахче", "🥇 Жозе Моуринью", 10, "+10% к прибыли Экспресса", "Золотой", 88, 92, 91),
+    "co_2": _mk_card("co_2", "COACH", 2, 93, "🇩🇪", "Легенда", "🥇 Юрген Клопп", 11, "+11% к прибыли Экспресса", "Золотой", 94, 93, 92),
+    "co_3": _mk_card("co_3", "COACH", 3, 96, "🇮🇹", "Реал Мадрид", "💎 Карло Анчелотти (ICON)", 14, "+14% к прибыли Экспресса", "Элитный ЛЧ", 95, 96, 97),
+    "co_6": _mk_card("co_6", "COACH", 3, 97, "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Легенда", "💎 Сэр Алекс Фергюсон (ICON)", 15, "+15% к прибыли Экспресса", "Элитный ЛЧ", 97, 98, 97),
 
     # GOAT — ЧЕРНЫЙ РЫНОК (12 ЭКСКЛЮЗИВНЫХ ЛЕГЕНД 98–99 OVR НА ВСЕ 5 ПОЗИЦИЙ)
     "goat_messi": _mk_card("goat_messi", "FW", 4, 99, "🇦🇷", "Интер Майами", "🐐 Лионель Месси (GOAT)", 25, "+25% к прибыли на Тоталах", "Черный рынок", 97, 99, 99),
@@ -5198,30 +5201,37 @@ FUT_CARDS.update({
     "goat_maldini": _mk_card("goat_maldini", "DEF", 4, 99, "🇮🇹", "Милан", "🐐 Паоло Мальдини (GOAT)", 25, "+25% к прибыли на Форах и ОЗ", "Черный рынок", 94, 82, 95),
     "goat_yashin": _mk_card("goat_yashin", "GK", 4, 99, "🇷🇺", "Динамо М", "🐐 Лев Яшин (GOAT)", 26, "26% кэшбэк при проигрыше", "Черный рынок", 99, 99, 97),
     "goat_neuer": _mk_card("goat_neuer", "GK", 4, 98, "🇩🇪", "Бавария", "🐐 Мануэль Нойер (Prime GOAT)", 24, "24% кэшбэк при проигрыше", "Черный рынок", 97, 98, 98),
-    "goat_pep": _mk_card("goat_pep", "COACH", 4, 99, "🇪🇸", "Ман Сити", "🐐 Пеп Гвардиола (GOAT)", 0.48, "+0.48 к кэфу Экспресса", "Черный рынок", 99, 99, 99),
-    "goat_zidane_co": _mk_card("goat_zidane_co", "COACH", 4, 98, "🇫🇷", "Реал Мадрид", "🐐 Зинедин Зидан 3×ЛЧ (GOAT)", 0.44, "+0.44 к кэфу Экспресса", "Черный рынок", 97, 98, 99)
+    "goat_pep": _mk_card("goat_pep", "COACH", 4, 99, "🇪🇸", "Ман Сити", "🐐 Пеп Гвардиола (GOAT)", 18, "+18% к прибыли Экспресса", "Черный рынок", 99, 99, 99),
+    "goat_zidane_co": _mk_card("goat_zidane_co", "COACH", 4, 98, "🇫🇷", "Реал Мадрид", "🐐 Зинедин Зидан 3×ЛЧ (GOAT)", 17, "+17% к прибыли Экспресса", "Черный рынок", 97, 98, 99)
 })
 
 BLACK_MARKET_GOAT_POOL = [k for k, v in FUT_CARDS.items() if v.get("tier") == 4]
 FUT_ROLES = ["FW", "MID", "DEF", "GK", "COACH"]
 
 CLUB_SETS_CONFIG = [
-    {"id": "set_real", "club": "Реал Мадрид", "title": "👑 Галактикос (Реал Мадрид)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_barca", "club": "Барселона", "title": "🔵🔴 Ла Масия (Барселона)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_mancity", "club": "Ман Сити", "title": "🩵 Голубая Луна (Ман Сити)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_liv", "club": "Ливерпуль", "title": "🔴 Энфилд (Ливерпуль)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_ars", "club": "Арсенал", "title": "🔫 Канониры (Арсенал)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_psg", "club": "ПСЖ", "title": "🗼 Парк де Пренс (ПСЖ)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_cska", "club": "ЦСКА", "title": "🐴 Красно-синие (ЦСКА)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_zenit", "club": "Зенит", "title": "🦁 Северная Столица (Зенит)", "req": 3, "reward": 3000, "odd": 0.03},
-    {"id": "set_legends", "club": "Легенда", "title": "💎 Зал Славы (ICON)", "req": 3, "reward": 5000, "odd": 0.04}
+    {"id": "set_real", "club": "Реал Мадрид", "title": "👑 Галактикос (Реал Мадрид)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_barca", "club": "Барселона", "title": "🔵🔴 Ла Масия (Барселона)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_mancity", "club": "Ман Сити", "title": "🩵 Голубая Луна (Ман Сити)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_liv", "club": "Ливерпуль", "title": "🔴 Энфилд (Ливерпуль)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_ars", "club": "Арсенал", "title": "🔫 Канониры (Арсенал)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_psg", "club": "ПСЖ", "title": "🗼 Парк де Пренс (ПСЖ)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_cska", "club": "ЦСКА", "title": "🐴 Красно-синие (ЦСКА)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_zenit", "club": "Зенит", "title": "🦁 Северная Столица (Зенит)", "req": 3, "reward": 3000, "profit_pct": 1.5},
+    {"id": "set_legends", "club": "Легенда", "title": "💎 Зал Славы (ICON)", "req": 3, "reward": 5000, "profit_pct": 2.5}
 ]
+
+BOOSTER_NAMES.update({
+    "boost035": "⚡ Бустер прибыли +15% (от кэфа 1.35)",
+    "insure50": "🛡 Страховка купона 50%"
+})
 
 def get_clubs_playing_today() -> set[str]:
     playing = set()
     today_dm = now_msk().strftime("%d.%m")
     for l_d in (SCHEDULE_CACHE.get("data") or {}).values():
         for m in (l_d.get("matches") or {}).values():
+            if m.get("is_finished"):
+                continue
             if m.get("is_live") or str(m.get("short_date", "")).startswith(today_dm):
                 h_ru = translate_team_ru(m.get("home_team", ""))
                 a_ru = translate_team_ru(m.get("away_team", ""))
@@ -5288,6 +5298,7 @@ def parse_user_fut_state(user: dict) -> dict:
         "ladder_claimed": list(raw.get("_ladder_claimed") or []),
         "clan_id": int(raw.get("_clan_id") or 0),
         "captain": captain,
+        "goal_alerts": int(raw.get("_goal_alerts") if raw.get("_goal_alerts") is not None else 1),
         "login_streak": int(raw.get("_login_streak") or 0),
         "last_streak_date": str(raw.get("_last_streak_date") or ""),
         "ticket_mode": str(raw.get("_ticket_mode") or "optimal"),
@@ -5335,6 +5346,7 @@ def dump_user_fut_state(st: dict, is_vip_flag: bool = False) -> str:
         "_ladder_claimed": st.get("ladder_claimed", []),
         "_clan_id": st.get("clan_id", 0),
         "_captain": st["captain"],
+        "_goal_alerts": int(st.get("goal_alerts") if st.get("goal_alerts") is not None else 1),
         "_login_streak": st.get("login_streak", 0),
         "_last_streak_date": st.get("last_streak_date", ""),
         "_ticket_mode": st.get("ticket_mode", "optimal"),
@@ -5375,6 +5387,12 @@ def calculate_forbes_net_worth(user: dict, st: dict = None) -> int:
     except Exception:
         return int(float(dict(user).get("balance") or 0)) if user else 0
 
+def _get_exhibit_profit_pct(it: dict) -> float:
+    if it.get("show_pct") is not None:
+        return float(it["show_pct"])
+    rar = int(it.get("rarity") or 1)
+    return _RARITY_PROFIT_PCT.get(rar, 1.0)
+
 def get_user_fut_buffs_v2(user: dict) -> dict:
     u_d = dict(user) if user else {}
     st = parse_user_fut_state(u_d)
@@ -5398,25 +5416,32 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
         lvl_mult = 1.0 + (lvl - 1) * 0.12
         cap_mult = 1.25 if cap_role == role_key else 1.0
         form_mult = 1.25 if c_obj.get("club") in playing_today else 1.0
-        return round(base_v * lvl_mult * cap_mult * chem_mult * form_mult, 2)
+        return round(base_v * lvl_mult * cap_mult * chem_mult * form_mult, 1)
 
     lab_lvl = int(u_d.get("lab_level") or 1)
-    lab_bonus = LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1])["odd_bonus"]
+    lab_profit_pct = float(LAB_PROFIT_PCT_MAP.get(lab_lvl, 0))
 
     showroom_items = st.get("startup_showroom") or []
     showroom_daily_fc = sum(int(it.get("show_inc") or 0) for it in showroom_items)
-    showroom_odd_boost = round(sum(float(it.get("show_odd") or 0.0) for it in showroom_items), 2)
-    vip_odd_boost = 0.15 if vip_active else 0.0
-    hot_hand_boost = 0.10 if int(u_d.get("streak") or 0) >= 3 else 0.0
+    showroom_profit_pct = min(10.0, round(sum(_get_exhibit_profit_pct(it) for it in showroom_items), 1))
+    vip_profit_pct = 8.0 if vip_active else 0.0
+    hot_hand_pct = 5.0 if int(u_d.get("streak") or 0) >= 3 else 0.0
 
     claimed_sets = st.get("claimed_sets", [])
-    sets_odd_boost = round(sum(s["odd"] for s in CLUB_SETS_CONFIG if s["id"] in claimed_sets), 2)
+    sets_profit_pct = min(8.0, round(sum(float(s["profit_pct"]) for s in CLUB_SETS_CONFIG if s["id"] in claimed_sets), 1))
+    chem_profit_pct = 3.0 if chemistry_pct == 100 else 0.0
 
     clan_id = int(st.get("clan_id") or 0)
     clan_obj = CLANS_REGISTRY.get(clan_id)
     clan_hq_cfg = CLAN_HQ_LEVELS.get(clan_obj["hq_level"], CLAN_HQ_LEVELS[1]) if clan_obj else None
-    clan_odd_boost = float(clan_hq_cfg["odd_boost"]) if clan_hq_cfg else 0.0
+    clan_profit_pct = float(clan_hq_cfg["profit_pct"]) if clan_hq_cfg else 0.0
     clan_arena_pct = int(clan_hq_cfg["arena_pct"]) if clan_hq_cfg else 0
+
+    profile_profit_pct = min(
+        MAX_PROFILE_PROFIT_PCT,
+        round(lab_profit_pct + showroom_profit_pct + vip_profit_pct + hot_hand_pct + sets_profit_pct + chem_profit_pct, 1)
+    )
+    express_profit_pct = min(25.0, round(_slot_val("COACH") + clan_profit_pct, 1))
 
     active_ids = set(v for v in squad.values() if v)
     reserve_ids = [cid for cid in st["owned"] if cid not in active_ids]
@@ -5427,18 +5452,19 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
         "def_card": FUT_CARDS.get(squad.get("DEF", "")),
         "gk_card": FUT_CARDS.get(squad.get("GK", "")),
         "co_card": FUT_CARDS.get(squad.get("COACH", "")),
-        "totals_profit_pct": round(_slot_val("FW"), 1),
-        "outcomes_profit_pct": round(_slot_val("MID"), 1),
-        "handicap_profit_pct": round(_slot_val("DEF"), 1),
+        "totals_profit_pct": min(30.0, round(_slot_val("FW"), 1)),
+        "outcomes_profit_pct": min(30.0, round(_slot_val("MID"), 1)),
+        "handicap_profit_pct": min(30.0, round(_slot_val("DEF"), 1)),
         "loss_cashback_pct": min(35.0, round(_slot_val("GK"), 1)),
-        "express_odd_boost": round(_slot_val("COACH") + clan_odd_boost, 2),
-        "lab_odd_boost": round(lab_bonus + showroom_odd_boost + vip_odd_boost + hot_hand_boost + sets_odd_boost + (0.04 if chemistry_pct == 100 else 0.0), 2),
+        "express_profit_pct": express_profit_pct,
+        "profile_profit_pct": profile_profit_pct,
+        "lab_profit_pct": lab_profit_pct,
         "showroom_daily_fc": showroom_daily_fc,
-        "showroom_odd_boost": showroom_odd_boost,
-        "vip_odd_boost": vip_odd_boost,
-        "hot_hand_boost": hot_hand_boost,
-        "sets_odd_boost": sets_odd_boost,
-        "clan_odd_boost": clan_odd_boost,
+        "showroom_profit_pct": showroom_profit_pct,
+        "vip_profit_pct": vip_profit_pct,
+        "hot_hand_pct": hot_hand_pct,
+        "sets_profit_pct": sets_profit_pct,
+        "clan_profit_pct": clan_profit_pct,
         "clan_arena_pct": clan_arena_pct,
         "is_vip_active": vip_active,
         "chemistry": chemistry_pct,
@@ -5452,7 +5478,7 @@ def get_user_fut_buffs_v2(user: dict) -> dict:
     }
 
 globals()["get_user_fut_buffs"] = get_user_fut_buffs_v2
-# 10. ОПЛАТА STARS, ПРОКАЧКА КАРТОЧЕК, ЧЁРНЫЙ РЫНОК V2 (12 ЛЕГЕНД + ТАЙМЕР + УВЕДОМЛЕНИЯ) И РАСЧЁТ СТАВОК
+# 10. ОПЛАТА STARS, ПРОКАЧКА КАРТОЧЕК С УЧЁТОМ ★ УРОВНЯ, ЧЁРНЫЙ РЫНОК V3 (АНТИ-СНАЙПИНГ + ИСТОРИЯ) И ЧЕСТНЫЙ РАСЧЁТ
 @dp.pre_checkout_query()
 async def process_stars_pre_checkout(pre_checkout_query: PreCheckoutQuery):
     await pre_checkout_query.answer(ok=True)
@@ -5482,8 +5508,9 @@ async def process_stars_successful_payment(message: Message):
                 "name": chosen_tpl["name"], "ico": chosen_tpl["ico"], "cat": chosen_tpl.get("cat", "art"),
                 "is_in_demand": True, "rarity": max(4, chosen_tpl["rarity"]), "condition": 96,
                 "wear_label": "✨ Прямо с завода", "restored_count": 0, "value": val,
+                "quick_sell_price": max(40, int(round(val * 0.90, -1))),
                 "expected_restore": int(round(val * 1.55, -1)), "restore_cost": int(round(val * 0.35, -1)),
-                "show_inc": chosen_tpl["show_inc"], "show_odd": chosen_tpl["show_odd"], "container_price": 0
+                "show_inc": chosen_tpl["show_inc"], "show_pct": chosen_tpl.get("show_pct", 2.5), "container_price": 0
             }
             st["startup_storage"].insert(0, found_item)
             new_bal = round(new_bal + 15000, 1)
@@ -5511,6 +5538,13 @@ async def process_stars_successful_payment(message: Message):
             f"✨ <b>ОПЛАТА STARS УСПЕШНО ЗАВЕРШЕНА!</b>\n\n<blockquote>{reward_desc}</blockquote>",
             reply_markup=minimalist_chat_menu_kb(uid), parse_mode="HTML"
         )
+
+def _card_effective_power(card_id: str, card_levels: dict) -> float:
+    c = FUT_CARDS.get(card_id)
+    if not c:
+        return 0.0
+    lvl = max(1, min(5, int(card_levels.get(card_id) or 1)))
+    return float(c["val"]) * (1.0 + (lvl - 1) * 0.12)
 
 async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
     user = await db_manager.get_user(user_id)
@@ -5542,12 +5576,13 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
         st["card_levels"][card_id] = 1
         card["level"] = 1
         cur_id = st["squad"].get(role, "")
-        cur_card = FUT_CARDS.get(cur_id)
-        if not cur_card or card["val"] > cur_card["val"]:
+        cur_power = _card_effective_power(cur_id, st["card_levels"]) if cur_id else -1.0
+        new_power = _card_effective_power(card_id, st["card_levels"])
+        if not cur_id or new_power > cur_power:
             st["squad"][role] = card_id
             status_note = "✅ Новая карточка добавлена в коллекцию и сразу вышла в стартовый состав!"
         else:
-            status_note = "📚 Новая карточка в коллекции! (Дубликаты качают ★ уровень, а резерв можно продать или сдать в СПК)."
+            status_note = "📚 Новая карточка в коллекции! (Текущий игрок в основе сильнее с учётом ★ уровня)."
 
     new_bal = round(user["balance"] - cost + cashback, 1)
     await db_manager.exec(
@@ -5558,51 +5593,54 @@ async def open_fut_pack_v2(user_id: int, cost: int, card_id: str) -> dict:
 
 db_manager.open_fut_pack_db = open_fut_pack_v2
 
-# ================= ЧЁРНЫЙ РЫНОК V2: 12 ЛЕГЕНД (98–99 OVR), ТАЙМЕР И УВЕДОМЛЕНИЕ О ПЕРЕБИТОЙ СТАВКЕ =================
+# ================= ЧЁРНЫЙ РЫНОК V3: 12 ЛЕГЕНД, АНТИ-СНАЙПИНГ (+2 МИН) И ИСТОРИЯ 5 СТАВОК =================
 BM_BID_LOCK = asyncio.Lock()
-_BM_V2_TABLE_READY = False
+_BM_V3_TABLE_READY = False
 
-async def _ensure_bm_v2_table():
-    global _BM_V2_TABLE_READY
-    if _BM_V2_TABLE_READY:
+async def _ensure_bm_v3_table():
+    global _BM_V3_TABLE_READY
+    if _BM_V3_TABLE_READY:
         return
     try:
         await db_manager.exec("""
-            CREATE TABLE IF NOT EXISTS bm_state_v2 (
+            CREATE TABLE IF NOT EXISTS bm_state_v3 (
                 id INTEGER PRIMARY KEY,
                 lot_id TEXT,
                 highest_bid BIGINT DEFAULT 25000,
                 leader_id BIGINT DEFAULT 0,
                 leader_name TEXT DEFAULT 'Нет ставок',
-                end_ts BIGINT DEFAULT 0
+                end_ts BIGINT DEFAULT 0,
+                history_json TEXT DEFAULT '[]'
             )
         """)
-        _BM_V2_TABLE_READY = True
+        _BM_V3_TABLE_READY = True
     except Exception as e:
-        logging.warning(f"Инициализация bm_state_v2: {e}")
+        logging.warning(f"Инициализация bm_state_v3: {e}")
 
-async def _save_bm_v2_row(lot: dict):
+async def _save_bm_v3_row(lot: dict):
     try:
+        hist_str = json.dumps(lot.get("bids_history", [])[:5], ensure_ascii=False)
         if db_manager.use_pg:
             await db_manager.exec("""
-                INSERT INTO bm_state_v2 (id, lot_id, highest_bid, leader_id, leader_name, end_ts)
-                VALUES (1, $1, $2, $3, $4, $5)
+                INSERT INTO bm_state_v3 (id, lot_id, highest_bid, leader_id, leader_name, end_ts, history_json)
+                VALUES (1, $1, $2, $3, $4, $5, $6)
                 ON CONFLICT (id) DO UPDATE SET
                     lot_id = EXCLUDED.lot_id,
                     highest_bid = EXCLUDED.highest_bid,
                     leader_id = EXCLUDED.leader_id,
                     leader_name = EXCLUDED.leader_name,
-                    end_ts = EXCLUDED.end_ts
-            """, lot["lot_id"], int(lot["highest_bid"]), int(lot["leader_id"]), str(lot["leader_name"]), int(lot["end_ts"]))
+                    end_ts = EXCLUDED.end_ts,
+                    history_json = EXCLUDED.history_json
+            """, lot["lot_id"], int(lot["highest_bid"]), int(lot["leader_id"]), str(lot["leader_name"]), int(lot["end_ts"]), hist_str)
         else:
             async with aiosqlite.connect(db_manager.sqlite_path) as db:
                 await db.execute("""
-                    INSERT OR REPLACE INTO bm_state_v2 (id, lot_id, highest_bid, leader_id, leader_name, end_ts)
-                    VALUES (1, ?, ?, ?, ?, ?)
-                """, (lot["lot_id"], int(lot["highest_bid"]), int(lot["leader_id"]), str(lot["leader_name"]), int(lot["end_ts"])))
+                    INSERT OR REPLACE INTO bm_state_v3 (id, lot_id, highest_bid, leader_id, leader_name, end_ts, history_json)
+                    VALUES (1, ?, ?, ?, ?, ?, ?)
+                """, (lot["lot_id"], int(lot["highest_bid"]), int(lot["leader_id"]), str(lot["leader_name"]), int(lot["end_ts"]), hist_str))
                 await db.commit()
     except Exception as e:
-        logging.warning(f"Сохранение bm_state_v2: {e}")
+        logging.warning(f"Сохранение bm_state_v3: {e}")
 
 def _next_bm_end_ts() -> int:
     dt_now = now_msk()
@@ -5611,11 +5649,16 @@ def _next_bm_end_ts() -> int:
         end_today = end_today + timedelta(days=1)
     return int(end_today.timestamp())
 
-async def get_or_rotate_bm_v2() -> dict:
-    await _ensure_bm_v2_table()
+async def get_or_rotate_bm_v3() -> dict:
+    await _ensure_bm_v3_table()
     now_ts = int(now_msk().timestamp())
-    row = await db_manager.fetchrow("SELECT * FROM bm_state_v2 WHERE id = 1")
+    row = await db_manager.fetchrow("SELECT * FROM bm_state_v3 WHERE id = 1")
     cur = dict(row) if row else None
+    if cur:
+        try:
+            cur["bids_history"] = json.loads(cur.get("history_json") or "[]")
+        except Exception:
+            cur["bids_history"] = []
 
     needs_rotate = (
         not cur
@@ -5650,15 +5693,17 @@ async def get_or_rotate_bm_v2() -> dict:
             "highest_bid": 25000,
             "leader_id": 0,
             "leader_name": "Нет ставок",
-            "end_ts": _next_bm_end_ts()
+            "end_ts": _next_bm_end_ts(),
+            "bids_history": []
         }
-        await _save_bm_v2_row(cur)
+        await _save_bm_v3_row(cur)
 
     return cur
 
-async def place_bm_v2_bid(uid: int, username: str, amount: int) -> dict:
+async def place_bm_v3_bid(uid: int, username: str, amount: int) -> dict:
     async with BM_BID_LOCK:
-        lot = await get_or_rotate_bm_v2()
+        lot = await get_or_rotate_bm_v3()
+        now_ts = int(now_msk().timestamp())
         old_leader = int(lot.get("leader_id") or 0)
         old_bid = int(lot.get("highest_bid") or 25000)
         min_next = (old_bid + 500) if old_leader != 0 else old_bid
@@ -5690,14 +5735,27 @@ async def place_bm_v2_bid(uid: int, username: str, amount: int) -> dict:
             except Exception:
                 pass
 
+        sniped_extended = False
+        if int(lot.get("end_ts") or 0) - now_ts < 120:
+            lot["end_ts"] = now_ts + 120
+            sniped_extended = True
+
         lot["highest_bid"] = int(amount)
         lot["leader_id"] = int(uid)
         lot["leader_name"] = username
-        await _save_bm_v2_row(lot)
+        hist = list(lot.get("bids_history") or [])
+        hist.insert(0, {
+            "user_id": int(uid),
+            "name": username,
+            "amount": int(amount),
+            "time": now_msk().strftime("%H:%M:%S")
+        })
+        lot["bids_history"] = hist[:5]
+        await _save_bm_v3_row(lot)
 
         c_obj = FUT_CARDS.get(lot["lot_id"], {"name": "GOAT 99 OVR"})
         push_live_ticker(f"🔨 {username} поставил {amount} FC за лот «{c_obj['name']}» на Чёрном рынке!")
-        return {"ok": True, "lot": lot}
+        return {"ok": True, "lot": lot, "sniped_extended": sniped_extended}
 
 def get_express_boost_multiplier(num_legs: int) -> tuple[float, int]:
     if num_legs >= 10:
@@ -5730,6 +5788,7 @@ async def fast_create_pending_bet(
     if user["balance"] < total_deduct:
         return {"ok": False, "error": f"Недостаточно средств! С учетом страховки нужно {total_deduct} FC."}
 
+    now_ts = int(now_msk().timestamp())
     is_all_in = 1 if (user["balance"] - total_deduct < 10.0) else 0
     fav_club = user.get("favorite_club") or ""
     is_fav_club = 1 if (fav_club and (fav_club in match_title or fav_club in pick)) else 0
@@ -5739,23 +5798,31 @@ async def fast_create_pending_bet(
     except Exception:
         parsed_legs = []
 
-    if copied_from_uid and copied_from_uid != user_id and parsed_legs:
-        parsed_legs[0]["_copied_from"] = int(copied_from_uid)
-        parsed_legs[0]["_copied_bet_id"] = int(copied_from_bet_id or 0)
+    if parsed_legs:
+        parsed_legs[0]["_created_ts"] = now_ts
+        if copied_from_uid and copied_from_uid != user_id:
+            parsed_legs[0]["_copied_from"] = int(copied_from_uid)
+            parsed_legs[0]["_copied_bet_id"] = int(copied_from_bet_id or 0)
         legs_json = json.dumps(parsed_legs, ensure_ascii=False)
 
     buffs = get_user_fut_buffs_v2(user)
     st = buffs["full_state"]
     vip_act = buffs["is_vip_active"]
-    st["rookie_bet"] = 1
-    st["dq_bets"] = int(st.get("dq_bets") or 0) + 1
-    if bet_type == "express" and len(parsed_legs) >= 3:
-        st["dq_exp"] = 1
+
+    exp_mult, exp_pct = get_express_boost_multiplier(len(parsed_legs) if bet_type == "express" else 1)
+    # Чистый коэффициент без плоских накруток (все бонусы профиля идут в % к чистой прибыли при кэфе >= 1.35)
+    final_odds = round(odds * exp_mult, 2)
+
+    if final_odds >= MIN_ODD_FOR_BONUSES:
+        st["rookie_bet"] = 1
+        st["dq_bets"] = int(st.get("dq_bets") or 0) + 1
+        if bet_type == "express" and len(parsed_legs) >= 3:
+            st["dq_exp"] = 1
 
     TOURNAMENT_PRIZE_POOL_BONUS += max(5, int(round(amount * 0.03)))
 
     ref_inviter = int(user.get("referred_by") or 0)
-    if ref_inviter > 0 and st.get("ref_bonus_paid", 0) == 0:
+    if ref_inviter > 0 and st.get("ref_bonus_paid", 0) == 0 and final_odds >= MIN_ODD_FOR_BONUSES:
         st["ref_bonus_paid"] = 1
         try:
             await db_manager.exec("UPDATE users SET balance = balance + 500 WHERE user_id = $1", ref_inviter)
@@ -5768,24 +5835,21 @@ async def fast_create_pending_bet(
         except Exception:
             pass
 
-    exp_mult, exp_pct = get_express_boost_multiplier(len(parsed_legs) if bet_type == "express" else 1)
-
-    boosted_base = round(odds * exp_mult, 2)
-    final_odds = round(boosted_base + buffs["lab_odd_boost"], 2)
-    if bet_type == "express" and buffs["express_odd_boost"] > 0:
-        final_odds = round(final_odds + buffs["express_odd_boost"], 2)
-
     active_booster = user.get("active_booster") or ""
     booster_used = ""
-    if active_booster == "boost035":
-        final_odds = round(final_odds + 0.35, 2)
+    next_booster_val = active_booster
+
+    if active_booster == "boost035" and final_odds >= MIN_ODD_FOR_BONUSES:
         booster_used = "boost035"
-    elif active_booster == "insure50" or insure_paid:
+        next_booster_val = ""
+    elif insure_paid:
         booster_used = "insure50"
+    elif active_booster == "insure50":
+        booster_used = "insure50"
+        next_booster_val = ""
 
     new_balance = round(user["balance"] - total_deduct, 1)
     created_str = now_msk().strftime("%d.%m %H:%M")
-    next_booster_val = "" if (active_booster and not insure_paid) else active_booster
 
     for lg_item in parsed_legs:
         if lg_item.get("event_id"):
@@ -5819,10 +5883,16 @@ async def fast_create_pending_bet(
         asyncio.create_task(db_manager.unlock_achievement(user_id, "first_express"))
         push_live_ticker(f"⚡ Каппер {username} собрал Экспресс ({len(parsed_legs)} соб.) с кэфом {final_odds} на выплату {round(amount * final_odds)} FC!")
 
+    est_profit_pct = 0.0
+    if final_odds >= MIN_ODD_FOR_BONUSES:
+        est_profit_pct = buffs["profile_profit_pct"] + (buffs["express_profit_pct"] if bet_type == "express" else 0.0) + (15.0 if booster_used == "boost035" else 0.0)
+    raw_profit = max(0.0, amount * (final_odds - 1.0))
+    est_payout = round(amount + raw_profit * (1.0 + min(65.0, est_profit_pct) / 100.0), 1)
+
     return {
         "ok": True, "bet_id": bet_id, "final_odds": final_odds, "exp_boost_pct": exp_pct,
         "booster_used": booster_used, "is_fav_club": is_fav_club, "total_deduct": total_deduct,
-        "new_balance": new_balance, "potential_win": round(amount * final_odds, 1)
+        "new_balance": new_balance, "potential_win": est_payout
     }
 
 db_manager.create_pending_bet = fast_create_pending_bet
@@ -5880,25 +5950,28 @@ async def atomic_safe_settle_bet_in_db(bet: dict, status: str, odd_or_offer: flo
             base_win = amount * eff_odd
             raw_profit = max(0.0, base_win - amount)
 
-            pick_low = str(bet.get("pick") or "").lower()
-            if any(k in pick_low for k in ("тб", "тм", "тотал", "итб")):
-                role_pct = float(buffs.get("totals_profit_pct") or 0.0)
-            elif any(k in pick_low for k in ("фора", "обе забьют", "оз")):
-                role_pct = float(buffs.get("handicap_profit_pct") or 0.0)
-            else:
-                role_pct = float(buffs.get("outcomes_profit_pct") or 0.0)
+            total_bonus_pct = 0.0
+            if eff_odd >= MIN_ODD_FOR_BONUSES:
+                pick_low = str(bet.get("pick") or "").lower()
+                if any(k in pick_low for k in ("тб", "тм", "тотал", "итб")):
+                    role_pct = float(buffs.get("totals_profit_pct") or 0.0)
+                elif any(k in pick_low for k in ("фора", "обе забьют", "оз")):
+                    role_pct = float(buffs.get("handicap_profit_pct") or 0.0)
+                else:
+                    role_pct = float(buffs.get("outcomes_profit_pct") or 0.0)
 
-            fav_pct = 10.0 if int(bet.get("is_fav_club") or 0) == 1 else 0.0
-            total_bonus_pct = min(45.0, max(0.0, role_pct + fav_pct))
+                prof_pct = float(buffs.get("profile_profit_pct") or 0.0)
+                exp_pct_bonus = float(buffs.get("express_profit_pct") or 0.0) if bet.get("bet_type") == "express" else 0.0
+                fav_pct = 10.0 if int(bet.get("is_fav_club") or 0) == 1 else 0.0
+                booster_pct = 15.0 if bet.get("booster_used") == "boost035" else 0.0
+
+                total_bonus_pct = min(70.0, max(0.0, role_pct + prof_pct + exp_pct_bonus + fav_pct + booster_pct))
+
             bonus_fc = raw_profit * (total_bonus_pct / 100.0)
-
             final_payout = round(base_win + bonus_fc, 1)
-            hard_cap = round(amount * coupon_odds * 1.45, 1)
-            if final_payout > hard_cap:
-                final_payout = round(amount * coupon_odds, 1)
-
             net_profit = round(final_payout - amount, 1)
-            earned_pts = max(15, int(round(eff_odd * 35 + net_profit * 0.04)))
+
+            earned_pts = max(15, int(round(eff_odd * 35 + net_profit * 0.04))) if eff_odd >= MIN_ODD_FOR_BONUSES else 5
             st["tourney_pts"] = int(st.get("tourney_pts") or 0) + earned_pts
 
             clan_id = int(st.get("clan_id") or 0)
@@ -6070,20 +6143,28 @@ def build_public_player_profile(target_user: dict) -> dict:
         "captain_role": buffs["captain"],
         "squad_cards": squad_cards,
         "owned_cards_count": len(buffs["owned_ids"]),
+        "total_cards_count": len(FUT_CARDS),
         "showroom": st.get("startup_showroom", []),
         "showroom_daily_fc": buffs["showroom_daily_fc"],
-        "showroom_odd_boost": buffs["showroom_odd_boost"],
+        "showroom_profit_pct": buffs["showroom_profit_pct"],
         "trophies_count": len(ach_list)
     }
 
-# ================= ПАРСЕР ЖИВОЙ СТАТИСТИКИ, АВТОРОВ ГОЛОВ И СЧЕТА 1-ГО ТАЙМА ИЗ ESPN =================
+# ================= ПАРСЕР ЖИВОЙ СТАТИСТИКИ, ФАМИЛИЙ АВТОРОВ ГОЛОВ И 1-ГО ТАЙМА ИЗ ESPN =================
 MATCH_ESPN_DETAILS_CACHE = {}
+
+def _extract_scorer_surname(raw_name: str) -> str:
+    clean = str(raw_name or "").strip()
+    if not clean:
+        return "Гол"
+    parts = clean.split()
+    return parts[-1] if len(parts) >= 2 else clean
 
 async def fetch_espn_match_details(session: aiohttp.ClientSession, league_slug: str, event_id: str) -> dict:
     ev_key = str(event_id)
     now_f = now_msk().timestamp()
     cached = MATCH_ESPN_DETAILS_CACHE.get(ev_key)
-    if cached and (now_f - cached["ts"] < 25.0):
+    if cached and (now_f - cached["ts"] < 18.0):
         return cached["data"]
 
     result = {
@@ -6146,9 +6227,10 @@ async def fetch_espn_match_details(session: aiohttp.ClientSession, league_slug: 
             side = "home" if ev_tid == home_id else "away"
 
             athletes = ev.get("athletesInvolved") or []
-            player_name = str(athletes[0].get("shortName") or athletes[0].get("displayName") or "Гол") if athletes else "Гол"
+            raw_pname = str(athletes[0].get("shortName") or athletes[0].get("displayName") or "Гол") if athletes else "Гол"
+            surname = _extract_scorer_surname(raw_pname)
             tag = " (пен.)" if ev.get("penaltyKick") else (" (авт.)" if ev.get("ownGoal") else "")
-            scorers.append({"side": side, "minute": clk, "player": player_name + tag})
+            scorers.append({"side": side, "minute": clk, "player": surname + tag})
 
             if period_num == 1 or (period_num == 0 and clk and parse_live_minute(clk) <= 45):
                 if side == "home":
@@ -6188,14 +6270,14 @@ async def fetch_espn_match_details(session: aiohttp.ClientSession, league_slug: 
             "h1_h": h1_h,
             "h1_a": h1_a,
             "stats": parsed_stats,
-            "scorers": scorers[:12]
+            "scorers": scorers[:14]
         }
         MATCH_ESPN_DETAILS_CACHE[ev_key] = {"ts": now_f, "data": result}
         return result
     except Exception:
         return result
 
-# ================= КАЛЬКУЛЯТОР КОТИРОВОК: ТОТАЛЫ ДО 6.5, ФОРЫ, BET BUILDER И ЗАЩИЩЕННЫЙ LIVE-ПУАССОН =================
+# ================= ЧЕСТНАЯ 2D-МОДЕЛЬ ПУАССОНА ДЛЯ LIVE + CASHOUT V2 =================
 _orig_evaluate_custom_market = evaluate_custom_market
 _orig_evaluate_leg_result = evaluate_leg_result
 
@@ -6215,6 +6297,38 @@ def parse_live_minute(detail_str: str) -> int:
     m = re.search(r"(\d+)", s)
     return int(m.group(1)) if m else 45
 
+def compute_2d_live_probs(gh: int, ga: int, lam_h: float, lam_a: float) -> dict:
+    """Точная двумерная модель Пуассона от оставшихся минут и текущего счёта"""
+    pmf_h = [poisson_pmf(k, max(0.03, lam_h)) for k in range(9)]
+    pmf_a = [poisson_pmf(k, max(0.03, lam_a)) for k in range(9)]
+    p_p1, p_x, p_p2 = 0.0, 0.0, 0.0
+    for dh in range(9):
+        ph = pmf_h[dh]
+        fh = gh + dh
+        for da in range(9):
+            p = ph * pmf_a[da]
+            fa = ga + da
+            if fh > fa:
+                p_p1 += p
+            elif fh == fa:
+                p_x += p
+            else:
+                p_p2 += p
+    s_tot = max(1e-6, p_p1 + p_x + p_p2)
+    p_p1 /= s_tot
+    p_x /= s_tot
+    p_p2 /= s_tot
+    non_draw = max(1e-5, p_p1 + p_p2)
+    return {
+        "p1": p_p1,
+        "x": p_x,
+        "p2": p_p2,
+        "1x": p_p1 + p_x,
+        "x2": p_p2 + p_x,
+        "f10": p_p1 / non_draw,
+        "f20": p_p2 / non_draw
+    }
+
 def is_market_already_decided_in_live(pick_code: str, gh: int, ga: int, minute: int) -> bool:
     code = pick_code.lower()
     tot = gh + ga
@@ -6231,10 +6345,12 @@ def is_market_already_decided_in_live(pick_code: str, gh: int, ga: int, minute: 
     if code.startswith("tb_") or code.startswith("tm_"):
         try:
             line = float(code.split("_")[1])
-            if tot >= line and line % 1.0 == 0.0:
-                return True
-            if tot > line:
-                return True
+            if line % 1.0 == 0.0:
+                if tot >= int(line):
+                    return True
+            else:
+                if tot > line:
+                    return True
         except Exception:
             pass
     if code.startswith("itb1_"):
@@ -6261,10 +6377,12 @@ def _poisson_prob_at_least(k_needed: int, lam: float) -> float:
         return 1.0
     cdf = 0.0
     for i in range(k_needed):
-        cdf += poisson_pmf(i, max(0.05, lam))
-    return max(0.015, min(0.96, 1.0 - cdf))
+        cdf += poisson_pmf(i, max(0.04, lam))
+    return max(0.005, min(0.995, 1.0 - cdf))
 
 def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
+    if match.get("is_finished"):
+        return None
     code = pick_code.lower()
     t1, t2 = translate_team_ru(match["home_team"]), translate_team_ru(match["away_team"])
     lam_h_pre = float(match.get("lam_h", 1.45))
@@ -6285,16 +6403,31 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
         minute = parse_live_minute(match.get("live_detail", "45'"))
         if minute >= 85 or is_market_already_decided_in_live(code, gh, ga, minute):
             return None
-        rem_ratio = max(0.08, (91.0 - minute) / 90.0)
-        lam_h = max(0.10, lam_h_pre * rem_ratio)
-        lam_a = max(0.10, lam_a_pre * rem_ratio)
+        rem_ratio = max(0.05, (92.0 - minute) / 90.0)
+        lam_h = max(0.05, lam_h_pre * rem_ratio)
+        lam_a = max(0.05, lam_a_pre * rem_ratio)
         lam_total = lam_h + lam_a
     else:
         lam_h, lam_a, lam_total = lam_h_pre, lam_a_pre, lam_total_pre
 
     res = None
 
-    if code.startswith("tb_") or code.startswith("tm_"):
+    # 1. ЧЕСТНЫЕ 2D LIVE-КОТИРОВКИ ДЛЯ 1Х2, ДВОЙНОГО ШАНСА И ФОРЫ (0)
+    if is_live and code in ("p1", "x", "p2", "1x", "x2", "f10", "f20"):
+        probs_2d = compute_2d_live_probs(gh, ga, lam_h, lam_a)
+        p_val = probs_2d[code]
+        # Закрываем почти решённые (>94.5%) или мёртвые (<2.2%) рынки как в реальных БК
+        if p_val > 0.945 or p_val < 0.022:
+            return None
+        odd_v = round(max(1.03, min(28.0, 1.0 / (p_val * 1.06))), 2)
+        lbl_map = {
+            "p1": f"П1 ({t1})", "x": "Ничья", "p2": f"П2 ({t2})",
+            "1x": f"1Х ({t1})", "x2": f"Х2 ({t2})",
+            "f10": "Фора 1 (0)", "f20": "Фора 2 (0)"
+        }
+        res = {"pick_code": code, "label": lbl_map[code], "odds": odd_v, "prob": round(p_val * 100, 1)}
+
+    elif code.startswith("tb_") or code.startswith("tm_"):
         try:
             line = float(code.split("_")[1])
             cur_tot = gh + ga
@@ -6305,15 +6438,17 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
                 needed_push = max(0, int_line - cur_tot)
                 p_over = _poisson_prob_at_least(needed_win, lam_total)
                 p_push = poisson_pmf(needed_push, lam_total) if needed_push >= 0 else 0.0
-                p_under = max(0.02, 1.0 - p_over - p_push)
-                eff_p = p_over / max(0.10, (1.0 - p_push)) if is_over else p_under / max(0.10, (1.0 - p_push))
+                p_under = max(0.005, 1.0 - p_over - p_push)
+                eff_p = p_over / max(0.05, (1.0 - p_push)) if is_over else p_under / max(0.05, (1.0 - p_push))
             else:
                 needed_goals = max(1, int(math.floor(line)) + 1 - cur_tot)
                 p_over = _poisson_prob_at_least(needed_goals, lam_total)
                 eff_p = p_over if is_over else (1.0 - p_over)
 
-            eff_p = max(0.03, min(0.92, eff_p))
-            odd_v = round(max(1.08, min(19.0, 1.0 / (eff_p * 1.055))), 2)
+            if is_live and (eff_p > 0.945 or eff_p < 0.03):
+                return None
+            eff_p = max(0.03, min(0.93, eff_p))
+            odd_v = round(max(1.05, min(22.0, 1.0 / (eff_p * 1.06))), 2)
             lbl = f"{'ТБ' if is_over else 'ТМ'} {line:g}"
             res = {"pick_code": code, "label": lbl, "odds": odd_v, "prob": round(eff_p * 100, 1)}
         except Exception:
@@ -6326,8 +6461,11 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             cur_g = gh if is_home else ga
             team_lam = lam_h if is_home else lam_a
             needed = max(1, int(math.floor(line)) + 1 - cur_g)
-            p_win = max(0.03, min(0.90, _poisson_prob_at_least(needed, team_lam)))
-            odd_v = round(max(1.10, min(17.0, 1.0 / (p_win * 1.06))), 2)
+            p_win = _poisson_prob_at_least(needed, team_lam)
+            if is_live and (p_win > 0.945 or p_win < 0.03):
+                return None
+            p_win = max(0.03, min(0.92, p_win))
+            odd_v = round(max(1.06, min(20.0, 1.0 / (p_win * 1.06))), 2)
             lbl = f"{'ИТБ1' if is_home else 'ИТБ2'} ({t1 if is_home else t2}) > {line:g}"
             res = {"pick_code": code, "label": lbl, "odds": odd_v, "prob": round(p_win * 100, 1)}
         except Exception:
@@ -6398,8 +6536,10 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
             if is_live and (gh_t < gh or ga_t < ga):
                 return None
             p_score = poisson_pmf(max(0, gh_t - gh), lam_h) * poisson_pmf(max(0, ga_t - ga), lam_a)
-            p_clean = max(0.025, min(0.28, p_score))
-            odd_cs = round(max(4.20, min(34.0, 1.0 / (p_clean * 1.08))), 2)
+            if is_live and (p_score > 0.90 or p_score < 0.02):
+                return None
+            p_clean = max(0.025, min(0.55, p_score))
+            odd_cs = round(max(1.65 if is_live else 4.20, min(34.0, 1.0 / (p_clean * 1.08))), 2)
             res = {"pick_code": code, "label": f"Точный счёт {gh_t}:{ga_t}", "odds": odd_cs, "prob": round(p_clean * 100, 1)}
 
     elif code.startswith("h1_"):
@@ -6444,20 +6584,7 @@ def evaluate_custom_market(match: dict, pick_code: str) -> dict | None:
     if not res:
         return None
 
-    if is_live and code in ("p1", "x", "p2", "1x", "x2", "f10", "f20"):
-        time_factor = 1.0 + (minute / 90.0) * 0.45
-        if code in ("p1", "1x", "f10") and gh > ga:
-            res["odds"] = round(max(1.06, res["odds"] / (1.55 * time_factor)), 2)
-        elif code in ("p1", "1x", "f10") and gh < ga:
-            res["odds"] = round(min(17.0, res["odds"] * (1.75 * time_factor)), 2)
-        elif code in ("p2", "x2", "f20") and ga > gh:
-            res["odds"] = round(max(1.06, res["odds"] / (1.55 * time_factor)), 2)
-        elif code in ("p2", "x2", "f20") and ga < gh:
-            res["odds"] = round(min(17.0, res["odds"] * (1.75 * time_factor)), 2)
-        elif code == "x" and gh == ga:
-            res["odds"] = round(max(1.30, res["odds"] / (1.18 * time_factor)), 2)
-
-    if match.get("is_match_of_day"):
+    if match.get("is_match_of_day") and not is_live:
         res["odds"] = round(res["odds"] * 1.08, 2)
 
     return res
@@ -6514,7 +6641,6 @@ def evaluate_leg_result(pick_code: str, home_score: int, away_score: int, h1_h: 
     if code == "win_nil_2": return "win" if (away_score > home_score and home_score == 0) else "loss"
     if code == "p1_tb25": return "win" if (home_score > away_score and total >= 3) else "loss"
     if code == "p2_tb25": return "win" if (away_score > home_score and total >= 3) else "loss"
-    if code == "late_goal_yes": return "win" if total >= 3 else "loss"
     if code == "odd_goals": return "win" if (total % 2 == 1) else "loss"
     if code == "even_goals": return "win" if (total % 2 == 0) else "loss"
 
@@ -6544,6 +6670,94 @@ def evaluate_leg_result(pick_code: str, home_score: int, away_score: int, h1_h: 
 
     return _orig_evaluate_leg_result(pick_code, home_score, away_score)
 
+def calculate_live_cashout_v2(bet: dict, live_lookup: dict = None) -> tuple[float, str]:
+    """Возвращает (сумма выкупа, причина блокировки). Защита от абуза мгновенного CashOut."""
+    if bet.get("status") != "pending":
+        return 0.0, "Купон уже рассчитан"
+
+    amount = float(bet.get("amount") or 0.0)
+    coupon_odds = float(bet.get("odds") or 1.0)
+    if amount <= 0:
+        return 0.0, "Неверная сумма"
+
+    try:
+        legs = json.loads(bet.get("legs_json") or "[]")
+    except Exception:
+        legs = []
+
+    now_ts = int(now_msk().timestamp())
+    created_ts = int(legs[0].get("_created_ts") or 0) if legs else 0
+    if created_ts > 0 and (now_ts - created_ts) < CASHOUT_LOCK_SECONDS:
+        left_s = CASHOUT_LOCK_SECONDS - (now_ts - created_ts)
+        return 0.0, f"Выкуп откроется через {left_s} сек"
+
+    if live_lookup is None:
+        live_lookup = {}
+        for l_d in (SCHEDULE_CACHE.get("data") or {}).values():
+            for ev_id, m_obj in (l_d.get("matches") or {}).items():
+                live_lookup[str(ev_id)] = m_obj
+
+    any_started = False
+    comb_prob_factor = 1.0
+    max_possible = round(amount * coupon_odds * 0.92, 1)
+
+    for lg in legs:
+        f_st = lg.get("final_status")
+        if f_st == "loss":
+            return 0.0, "Одно из событий не зашло"
+        if f_st == "win":
+            any_started = True
+            comb_prob_factor *= max(1.0, float(lg.get("odds") or 1.0))
+            continue
+        if f_st == "push":
+            any_started = True
+            continue
+
+        ev_id = str(lg.get("event_id") or "")
+        m_live = live_lookup.get(ev_id)
+        if m_live and m_live.get("is_live"):
+            any_started = True
+            gh, ga = parse_live_score_pair(m_live.get("live_score", "0:0"))
+            minute = parse_live_minute(m_live.get("live_detail", "45'"))
+            if minute >= 86:
+                return 0.0, "Конец матча — выкуп закрыт"
+            p_code = str(lg.get("pick_code") or "").lower()
+            lg_odd = max(1.05, float(lg.get("odds") or 1.5))
+
+            rem_ratio = max(0.05, (92.0 - minute) / 90.0)
+            lam_h = max(0.05, float(m_live.get("lam_h", 1.4)) * rem_ratio)
+            lam_a = max(0.05, float(m_live.get("lam_a", 1.2)) * rem_ratio)
+
+            if p_code in ("p1", "x", "p2", "1x", "x2", "f10", "f20"):
+                cur_prob = compute_2d_live_probs(gh, ga, lam_h, lam_a)[p_code]
+            elif p_code.startswith("tb_") or p_code.startswith("tm_"):
+                try:
+                    line = float(p_code.split("_")[1])
+                    tot = gh + ga
+                    if p_code.startswith("tb_"):
+                        cur_prob = 0.97 if tot > line else _poisson_prob_at_least(max(1, int(math.floor(line)) + 1 - tot), lam_h + lam_a)
+                    else:
+                        cur_prob = 0.01 if tot > line else (1.0 - _poisson_prob_at_least(max(1, int(math.floor(line)) + 1 - tot), lam_h + lam_a))
+                except Exception:
+                    cur_prob = 1.0 / lg_odd
+            else:
+                cur_prob = 1.0 / lg_odd
+
+            comb_prob_factor *= (cur_prob * lg_odd)
+        else:
+            st_ts = int(lg.get("start_ts") or 0)
+            if st_ts > 0 and st_ts <= now_ts:
+                any_started = True
+
+    if not any_started:
+        # До старта матчей выкуп строго 86% от суммы ставки (закрывает абуз квестов и перепродаж)
+        return round(amount * 0.86, 1), ""
+
+    offer = round(amount * comb_prob_factor * 0.88, 1)
+    if offer < amount * 0.15:
+        return 0.0, "Исход в глубоком минусе"
+    return min(max_possible, offer), ""
+
 def smart_live_match_analysis(match: dict) -> str:
     t1, t2 = translate_team_ru(match["home_team"]), translate_team_ru(match["away_team"])
     sc_str = match.get("live_score", "0:0")
@@ -6564,7 +6778,7 @@ def smart_live_match_analysis(match: dict) -> str:
     elif gh > ga:
         diff = gh - ga
         line1 = f"1. 🔴 <b>Ход игры ({sc_str}, {det_str}):</b> <b>{t1}</b> контролирует счет (+{diff}), вынуждая <b>{t2}</b> раскрываться и идти вперед большими силами."
-        line2 = f"2. 📊 <b>Прогноз на остаток ({mins_left} мин):</b> Свободные зоны под контратаки дают ~{rem_xg} xG — перспективны <b>удержание П1</b> или <b>ТБ {tot + 0.5}</b>."
+        line2 = f"2. 📊 <b>Прогноз на остаток ({mins_left} мин):</b> Свободные зоны под контратаки дают ~{rem_xg} xG — перспективны <b>ТБ {tot + 0.5}</b> или <b>ИТБ</b>."
     else:
         diff = ga - gh
         line1 = f"1. 🔴 <b>Ход игры ({sc_str}, {det_str}):</b> <b>{t2}</b> ведет в гостях (+{diff}), а хозяева поля (<b>{t1}</b>) усиливают фланговый навал."
@@ -6635,18 +6849,25 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
     m["teams"] = f"{m['home_team']} — {m['away_team']}"
 
     base_odds = dict(m["odds"])
-    if m.get("is_match_of_day"):
+    is_live = bool(m.get("is_live"))
+
+    if m.get("is_match_of_day") and not is_live:
         for k_odd in base_odds:
             if isinstance(base_odds[k_odd], (int, float)):
                 base_odds[k_odd] = round(base_odds[k_odd] * 1.08, 2)
 
-    if m.get("is_live"):
+    if is_live:
         for k_live in ("p1", "x", "p2", "1x", "x2", "f10", "f20"):
             m_ev = evaluate_custom_market(m, k_live)
-            if m_ev:
-                base_odds[k_live] = m_ev["odds"]
+            base_odds[k_live] = m_ev["odds"] if m_ev else 0
 
-    probs = calculate_ai_probabilities(base_odds)
+        gh, ga = parse_live_score_pair(m.get("live_score", "0:0"))
+        minute = parse_live_minute(m.get("live_detail", "45'"))
+        rem_ratio = max(0.05, (92.0 - minute) / 90.0)
+        p2d = compute_2d_live_probs(gh, ga, max(0.05, float(m.get("lam_h", 1.4)) * rem_ratio), max(0.05, float(m.get("lam_a", 1.2)) * rem_ratio))
+        probs = {"p1": round(p2d["p1"] * 100), "x": round(p2d["x"] * 100), "p2": round(p2d["p2"] * 100)}
+    else:
+        probs = calculate_ai_probabilities(base_odds)
 
     all_totals_lines = ["0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0", "6.5"]
     all_totals_list = []
@@ -6713,17 +6934,21 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
 
     ai_battle, radar = build_ai_battle_and_radar(m)
     elite_score = (get_elite_bonus(m["home_team"]) + get_elite_bonus(m["away_team"])) * 100
-    is_top_banner = (elite_score >= 30 or l_key in ("ucl", "epl", "laliga", "rpl") or bool(m.get("is_live")))
+    is_top_banner = (elite_score >= 30 or l_key in ("ucl", "epl", "laliga", "rpl") or is_live)
     today_dm = now_msk().strftime("%d.%m")
-    is_today = bool(m.get("is_live")) or str(m.get("short_date", "")).startswith(today_dm)
+    is_today = is_live or str(m.get("short_date", "")).startswith(today_dm)
+
+    cached_det = MATCH_ESPN_DETAILS_CACHE.get(str(m["event_id"]))
+    scorers_list = m.get("scorers") or (cached_det["data"].get("scorers") if cached_det else []) or []
 
     return {
         "event_id": m["event_id"], "league_key": l_key, "league_title": l_title,
         "teams": m["teams"], "home_team": m["home_team"], "away_team": m["away_team"],
         "venue": m.get("venue", "Центральная арена"),
-        "is_live": bool(m.get("is_live")), "is_today": is_today,
+        "is_live": is_live, "is_today": is_today,
         "is_match_of_day": bool(m.get("is_match_of_day")),
         "live_score": m.get("live_score", "0:0"), "live_detail": m.get("live_detail", ""),
+        "scorers": scorers_list,
         "date": m["date"], "short_date": m["short_date"], "start_ts": m["start_ts"],
         "exp_goals": m["exp_goals"], "lam_h": m.get("lam_h", 1.4), "lam_a": m.get("lam_a", 1.2),
         "best_score": m["best_score"], "h_stats": m.get("h_stats", {}), "a_stats": m.get("a_stats", {}),
@@ -6740,8 +6965,61 @@ def build_full_match_payload(m: dict, l_key: str, l_title: str) -> dict:
     }
 
 _STAGE_2A_READY = True
-# ================= СТРОГАЯ ХРОНОЛОГИЯ МАТЧЕЙ (СНАЧАЛА LIVE И БЛИЖАЙШИЕ ПО ВРЕМЕНИ) =================
+# ================= ТОЧЕЧНЫЙ ФИКС ЦЕЛЫХ ТОТАЛОВ В LIVE (ТБ 2.0 ОСТАЕТСЯ ОТКРЫТЫМ ПРИ 1:1) =================
+def is_market_already_decided_in_live(pick_code: str, gh: int, ga: int, minute: int) -> bool:
+    code = pick_code.lower()
+    tot = gh + ga
+    if code.startswith("h1_") and minute >= 45:
+        return True
+    if code in ("btts", "btts_no") and gh >= 1 and ga >= 1:
+        return True
+    if code == "win_nil_1" and ga >= 1:
+        return True
+    if code == "win_nil_2" and gh >= 1:
+        return True
+    if code in ("1x_tm35", "x2_tm35") and tot >= 4:
+        return True
+    if code.startswith("tb_"):
+        try:
+            line = float(code.split("_")[1])
+            if tot > line:
+                return True
+        except Exception:
+            pass
+    elif code.startswith("tm_"):
+        try:
+            line = float(code.split("_")[1])
+            if line % 1.0 == 0.0:
+                if tot >= int(line):
+                    return True
+            elif tot > line:
+                return True
+        except Exception:
+            pass
+    if code.startswith("itb1_"):
+        try:
+            if gh > float(code.split("_")[1]):
+                return True
+        except Exception:
+            pass
+    if code.startswith("itb2_"):
+        try:
+            if ga > float(code.split("_")[1]):
+                return True
+        except Exception:
+            pass
+    if code.startswith("cs_"):
+        parts = code.split("_")
+        if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
+            if gh > int(parts[1]) or ga > int(parts[2]):
+                return True
+    return False
+
+# ================= СТРОГАЯ ХРОНОЛОГИЯ МАТЧЕЙ + FAST LIVE POLLER (18 СЕК) + GOAL ALERTS =================
 _IS_REFRESHING_SCHEDULE = False
+_LAST_SEEN_LIVE_SCORES = {}
+_SENT_GOAL_ALERTS = set()
+
 PRECOMPUTED_WEBAPP_CACHE = {
     "built_at": 0, "source_updated_at": 0, "filtered_db": {},
     "leagues_nav": [], "matches": [], "daily_express": None, "match_of_day_id": ""
@@ -6774,6 +7052,183 @@ async def get_matches_instant() -> dict:
         return SCHEDULE_CACHE["data"]
     return await get_real_matches()
 
+async def dispatch_goal_alerts(ev_id: str, match_obj: dict, old_score: str, new_score: str):
+    """Отправляет пуш-уведомление в чат о голе игрокам с активным купоном на этот матч"""
+    try:
+        pending_rows = await db_manager.fetch("SELECT bet_id, user_id, pick, legs_json FROM bets WHERE status = 'pending'")
+        if not pending_rows:
+            return
+        h_ru = translate_team_ru(match_obj.get("home_team", ""))
+        a_ru = translate_team_ru(match_obj.get("away_team", ""))
+        det_str = match_obj.get("live_detail") or "LIVE"
+
+        old_h, old_a = parse_live_score_pair(old_score)
+        new_h, new_a = parse_live_score_pair(new_score)
+        if (new_h + new_a) <= (old_h + old_a):
+            return
+        scored_side = "home" if new_h > old_h else "away"
+
+        scorers = match_obj.get("scorers") or []
+        last_scorer_txt = ""
+        side_scorers = [s for s in scorers if s.get("side") == scored_side]
+        if side_scorers:
+            ls = side_scorers[-1]
+            last_scorer_txt = f"{ls.get('minute', '')} {ls.get('player', '')}".strip()
+        elif scorers:
+            ls = scorers[-1]
+            last_scorer_txt = f"{ls.get('minute', '')} {ls.get('player', '')}".strip()
+
+        notified_uids = set()
+        for r in pending_rows:
+            b = dict(r)
+            uid = int(b["user_id"])
+            if uid in notified_uids:
+                continue
+            try:
+                legs = json.loads(b.get("legs_json") or "[]")
+            except Exception:
+                legs = []
+            matched_leg = next((lg for lg in legs if str(lg.get("event_id") or "") == str(ev_id)), None)
+            if not matched_leg:
+                continue
+
+            alert_key = f"{uid}:{ev_id}:{new_score}"
+            if alert_key in _SENT_GOAL_ALERTS:
+                continue
+
+            u = await db_manager.get_user(uid)
+            st = parse_user_fut_state(u)
+            if int(st.get("goal_alerts") if st.get("goal_alerts") is not None else 1) != 1:
+                continue
+
+            _SENT_GOAL_ALERTS.add(alert_key)
+            if len(_SENT_GOAL_ALERTS) > 3000:
+                _SENT_GOAL_ALERTS.clear()
+            notified_uids.add(uid)
+
+            pick_lbl = matched_leg.get("pick_label") or b.get("pick", "")
+            scorer_line = f"\n👤 Автор гола: <b>{last_scorer_txt}</b>" if last_scorer_txt else ""
+            try:
+                await bot.send_message(
+                    uid,
+                    f"⚽ <b>ГОООЛ В ТВОЁМ МАТЧЕ!</b>\n\n"
+                    f"<blockquote>🏟 {h_ru} <b>{new_score}</b> {a_ru} ({det_str}){scorer_line}\n"
+                    f"🎫 Купон #{b['bet_id']}: <b>{pick_lbl}</b></blockquote>",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+    except Exception as e:
+        logging.warning(f"Goal Alerts: {e}")
+
+async def fast_live_poller_worker():
+    """Быстрый опрос только активных LIVE-лиг каждые 18 сек: актуальный счёт, фамилии авторов голов и удаление завершённых матчей"""
+    await asyncio.sleep(8)
+    while True:
+        try:
+            raw_db = SCHEDULE_CACHE.get("data") or {}
+            now_ts = int(now_msk().timestamp())
+            slugs_to_poll = {}
+            any_changed = False
+
+            for l_key, l_data in raw_db.items():
+                slug = l_data.get("slug") or LEAGUES_CONFIG.get(l_key, {}).get("slug", "")
+                matches_map = l_data.get("matches") or {}
+                if not slug or not matches_map:
+                    continue
+                for m_id, m in matches_map.items():
+                    if m.get("is_finished"):
+                        continue
+                    st_ts = int(m.get("start_ts") or 0)
+                    if m.get("is_live") or (st_ts > 0 and (now_ts - 9600) <= st_ts <= (now_ts + 300)):
+                        slugs_to_poll[slug] = (l_key, matches_map)
+                        break
+
+            if slugs_to_poll:
+                async with aiohttp.ClientSession() as session:
+                    for slug, (l_key, matches_map) in list(slugs_to_poll.items())[:12]:
+                        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard"
+                        try:
+                            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as resp:
+                                if resp.status != 200:
+                                    continue
+                                sb_data = await resp.json()
+                        except Exception:
+                            continue
+
+                        seen_in_sb = set()
+                        for ev in (sb_data.get("events") or []):
+                            ev_id = str(ev.get("id") or "")
+                            if ev_id not in matches_map:
+                                continue
+                            seen_in_sb.add(ev_id)
+                            m = matches_map[ev_id]
+                            comps = ev.get("competitions") or []
+                            comp = comps[0] if comps else {}
+                            st_obj = comp.get("status") or ev.get("status") or {}
+                            st_type = st_obj.get("type") or {}
+                            state = str(st_type.get("state") or "")
+                            detail = str(st_type.get("shortDetail") or st_obj.get("displayClock") or "LIVE")
+
+                            h_sc, a_sc = 0, 0
+                            for c in (comp.get("competitors") or []):
+                                try:
+                                    sc_val = int(float(c.get("score") or 0))
+                                except Exception:
+                                    sc_val = 0
+                                if c.get("homeAway") == "home":
+                                    h_sc = sc_val
+                                else:
+                                    a_sc = sc_val
+                            new_score = f"{h_sc}:{a_sc}"
+
+                            if state == "in":
+                                old_score = _LAST_SEEN_LIVE_SCORES.get(ev_id)
+                                was_live = bool(m.get("is_live"))
+                                old_det = m.get("live_detail", "")
+                                m["is_live"] = True
+                                m["is_finished"] = False
+                                m["live_score"] = new_score
+                                m["live_detail"] = detail
+
+                                if (h_sc + a_sc) > 0 and (old_score != new_score or not m.get("scorers")):
+                                    det_espn = await fetch_espn_match_details(session, slug, ev_id)
+                                    if det_espn.get("ok"):
+                                        m["scorers"] = det_espn.get("scorers") or []
+
+                                if old_score is not None and old_score != new_score:
+                                    asyncio.create_task(dispatch_goal_alerts(ev_id, m, old_score, new_score))
+                                _LAST_SEEN_LIVE_SCORES[ev_id] = new_score
+
+                                if not was_live or old_score != new_score or old_det != detail:
+                                    any_changed = True
+
+                            elif state == "post":
+                                if m.get("is_live") or not m.get("is_finished"):
+                                    m["is_live"] = False
+                                    m["is_finished"] = True
+                                    m["live_score"] = new_score
+                                    m["live_detail"] = "FT"
+                                    _LAST_SEEN_LIVE_SCORES.pop(ev_id, None)
+                                    any_changed = True
+
+                        # Защита от зависших LIVE-матчей (если матч старше 3 часов и пропал из scoreboard)
+                        for m_id, m in matches_map.items():
+                            if m.get("is_live") and str(m_id) not in seen_in_sb:
+                                st_ts = int(m.get("start_ts") or 0)
+                                if st_ts > 0 and (now_ts - st_ts) > 10800:
+                                    m["is_live"] = False
+                                    m["is_finished"] = True
+                                    _LAST_SEEN_LIVE_SCORES.pop(str(m_id), None)
+                                    any_changed = True
+
+            if any_changed:
+                PRECOMPUTED_WEBAPP_CACHE["built_at"] = 0
+        except Exception as e:
+            logging.warning(f"Fast LIVE Poller: {e}")
+
+        await asyncio.sleep(18)
+
 async def get_precomputed_webapp_line() -> dict:
     raw_db = await get_matches_instant()
     now_ts = int(now_msk().timestamp())
@@ -6782,7 +7237,7 @@ async def get_precomputed_webapp_line() -> dict:
     if (
         PRECOMPUTED_WEBAPP_CACHE["matches"]
         and PRECOMPUTED_WEBAPP_CACHE["source_updated_at"] == src_ts
-        and (now_ts - PRECOMPUTED_WEBAPP_CACHE["built_at"] < 35)
+        and (now_ts - PRECOMPUTED_WEBAPP_CACHE["built_at"] < 15)
     ):
         return PRECOMPUTED_WEBAPP_CACHE
 
@@ -6791,8 +7246,10 @@ async def get_precomputed_webapp_line() -> dict:
     near_window = now_ts + (36 * 3600)
     for l_k, l_d in raw_db.items():
         for m_id, m_obj in (l_d.get("matches") or {}).items():
+            if m_obj.get("is_finished"):
+                continue
             st_t = int(m_obj.get("start_ts") or 0)
-            if m_obj.get("is_live") or (now_ts < st_t <= near_window):
+            if not m_obj.get("is_live") and (now_ts < st_t <= near_window):
                 sc = (get_elite_bonus(m_obj["home_team"]) + get_elite_bonus(m_obj["away_team"])) * 100 + float(m_obj.get("exp_goals", 2.5)) * 10
                 if sc > best_mod_score:
                     best_mod_score = sc
@@ -6808,7 +7265,10 @@ async def get_precomputed_webapp_line() -> dict:
         raw_m_dict = l_data.get("matches", {})
         active_m_dict = {
             m_id: m for m_id, m in raw_m_dict.items()
-            if m.get("is_live") or int(m.get("start_ts") or 0) > now_ts
+            if not m.get("is_finished") and (
+                (m.get("is_live") and parse_live_minute(m.get("live_detail", "45'")) < 90 and "FT" not in str(m.get("live_detail", "")).upper())
+                or int(m.get("start_ts") or 0) > now_ts
+            )
         }
         for m_id, m_obj in active_m_dict.items():
             m_obj["is_match_of_day"] = (str(m_id) == best_mod_id)
@@ -6860,7 +7320,7 @@ async def get_precomputed_webapp_line() -> dict:
     })
     return PRECOMPUTED_WEBAPP_CACHE
 
-# ================= ПРОВЕРКА СТРИКА ВХОДОВ И ДЕДЛАЙНА СУПЕРЭКСПРЕССА =================
+# ================= ПРОВЕРКА СТРИКА ВХОДОВ, СПОНСОРОВ (ОТ КЭФА 1.35) И ДЕДЛАЙНА СУПЕРЭКСПРЕССА =================
 def compute_login_streak_info(st: dict) -> tuple[int, bool]:
     today_dt = now_msk().date()
     today_str = today_dt.strftime("%Y-%m-%d")
@@ -6880,17 +7340,18 @@ def compute_login_streak_info(st: dict) -> tuple[int, bool]:
 def check_sponsor_quest_done(sp_id: str, user: dict, st: dict, active_bets: list) -> bool:
     sp = next((s for s in STADIUM_SPONSORS if s["id"] == sp_id), STADIUM_SPONSORS[0])
     code = sp["task_code"]
+    valid_bets = [b for b in (active_bets or []) if float(b.get("odds") or 1.0) >= MIN_ODD_FOR_BONUSES]
     if code == "any_bet":
-        return len(active_bets) > 0 or int(user.get("wins") or 0) + int(user.get("losses") or 0) > 0
+        return len(valid_bets) > 0 or int(user.get("wins") or 0) + int(user.get("losses") or 0) > 0
     elif code == "bet_500_or_pvp":
-        return any(b["amount"] >= 500 for b in active_bets) or int(user.get("wins") or 0) > 0
+        return any(float(b.get("amount") or 0) >= 500 for b in valid_bets) or int(user.get("wins") or 0) > 0
     elif code == "express_bet":
-        return any(b.get("bet_type") == "express" for b in active_bets)
+        return any(b.get("bet_type") == "express" for b in valid_bets)
     elif code == "streak_or_fut":
         filled = sum(1 for r in FUT_ROLES if st["squad"].get(r))
         return int(user.get("streak") or 0) >= 1 or filled >= 3
     elif code == "showroom_and_bet":
-        return len(active_bets) > 0 and len(st.get("startup_showroom") or []) >= 1
+        return len(valid_bets) > 0 and len(st.get("startup_showroom") or []) >= 1
     return True
 
 def is_superexpress_deadline_passed(se_matches: list) -> tuple[bool, str]:
@@ -6908,7 +7369,7 @@ def is_superexpress_deadline_passed(se_matches: list) -> tuple[bool, str]:
         st_ts = int(sm.get("start_ts") or (m_live.get("start_ts") if m_live else 0) or 0)
         s_date = sm.get("short_date") or (m_live.get("short_date") if m_live else "") or ""
 
-        if m_live and (m_live.get("is_live") or int(m_live.get("start_ts") or 0) <= now_ts):
+        if m_live and (m_live.get("is_live") or m_live.get("is_finished") or int(m_live.get("start_ts") or 0) <= now_ts):
             return True, "Матчи тиража уже начались"
         if st_ts > 0 and st_ts <= now_ts:
             return True, "Матчи тиража уже начались"
@@ -6918,18 +7379,19 @@ def is_superexpress_deadline_passed(se_matches: list) -> tuple[bool, str]:
 
     return False, (f"До {min_date_str} МСК" if min_date_str else "До старта 1-го матча")
 
-# ================= ВРЕМЯ СТАРТА, LIVE-СЧЕТ И ГАЛОЧКИ ЗАХОДА СОБЫТИЙ В КУПОНАХ =================
-def format_bet_legs_with_live_checkmarks(b: dict) -> list[dict]:
+# ================= ФОРМАТИРОВАНИЕ СОБЫТИЙ В КУПОНАХ (БЕЗ ПРАВИЛА +2 ГОЛА) =================
+def format_bet_legs_with_live_checkmarks(b: dict, live_lookup: dict = None) -> list[dict]:
     st_overall = b.get("status", "pending")
     try:
         legs = json.loads(b.get("legs_json") or "[]")
     except Exception:
         legs = []
 
-    live_lookup = {}
-    for l_d in (SCHEDULE_CACHE.get("data") or {}).values():
-        for ev_id, m_obj in (l_d.get("matches") or {}).items():
-            live_lookup[str(ev_id)] = m_obj
+    if live_lookup is None:
+        live_lookup = {}
+        for l_d in (SCHEDULE_CACHE.get("data") or {}).values():
+            for ev_id, m_obj in (l_d.get("matches") or {}).items():
+                live_lookup[str(ev_id)] = m_obj
 
     title_time_match = re.search(r"\((\d{2}\.\d{2}\s+\d{2}:\d{2})\)", str(b.get("match_title") or ""))
     fallback_title_time = title_time_match.group(1) if title_time_match else ""
@@ -6946,7 +7408,6 @@ def format_bet_legs_with_live_checkmarks(b: dict) -> list[dict]:
                 ru_teams = raw_teams_clean
 
             ev_str = str(lg.get("event_id") or "")
-            p_code = str(lg.get("pick_code") or "").lower()
             leg_st = lg.get("final_status")
             f_sc = lg.get("final_score") or ""
             m_live = live_lookup.get(ev_str)
@@ -6961,19 +7422,9 @@ def format_bet_legs_with_live_checkmarks(b: dict) -> list[dict]:
                     badge_txt = f"❌ Не зашёл [{f_sc}]" if f_sc else "❌ Не зашёл"
                 elif m_live and m_live.get("is_live"):
                     cur_sc = m_live.get("live_score", "0:0")
-                    gh, ga = parse_live_score_pair(cur_sc)
-                    if (p_code == "p1" and (gh - ga) >= 2) or (p_code == "p2" and (ga - gh) >= 2):
-                        leg_st = "win"
-                        f_sc = cur_sc
-                        badge_txt = f"✅ +2 Гола (2-Up) [{cur_sc}]"
-                    elif (p_code.startswith("tb_") or p_code.startswith("itb") or p_code in ("btts", "h1_tb_0.5", "h1_tb_1.5")) and evaluate_leg_result(p_code, gh, ga) == "win":
-                        leg_st = "win"
-                        f_sc = cur_sc
-                        badge_txt = f"✅ Зашёл досрочно [{cur_sc}]"
-                    else:
-                        leg_st = "live"
-                        f_sc = cur_sc
-                        badge_txt = f"🔴 LIVE [{cur_sc}] {m_live.get('live_detail', '')}"
+                    leg_st = "live"
+                    f_sc = cur_sc
+                    badge_txt = f"🔴 LIVE [{cur_sc}] {m_live.get('live_detail', '')}"
                 else:
                     leg_st = "pending"
                     badge_txt = f"🕒 {start_time_lbl}" if start_time_lbl else "🕒 До матча"
@@ -6983,7 +7434,7 @@ def format_bet_legs_with_live_checkmarks(b: dict) -> list[dict]:
                 if not f_sc and len(legs) == 1:
                     f_sc = b.get("score_result", "")
                 if leg_st == "win":
-                    badge_txt = (f"✅ Зашёл [{f_sc}]" if f_sc else "✅ Зашёл") + (" ⚡" if lg.get("early_win") else "")
+                    badge_txt = f"✅ Зашёл [{f_sc}]" if f_sc else "✅ Зашёл"
                 elif leg_st == "push":
                     badge_txt = f"🔄 Возврат [{f_sc}]" if f_sc else "🔄 Возврат"
                 elif st_overall == "cashout":
@@ -7013,8 +7464,9 @@ def format_bet_legs_with_live_checkmarks(b: dict) -> list[dict]:
         })
     return result_legs
 
-# ================= ЕДИНЫЙ ВОРКЕР РАСЧЕТА (LINESCORES ТАЙМОВ, 2-UP, ЧР V2, АВТО-ВОЗВРАТ 5Ч) =================
+# ================= ЕДИНЫЙ ВОРКЕР РАСЧЕТА (СТРОГО ПО ФИНАЛЬНОМУ СВИСТКУ + АВТОРАСЧЕТ СУПЕРЭКСПРЕССА) =================
 _LAST_CHECKED_TOURNEY_WK = get_current_tourney_week_key()
+_LAST_SE_SETTLE_TS = 0
 
 def is_user_hidden_from_tops(u_dict: dict) -> bool:
     uid = int(u_dict.get("user_id") or 0)
@@ -7058,17 +7510,98 @@ async def distribute_weekly_tournament_prizes(finished_wk: str):
     except Exception as e:
         logging.warning(f"Раздача призов турнира: {e}")
 
+async def settle_pending_superexpress_entries():
+    """Автоматический расчет всех завершенных тиражей еженедельного Суперэкспресса"""
+    try:
+        rows = await db_manager.fetch("SELECT * FROM superexpress_entries WHERE status = 'pending'")
+        if not rows:
+            return
+        se_events = {}
+        parsed_entries = []
+        for r in rows:
+            rd = dict(r)
+            try:
+                picks = json.loads(rd.get("picks_json") or "[]")
+            except Exception:
+                picks = []
+            if len(picks) < 6:
+                continue
+            rd["_picks"] = picks
+            parsed_entries.append(rd)
+            for p in picks:
+                ev_id = str(p.get("event_id") or "")
+                slug = str(p.get("league_slug") or "")
+                if ev_id and slug:
+                    se_events[ev_id] = slug
+
+        if not se_events:
+            return
+        res_map = {}
+        async with aiohttp.ClientSession() as session:
+            for ev_id, slug in list(se_events.items())[:36]:
+                try:
+                    fr = await asyncio.wait_for(fetch_real_match_result(session, slug, ev_id), timeout=5.0)
+                    if fr and fr.get("ok"):
+                        res_map[ev_id] = fr
+                except Exception:
+                    pass
+
+        for entry in parsed_entries:
+            picks = entry["_picks"]
+            all_done = all(
+                res_map.get(str(p.get("event_id") or ""), {}).get("state") == "post"
+                for p in picks
+            )
+            if not all_done:
+                continue
+
+            guessed = 0
+            for p in picks:
+                fr = res_map[str(p["event_id"])]
+                gh = int(fr.get("home_score") or 0)
+                ga = int(fr.get("away_score") or 0)
+                if evaluate_leg_result(str(p.get("pick_code") or ""), gh, ga) == "win":
+                    guessed += 1
+
+            payout = 10000 if guessed >= 6 else (2500 if guessed == 5 else (500 if guessed == 4 else 0))
+            uid = int(entry["user_id"])
+            rk = str(entry["round_key"])
+
+            await db_manager.exec(
+                "UPDATE superexpress_entries SET status = 'settled', guessed = $1, payout = $2 WHERE user_id = $3 AND round_key = $4 AND status = 'pending'",
+                guessed, payout, uid, rk
+            )
+            if payout > 0:
+                await db_manager.exec("UPDATE users SET balance = balance + $1, profit = profit + $1 WHERE user_id = $2", float(payout), uid)
+                try:
+                    await bot.send_message(
+                        uid,
+                        f"🎯 <b>ИТОГИ СУПЕРЭКСПРЕССА НЕДЕЛИ!</b>\n\n"
+                        f"<blockquote>✅ Угадано исходов: <b>{guessed} из 6</b>\n"
+                        f"💰 На твой баланс начислен выигрыш: <b><code>+{payout} FC</code></b>!</blockquote>",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+    except Exception as e:
+        logging.warning(f"Авторасчет Суперэкспресса: {e}")
+
 async def fast_unified_settlement_worker():
-    global _LAST_CHECKED_TOURNEY_WK
+    global _LAST_CHECKED_TOURNEY_WK, _LAST_SE_SETTLE_TS
     await asyncio.sleep(5)
     while True:
         try:
             prune_expired_copy_signals()
             try:
-                await get_or_rotate_bm_v2()
+                await get_or_rotate_bm_v3()
             except Exception:
                 pass
             now_ts = int(now_msk().timestamp())
+
+            if now_ts - _LAST_SE_SETTLE_TS >= 240:
+                _LAST_SE_SETTLE_TS = now_ts
+                asyncio.create_task(settle_pending_superexpress_entries())
+
             cur_wk = get_current_tourney_week_key()
             if cur_wk != _LAST_CHECKED_TOURNEY_WK:
                 prev_wk = _LAST_CHECKED_TOURNEY_WK
@@ -7147,24 +7680,12 @@ async def fast_unified_settlement_worker():
                         p_code = str(lg.get("pick_code") or "").lower()
                         h1_h, h1_a = fresh_halves.get(ev_id, (None, None))
 
+                        # Основные рынки рассчитываются СТРОГО после финального свистка (state == "post")
                         if state == "in":
-                            if (p_code == "p1" and (gh - ga) >= 2) or (p_code == "p2" and (ga - gh) >= 2):
-                                lg["final_status"] = "win"
-                                lg["final_score"] = f"{sc_str} (+2 Гола)"
-                                lg["early_win"] = True
-                                legs_modified = True
-                            elif (p_code.startswith("tb_") or p_code.startswith("itb") or p_code in ("btts", "late_goal_yes")) and evaluate_leg_result(p_code, gh, ga) == "win":
-                                lg["final_status"] = "win"
-                                lg["final_score"] = sc_str
-                                lg["early_win"] = True
-                                legs_modified = True
-                            elif p_code.startswith("h1_") and (minute >= 46 or "HT" in det_str.upper() or "2ND" in det_str.upper()):
-                                g1h = h1_h if h1_h is not None else gh
-                                g1a = h1_a if h1_a is not None else ga
-                                h1_res = evaluate_leg_result(p_code, gh, ga, h1_h=g1h, h1_a=g1a)
+                            if p_code.startswith("h1_") and h1_h is not None and h1_a is not None and (minute >= 48 or "HT" in det_str.upper() or "2ND" in det_str.upper()):
+                                h1_res = evaluate_leg_result(p_code, gh, ga, h1_h=h1_h, h1_a=h1_a)
                                 lg["final_status"] = h1_res
-                                lg["final_score"] = f"1Т {g1h}:{g1a}"
-                                lg["early_win"] = (h1_res == "win")
+                                lg["final_score"] = f"1Т {h1_h}:{h1_a}"
                                 legs_modified = True
 
                         elif state == "post":
@@ -7182,7 +7703,7 @@ async def fast_unified_settlement_worker():
                     if len(legs) == 1 and all_finished:
                         lg0 = legs[0]
                         st_final = lg0["final_status"]
-                        sc_final = lg0.get("final_score", "0:0") + (" ⚡Досрочно" if lg0.get("early_win") else "")
+                        sc_final = lg0.get("final_score", "0:0")
                         b["legs_json"] = json.dumps(legs, ensure_ascii=False)
                         await db_manager.exec("UPDATE bets SET legs_json = $1 WHERE bet_id = $2", b["legs_json"], b["bet_id"])
 
@@ -7318,7 +7839,12 @@ async def api_get_match_ai(request):
             if fresh.get("ok"):
                 match["live_score"] = fresh["score_str"]
                 match["live_detail"] = fresh["detail"] or "LIVE"
-                if fresh.get("state") == "in":
+                if fresh.get("state") == "post":
+                    match["is_live"] = False
+                    match["is_finished"] = True
+                    is_live = False
+                    PRECOMPUTED_WEBAPP_CACHE["built_at"] = 0
+                elif fresh.get("state") == "in":
                     match["is_live"] = True
                     is_live = True
 
@@ -7326,6 +7852,8 @@ async def api_get_match_ai(request):
         if espn_det.get("ok"):
             espn_stats = espn_det.get("stats")
             espn_scorers = espn_det.get("scorers") or []
+            if espn_scorers:
+                match["scorers"] = espn_scorers
 
     odds = match["odds"]
     probs = calculate_ai_probabilities(odds)
@@ -7355,6 +7883,7 @@ async def api_get_match_ai(request):
         "ok": True,
         "ai_analysis": ai_text,
         "is_live": is_live,
+        "is_finished": bool(match.get("is_finished")),
         "live_score": match.get("live_score", "0:0"),
         "live_detail": match.get("live_detail", ""),
         "espn_stats": espn_stats,
@@ -7422,7 +7951,14 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
         it_copy["expected_restore"] = int(round(it_val * 1.52, -1))
         it_copy["restore_cost"] = max(150, int(round(it_val * 0.35, -1)))
         it_copy["quick_sell_price"] = max(50, int(round(it_val * 0.90, -1)))
+        it_copy["show_pct"] = _get_exhibit_profit_pct(it_copy)
         storage_enriched.append(it_copy)
+
+    showroom_enriched = []
+    for it in st.get("startup_showroom", []):
+        it_c = dict(it)
+        it_c["show_pct"] = _get_exhibit_profit_pct(it_c)
+        showroom_enriched.append(it_c)
 
     reserve_by_tier = {"1": 0, "2": 0, "3": 0}
     for r_cid in buffs["reserve_ids"]:
@@ -7433,7 +7969,7 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
     vip_until_ts = int(st.get("vip_until_ts") or 0)
     now_ts = int(now_msk().timestamp())
     vip_days_left = max(0, math.ceil((vip_until_ts - now_ts) / 86400)) if vip_until_ts > now_ts else (999 if int(user.get("is_vip") or 0) == 1 else 0)
-    can_claim_showroom = (len(st.get("startup_showroom", [])) > 0 and buffs["showroom_daily_fc"] > 0 and st.get("last_showroom_claim") != today_str)
+    can_claim_showroom = (len(showroom_enriched) > 0 and buffs["showroom_daily_fc"] > 0 and st.get("last_showroom_claim") != today_str)
 
     win_streak = int(user.get("streak") or 0)
     ladder_claimed = st.get("ladder_claimed", [])
@@ -7453,6 +7989,9 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
     hidden_flag = 1 if (uid_int == ADMIN_ID or uid_int in HIDDEN_FROM_TOPS_IDS or int(user.get("is_incognito") or 0) == 1) else 0
     settled_bets_cnt = int(user.get("wins") or 0) + int(user.get("losses") or 0)
 
+    lab_base_info = dict(LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1]))
+    lab_base_info["profit_pct"] = LAB_PROFIT_PCT_MAP.get(lab_lvl, 0)
+
     return {
         "user_id": uid_int,
         "username": user["username"],
@@ -7461,6 +8000,7 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
         "forbes_capital": calculate_forbes_net_worth(user, st),
         "tourney_pts": st.get("tourney_pts", 0),
         "golden_wrenches": st.get("golden_wrenches", 0),
+        "goal_alerts": int(st.get("goal_alerts") if st.get("goal_alerts") is not None else 1),
         "clan_id": clan_id,
         "clan_info": my_clan,
         "rank": rank_name,
@@ -7482,6 +8022,7 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
         "achievements_unlocked": achievements_unlocked,
         "equipped_cards": buffs["squad_ids"],
         "owned_cards": buffs["owned_ids"],
+        "total_cards_count": len(FUT_CARDS),
         "card_levels": st.get("card_levels", {}),
         "club_sets": build_club_sets_status(buffs["owned_ids"], st.get("claimed_sets", [])),
         "playing_today_clubs": buffs["playing_today_clubs"],
@@ -7501,12 +8042,12 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
         "startup": {
             "storage": storage_enriched,
             "max_storage": 12 if vip_act else 8,
-            "showroom": st.get("startup_showroom", []),
+            "showroom": showroom_enriched,
             "max_showroom": 4 if vip_act else 3,
             "can_claim_showroom": can_claim_showroom,
             "profit": st.get("startup_profit", 0),
             "showroom_daily_fc": buffs["showroom_daily_fc"],
-            "showroom_odd_boost": buffs["showroom_odd_boost"],
+            "showroom_profit_pct": buffs["showroom_profit_pct"],
             "restore_chance_pct": 55 if vip_act else 45
         },
         "rookie_quest": {
@@ -7524,7 +8065,7 @@ def build_fast_user_dict(user: dict, active_bets: list = None) -> dict:
             "claimed": int(st.get("dq_claimed") or 0)
         },
         "lab_level": lab_lvl,
-        "lab_info": LAB_LEVELS.get(lab_lvl, LAB_LEVELS[1]),
+        "lab_info": lab_base_info,
         "next_lab": LAB_LEVELS.get(lab_lvl + 1) if lab_lvl < 5 else None,
         "can_spin_roulette": user.get("last_spin") != today_str,
         "active_booster": user.get("active_booster", ""),
@@ -7544,7 +8085,8 @@ def build_black_market_payload(lot: dict) -> dict:
         "min_next_bid": int(lot["highest_bid"]) + 500 if int(lot["leader_id"]) != 0 else int(lot["highest_bid"]),
         "end_ts": end_ts,
         "time_left_sec": max(0, end_ts - now_ts),
-        "pool_count": len(BLACK_MARKET_GOAT_POOL)
+        "pool_count": len(BLACK_MARKET_GOAT_POOL),
+        "bids_history": list(lot.get("bids_history") or [])[:5]
     }
 
 async def build_capper_tournament_payload(uid: int) -> dict:
@@ -7601,11 +8143,34 @@ def build_clans_leaderboard() -> list[dict]:
             "members_count": len(c.get("members", [])),
             "max_members": hq_cfg["max_members"],
             "hq_name": hq_cfg["name"],
-            "odd_boost": hq_cfg["odd_boost"],
+            "profit_pct": hq_cfg["profit_pct"],
             "arena_pct": hq_cfg["arena_pct"],
             "next_hq_price": next_hq["price"] if next_hq else 0
         })
     return res
+
+def _serialize_active_bets(active_bets_raw: list) -> list[dict]:
+    live_lookup = {}
+    for l_d in (SCHEDULE_CACHE.get("data") or {}).values():
+        for ev_id, m_obj in (l_d.get("matches") or {}).items():
+            live_lookup[str(ev_id)] = m_obj
+
+    out = []
+    for b in active_bets_raw:
+        co_offer, co_reason = calculate_live_cashout_v2(b, live_lookup)
+        out.append({
+            "bet_id": b["bet_id"],
+            "match_title": b["match_title"],
+            "pick": b["pick"],
+            "amount": b["amount"],
+            "odds": b["odds"],
+            "potential_win": round(b["amount"] * b["odds"], 1),
+            "bet_type": b.get("bet_type", "single"),
+            "cashout_offer": co_offer,
+            "cashout_reason": co_reason,
+            "legs_detailed": format_bet_legs_with_live_checkmarks(b, live_lookup)
+        })
+    return out
 
 async def build_user_state_payload(uid: int, tg_uname: str = "") -> dict:
     prune_expired_copy_signals()
@@ -7616,7 +8181,7 @@ async def build_user_state_payload(uid: int, tg_uname: str = "") -> dict:
     archive_bets_raw = await db_manager.get_user_bets(uid, active_only=False)
 
     if now_ts - SHARED_DB_CACHE["bm_ts"] > 10 or not SHARED_DB_CACHE["bm_lot"]:
-        SHARED_DB_CACHE["bm_lot"] = await get_or_rotate_bm_v2()
+        SHARED_DB_CACHE["bm_lot"] = await get_or_rotate_bm_v3()
         SHARED_DB_CACHE["bm_ts"] = now_ts
     lot = SHARED_DB_CACHE["bm_lot"]
 
@@ -7671,6 +8236,7 @@ async def build_user_state_payload(uid: int, tg_uname: str = "") -> dict:
         "ok": True,
         "bot_username": BOT_USERNAME,
         "user": fast_u,
+        "min_odd_for_bonuses": MIN_ODD_FOR_BONUSES,
         "fut_quicksell_prices": FUT_QUICKSELL_PRICES,
         "fut_p2p_max_prices": FUT_P2P_MAX_PRICES,
         "clans_list": build_clans_leaderboard(),
@@ -7703,19 +8269,7 @@ async def build_user_state_payload(uid: int, tg_uname: str = "") -> dict:
             } if se_entry else None
         },
         "black_market": build_black_market_payload(lot),
-        "active_bets": [
-            {
-                "bet_id": b["bet_id"],
-                "match_title": b["match_title"],
-                "pick": b["pick"],
-                "amount": b["amount"],
-                "odds": b["odds"],
-                "potential_win": round(b["amount"] * b["odds"], 1),
-                "bet_type": b.get("bet_type", "single"),
-                "legs_detailed": format_bet_legs_with_live_checkmarks(b)
-            }
-            for b in active_bets_raw
-        ],
+        "active_bets": _serialize_active_bets(active_bets_raw),
         "archive_bets": [
             {
                 "bet_id": b["bet_id"],
@@ -7739,8 +8293,24 @@ async def api_get_state(request):
     uid_str = request.match_info.get("user_id", "0")
     if not uid_str.isdigit():
         return web.json_response({"ok": False, "error": "Некорректный ID"}, status=400, headers=CORS_HEADERS)
-    uname_q = request.rel_url.query.get("uname", "")
-    payload = await build_user_state_payload(int(uid_str), uname_q)
+    req_uid = int(uid_str)
+
+    # Проверка подписи Telegram WebApp initData (с fallback для ADMIN_ID при отладке)
+    init_data_hdr = request.headers.get("X-Telegram-Init-Data") or request.rel_url.query.get("init_data", "")
+    verified_uid, verified_uname = verify_telegram_init_data(init_data_hdr)
+    if verified_uid:
+        req_uid = verified_uid
+        uname_q = verified_uname or request.rel_url.query.get("uname", "")
+    else:
+        if ADMIN_ID and req_uid == int(ADMIN_ID):
+            uname_q = request.rel_url.query.get("uname", "")
+        else:
+            return web.json_response(
+                {"ok": False, "error": "🔒 Открой приложение напрямую из Telegram-бота!"},
+                status=403, headers=CORS_HEADERS
+            )
+
+    payload = await build_user_state_payload(req_uid, uname_q)
     return web.json_response(payload, headers=CORS_HEADERS)
 
 async def _fast_delta_response(uid: int, extra: dict = None, include_bets: bool = False):
@@ -7760,14 +8330,7 @@ async def _fast_delta_response(uid: int, extra: dict = None, include_bets: bool 
     }
     if include_bets:
         arch_raw = await db_manager.get_user_bets(uid, active_only=False)
-        resp["active_bets"] = [
-            {
-                "bet_id": b["bet_id"], "match_title": b["match_title"], "pick": b["pick"],
-                "amount": b["amount"], "odds": b["odds"], "potential_win": round(b["amount"] * b["odds"], 1),
-                "bet_type": b.get("bet_type", "single"), "legs_detailed": format_bet_legs_with_live_checkmarks(b)
-            }
-            for b in act_raw
-        ]
+        resp["active_bets"] = _serialize_active_bets(act_raw)
         resp["archive_bets"] = [
             {
                 "bet_id": b["bet_id"], "match_title": b["match_title"], "pick": b["pick"],
@@ -7842,7 +8405,7 @@ async def api_handle_action(request):
         vip_act = is_user_vip_active(user, st)
         today_str = now_msk().strftime("%Y-%m-%d")
 
-        # 0. АКТИВАЦИЯ ПРОМОКОДА
+        # 0. АКТИВАЦИЯ ПРОМОКОДА И НАСТРОЙКА GOAL ALERTS
         if action == "redeem_promo":
             raw_code = re.sub(r"[^a-zA-Z0-9_-]", "", str(body.get("code") or "")).upper()[:20]
             if len(raw_code) < 3:
@@ -7870,6 +8433,13 @@ async def api_handle_action(request):
                 "coin_delta": reward_amt
             })
 
+        elif action == "toggle_goal_alerts":
+            cur_ga = int(st.get("goal_alerts") if st.get("goal_alerts") is not None else 1)
+            st["goal_alerts"] = 0 if cur_ga == 1 else 1
+            await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
+            msg = "🔔 Гол-уведомления в чат ВКЛЮЧЕНЫ!" if st["goal_alerts"] == 1 else "🔕 Гол-уведомления в чат выключены."
+            return await _fast_delta_response(uid, {"message": msg})
+
         # 0.25 ЕЖЕДНЕВНЫЕ ЗАДАНИЯ КАППЕРА (СУНДУК ДНЯ)
         elif action == "claim_daily_quests":
             if st.get("dq_claimed") == 1:
@@ -7878,7 +8448,7 @@ async def api_handle_action(request):
             dq_exp = int(st.get("dq_exp") or 0)
             dq_port = 1 if (int(st.get("dq_port") or 0) >= 1 or user.get("last_spin") == today_str) else 0
             if dq_bets < 2 or dq_exp < 1 or dq_port < 1:
-                return web.json_response({"ok": False, "error": "Выполни все 3 задания дня (2 ставки, Экспресс от 3 матчей и Порт/Рулетка)!"}, headers=CORS_HEADERS)
+                return web.json_response({"ok": False, "error": "Выполни все 3 задания дня (2 ставки с кэфом ≥1.35, Экспресс 3+ и Порт/Рулетка)!"}, headers=CORS_HEADERS)
 
             st["dq_claimed"] = 1
             cur_booster = user.get("active_booster") or ""
@@ -7900,7 +8470,7 @@ async def api_handle_action(request):
                 )
             return await _fast_delta_response(uid, {"message": msg, "coin_delta": coins_rew})
 
-        # 0.5 БЫСТРАЯ ПРОДАЖА РЕЗЕРВНОЙ КАРТОЧКИ FUT КЛУБУ (QUICK-SELL)
+        # 0.5 БЫСТРАЯ ПРОДАЖА РЕЗЕРВНОЙ КАРТОЧКИ FUT
         elif action == "quicksell_fut_card":
             card_id = str(body.get("card_id") or "")
             if card_id not in st["owned"] or card_id not in FUT_CARDS:
@@ -7921,7 +8491,7 @@ async def api_handle_action(request):
                 "coin_delta": payout_qs
             })
 
-        # 0.75 АВТО-ПОДБОР «ЛУЧШИЙ СОСТАВ НА СЕГОДНЯ» (С УЧЕТОМ ★ УРОВНЕЙ И МАТЧЕЙ СЕГОДНЯ)
+        # 0.75 АВТО-ПОДБОР «ЛУЧШИЙ СОСТАВ НА СЕГОДНЯ»
         elif action == "auto_best_fut_squad":
             owned_ids = st.get("owned", [])
             if not owned_ids:
@@ -7959,7 +8529,7 @@ async def api_handle_action(request):
             msg = f"⚡ Выставлен оптимальный состав на сегодня{form_note}!" if changed > 0 else f"✅ У тебя уже стоит сильнейший состав на сегодня{form_note}!"
             return await _fast_delta_response(uid, {"message": msg})
 
-        # 1. КЛАНЫ (ФУТБОЛЬНЫЕ СИНДИКАТЫ)
+        # 1. КЛАНЫ
         elif action == "clan_create":
             if int(st.get("clan_id") or 0) in CLANS_REGISTRY:
                 return web.json_response({"ok": False, "error": "Ты уже состоишь в Клане! Сначала выйди из текущего."}, headers=CORS_HEADERS)
@@ -8009,7 +8579,7 @@ async def api_handle_action(request):
             st["clan_id"] = target_cid
             await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
             asyncio.create_task(db_manager.unlock_achievement(uid, "clan_member"))
-            return await _fast_delta_response(uid, {"message": f"🛡️ Ты вступил в Синдикат [{c_obj['tag']}] «{c_obj['name']}» (+{hq_cfg['odd_boost']} к экспрессам)!"})
+            return await _fast_delta_response(uid, {"message": f"🛡️ Ты вступил в Синдикат [{c_obj['tag']}] «{c_obj['name']}» (+{hq_cfg['profit_pct']}% к прибыли экспрессов)!"})
 
         elif action == "clan_leave":
             cur_cid = int(st.get("clan_id") or 0)
@@ -8080,7 +8650,7 @@ async def api_handle_action(request):
             c_obj["hq_level"] = next_lvl
             await save_clan_to_db(c_obj)
             push_live_ticker(f"🏰 Синдикат [{c_obj['tag']}] «{c_obj['name']}» улучшил Штаб до Ур.{next_lvl}!")
-            return await _fast_delta_response(uid, {"message": f"🏰 Штаб улучшен до «{next_cfg['name']}» (+{next_cfg['odd_boost']} к экспрессам всех участников)!"})
+            return await _fast_delta_response(uid, {"message": f"🏰 Штаб улучшен до «{next_cfg['name']}» (+{next_cfg['profit_pct']}% к прибыли экспрессов)!"})
 
         # 2. КОПИ-БЕТТИНГ
         elif action == "publish_bet_signal":
@@ -8125,7 +8695,7 @@ async def api_handle_action(request):
             push_live_ticker(f"📡 Каппер {user['username']} опубликовал Сигнал #{bet_id} (Кэф {bet['odds']}) для повторения!")
             return await _fast_delta_response(uid, {"message": "📡 Купон опубликован в Ленте Сигналов! Ты получишь 5% роялти с выигрыша каждого повторившего!"})
 
-        # 3. КОНТРАКТ ОБМЕНА 3➔1 В КОНТЕЙНЕРАХ
+        # 3. КОНТРАКТ ОБМЕНА 3➔1
         elif action == "startup_craft_3to1":
             storage = st.get("startup_storage", [])
             if len(storage) < 3:
@@ -8167,7 +8737,7 @@ async def api_handle_action(request):
                 "expected_restore": int(round(target_val * 1.52, -1)),
                 "restore_cost": max(150, int(round(target_val * 0.35, -1))),
                 "show_inc": chosen_tpl["show_inc"],
-                "show_odd": chosen_tpl["show_odd"],
+                "show_pct": chosen_tpl.get("show_pct", _RARITY_PROFIT_PCT.get(new_rar, 1.5)),
                 "container_price": sum_val
             }
             st["startup_storage"].insert(0, crafted_item)
@@ -8195,9 +8765,9 @@ async def api_handle_action(request):
             rew = s_cfg["reward"]
             await db_manager.exec("UPDATE users SET balance = balance + $1, fut_cards = $2 WHERE user_id = $3", float(rew), dump_user_fut_state(st, vip_act), uid)
             asyncio.create_task(db_manager.unlock_achievement(uid, "club_synergy"))
-            push_live_ticker(f"👑 {user['username']} собрал Клубный Сет «{s_cfg['title']}» и получил +{rew} FC + бафф к кэфам!")
+            push_live_ticker(f"👑 {user['username']} собрал Клубный Сет «{s_cfg['title']}» и получил +{rew} FC!")
             return await _fast_delta_response(uid, {
-                "message": f"👑 Клубный Сет «{s_cfg['title']}» закрыт! Начислено +{rew} FC и постоянные +{s_cfg['odd']} к кэфам!",
+                "message": f"👑 Клубный Сет «{s_cfg['title']}» закрыт! Начислено +{rew} FC и постоянные +{s_cfg['profit_pct']}% к прибыли!",
                 "coin_delta": rew
             })
 
@@ -8263,7 +8833,7 @@ async def api_handle_action(request):
                 "condition": 100,
                 "value": ask_price,
                 "show_inc": 0,
-                "show_odd": c_tpl["val"],
+                "show_pct": 0,
                 "desc": c_tpl["desc"]
             }
             lot_obj = {
@@ -8281,7 +8851,7 @@ async def api_handle_action(request):
             push_live_ticker(f"⚽ {user['username']} выставил на трансфер карту {c_tpl['name']} (★ Ур.{c_lvl}) за {ask_price} FC!")
             return await _fast_delta_response(uid, {"message": f"🌐 Карточка «{c_tpl['name']}» выставлена на P2P-трансфер за {ask_price} FC!"})
 
-        # 7. VIP, ЧЕСТНЫЙ КАЛЕНДАРЬ (200 FC В ДЕНЬ 1), КВЕСТ НОВИЧКА
+        # 7. VIP, ЧЕСТНЫЙ КАЛЕНДАРЬ, КВЕСТ НОВИЧКА
         elif action == "buy_vip_fc":
             plan_id = str(body.get("plan_id") or "vip_3d")
             plan = VIP_PLANS_FC.get(plan_id)
@@ -8339,7 +8909,7 @@ async def api_handle_action(request):
             rk_spin = 1 if (st.get("rookie_spin") or user.get("last_spin") == today_str) else 0
 
             if (rk_bet + rk_box + rk_spin) < 3:
-                return web.json_response({"ok": False, "error": "Выполни все 3 простых шага (1 ставка, 1 контейнер и 1 спин рулетки)!"}, headers=CORS_HEADERS)
+                return web.json_response({"ok": False, "error": "Выполни все 3 простых шага (1 ставка с кэфом ≥1.35, 1 контейнер и 1 спин рулетки)!"}, headers=CORS_HEADERS)
 
             st["rookie_claimed"] = 1
             st["rookie_bet"] = 1
@@ -8367,7 +8937,7 @@ async def api_handle_action(request):
                 "coin_delta": 1000
             })
 
-        # 8. ПОРТ (РЕБАЛАНС ШАНСОВ, БЫСТРАЯ ПРОДАЖА 90%, РЕСТАВРАЦИЯ 45%/55%)
+        # 8. ПОРТ
         elif action == "startup_open_container":
             cid = str(body.get("container_id") or "c_1")
             box = CONTAINERS_CATALOG.get(cid)
@@ -8414,7 +8984,7 @@ async def api_handle_action(request):
                 "expected_restore": int(round(market_val * 1.52, -1)),
                 "restore_cost": max(150, int(round(market_val * 0.35, -1))),
                 "show_inc": chosen_tpl["show_inc"],
-                "show_odd": chosen_tpl["show_odd"],
+                "show_pct": chosen_tpl.get("show_pct", 1.0),
                 "container_price": price
             }
             st["startup_storage"].insert(0, found_item)
@@ -8540,10 +9110,12 @@ async def api_handle_action(request):
                 return web.json_response({"ok": False, "error": f"В Шоуруме заняты все витрины ({max_show} шт.)! Сними один экспонат."}, headers=CORS_HEADERS)
 
             it = st["startup_storage"].pop(idx)
+            pct = _get_exhibit_profit_pct(it)
+            it["show_pct"] = pct
             st["startup_showroom"].append(it)
             await db_manager.exec("UPDATE users SET fut_cards = $1 WHERE user_id = $2", dump_user_fut_state(st, vip_act), uid)
             return await _fast_delta_response(uid, {
-                "message": f"🏛 «{it['name']}» выставлен в Шоурум (+{it['show_inc']} FC/день и +{it['show_odd']} к кэфам)!"
+                "message": f"🏛 «{it['name']}» выставлен в Шоурум (+{it['show_inc']} FC/день и +{pct}% к прибыли)!"
             })
 
         elif action == "startup_from_showroom":
@@ -8601,6 +9173,7 @@ async def api_handle_action(request):
 
             it = st["startup_storage"].pop(idx)
             it["_lot_type"] = "item"
+            it["show_pct"] = _get_exhibit_profit_pct(it)
             _P2P_LOT_SEQ += 1
             lot_obj = {
                 "lot_id": _P2P_LOT_SEQ,
@@ -8710,7 +9283,7 @@ async def api_handle_action(request):
                 "coin_delta": -price
             })
 
-        # 9. FUT: ЭКИПИРОВКА, КАПИТАН, 3-УРОВНЕВЫЙ СПК И ЧЕСТНЫЕ ПАКИ (7% В ЗОЛОТОМ, 100% 94-97 В ЭЛИТНОМ)
+        # 9. FUT: ЭКИПИРОВКА, КАПИТАН, 3-УРОВНЕВЫЙ СПК (СОРТИРОВКА ПО ★ УРОВНЮ) И ЧЕСТНЫЕ ПАКИ (7% / 100%)
         elif action == "equip_fut_card":
             card_id = str(body.get("card_id") or "")
             if card_id not in FUT_CARDS or card_id not in st["owned"]:
@@ -8745,7 +9318,8 @@ async def api_handle_action(request):
                     "error": f"Для этого рецепта СПК нужно 3 резервные карты уровня «{tier_titles[sbc_tier]}» (сейчас: {len(reserves_of_tier)}/3)."
                 }, headers=CORS_HEADERS)
 
-            reserves_of_tier.sort(key=lambda x: FUT_CARDS.get(x, {}).get("ovr", 80))
+            # Сначала сдаём карты 1-го ★ уровня и самого низкого OVR (защита прокачанных карт)
+            reserves_of_tier.sort(key=lambda x: (int(st["card_levels"].get(x) or 1), FUT_CARDS.get(x, {}).get("ovr", 80)))
             for sc_id in reserves_of_tier[:3]:
                 if sc_id in st["owned"]:
                     st["owned"].remove(sc_id)
@@ -8850,7 +9424,8 @@ async def api_handle_action(request):
             sp_obj = next((s for s in STADIUM_SPONSORS if s["id"] == sp_id), STADIUM_SPONSORS[0])
 
             active_bets = await db_manager.get_user_bets(uid, active_only=True)
-            has_activity = len(active_bets) > 0 or int(user.get("streak") or 0) > 0
+            valid_active = [b for b in active_bets if float(b.get("odds") or 1.0) >= MIN_ODD_FOR_BONUSES]
+            has_activity = len(valid_active) > 0 or int(user.get("streak") or 0) > 0
 
             if t_mode == "social":
                 mult, t_note = 1.0, "Социальный (100%)"
@@ -8907,7 +9482,7 @@ async def api_handle_action(request):
                 {"idx": 0, "name": "💰 +150 FC", "coins": 150, "booster": "", "respin": False, "weight": 28},
                 {"idx": 1, "name": "💰 +300 FC", "coins": 300, "booster": "", "respin": False, "weight": 22},
                 {"idx": 2, "name": "🛡 Страховка 50%", "coins": 0, "booster": "insure50", "respin": False, "weight": 15},
-                {"idx": 3, "name": "⚡ Буст +0.35", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
+                {"idx": 3, "name": "⚡ Буст +15%", "coins": 0, "booster": "boost035", "respin": False, "weight": 15},
                 {"idx": 4, "name": "🎟 Билет (+100 + Спин)", "coins": 100, "booster": "", "respin": True, "weight": 10},
                 {"idx": 5, "name": "💎 +750 FC!", "coins": 750, "booster": "", "respin": False, "weight": 7},
                 {"idx": 6, "name": "🔥 ДЖЕКПОТ +2000 FC!", "coins": 2000, "booster": "", "respin": False, "weight": 3},
@@ -8928,13 +9503,14 @@ async def api_handle_action(request):
 
         elif action == "bm_bid":
             amount = int(body.get("amount") or 0)
-            res = await place_bm_v2_bid(uid, user["username"], amount)
+            res = await place_bm_v3_bid(uid, user["username"], amount)
             if not res["ok"]:
                 return web.json_response({"ok": False, "error": res["error"]}, headers=CORS_HEADERS)
             SHARED_DB_CACHE["bm_lot"] = res["lot"]
             SHARED_DB_CACHE["bm_ts"] = int(now_msk().timestamp())
+            ext_note = " (⏱ Анти-снайпинг: таймер продлён на 2 мин!)" if res.get("sniped_extended") else ""
             return await _fast_delta_response(uid, {
-                "message": f"🔨 Ставка {amount} FC принята! Ты лидер торгов Чёрного рынка!",
+                "message": f"🔨 Ставка {amount} FC принята! Ты лидер торгов!{ext_note}",
                 "black_market": build_black_market_payload(res["lot"]),
                 "coin_delta": -amount
             })
@@ -8966,8 +9542,8 @@ async def api_handle_action(request):
             live_legs_to_verify = []
             for it in items:
                 m = db_schedule.get(it["league_key"], {}).get("matches", {}).get(str(it["event_id"]))
-                if not m:
-                    return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} не найден в линии!"}, headers=CORS_HEADERS)
+                if not m or m.get("is_finished"):
+                    return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} уже завершён или снят с линии!"}, headers=CORS_HEADERS)
                 if m.get("is_live"):
                     cur_min = parse_live_minute(m.get("live_detail", "45'"))
                     if cur_min >= 85:
@@ -8977,20 +9553,24 @@ async def api_handle_action(request):
                     return web.json_response({"ok": False, "error": f"Матч {it.get('teamsTitle', '')} только что начался, обнови линию!"}, headers=CORS_HEADERS)
 
             if live_legs_to_verify:
-                await asyncio.sleep(4.5)
+                await asyncio.sleep(4.0)
                 async with aiohttp.ClientSession() as session:
                     for m_live, p_code, initial_score in live_legs_to_verify:
                         fresh = await fetch_real_match_result(session, m_live["league_slug"], str(m_live["event_id"]))
                         if not fresh.get("ok"):
                             return web.json_response({"ok": False, "error": "🛑 VAR-Защита: Сигнал с арены временно прерван, повтори ставку через пару секунд!"}, headers=CORS_HEADERS)
                         if fresh.get("state") == "post":
-                            return web.json_response({"ok": False, "error": "🛑 VAR-Защита: Матч уже завершился!"}, headers=CORS_HEADERS)
+                            m_live["is_live"] = False
+                            m_live["is_finished"] = True
+                            PRECOMPUTED_WEBAPP_CACHE["built_at"] = 0
+                            return web.json_response({"ok": False, "error": "🛑 VAR-Защита: Матч уже завершился! Линия обновлена."}, headers=CORS_HEADERS)
                         new_score = str(fresh.get("score_str") or "0:0")
                         gh, ga = parse_live_score_pair(new_score)
                         fresh_min = parse_live_minute(fresh.get("detail") or "45'")
                         m_live["live_score"] = new_score
                         m_live["live_detail"] = fresh.get("detail") or "LIVE"
                         if new_score != initial_score:
+                            PRECOMPUTED_WEBAPP_CACHE["built_at"] = 0
                             return web.json_response({"ok": False, "error": f"🛑 VAR-Защита: В матче зафиксирован ГОЛ ({new_score})! Котировки обновлены."}, headers=CORS_HEADERS)
                         if fresh_min >= 85 or is_market_already_decided_in_live(p_code, gh, ga, fresh_min):
                             return web.json_response({"ok": False, "error": "🛑 VAR-Защита: Этот исход уже заблокирован по текущему счету матча!"}, headers=CORS_HEADERS)
@@ -9025,7 +9605,7 @@ async def api_handle_action(request):
 
                 ins_note = " 🛡[Застрахован 50%]" if res.get("booster_used") == "insure50" else ""
                 return await _fast_delta_response(uid, {
-                    "message": f"✅ Ординар #{res['bet_id']}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+                    "message": f"✅ Ординар #{res['bet_id']}{ins_note} принят (Кэф {res['final_odds']})! Выплата до {res['potential_win']} FC",
                     "coin_delta": -res["total_deduct"]
                 }, include_bets=True)
 
@@ -9068,7 +9648,7 @@ async def api_handle_action(request):
             boost_tag = f" [Буст +{res['exp_boost_pct']}%]" if res.get("exp_boost_pct", 0) > 0 else ""
             ins_note = " 🛡[Страховка 50%]" if res.get("booster_used") == "insure50" else (" 🛡[Кэшбэк 50% при 1 промахе]" if len(legs) >= 5 else "")
             return await _fast_delta_response(uid, {
-                "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag}{ins_note} принят (Кэф {res['final_odds']})! Выплата: {res['potential_win']} FC",
+                "message": f"⚡ Экспресс #{res['bet_id']}{boost_tag}{ins_note} принят (Кэф {res['final_odds']})! Выплата до {res['potential_win']} FC",
                 "coin_delta": -res["total_deduct"]
             }, include_bets=True)
 
@@ -9077,10 +9657,9 @@ async def api_handle_action(request):
             bet = await db_manager.get_bet_by_id(bet_id, uid)
             if not bet or bet["status"] != "pending":
                 return web.json_response({"ok": False, "error": "Купон уже рассчитан!"}, headers=CORS_HEADERS)
-            async with aiohttp.ClientSession() as session:
-                offer = await calculate_cashout_offer(session, bet)
+            offer, reason = calculate_live_cashout_v2(bet)
             if offer <= 0:
-                return web.json_response({"ok": False, "error": "CashOut недоступен: одно из событий уже проиграло или ушло в глубокий минус."}, headers=CORS_HEADERS)
+                return web.json_response({"ok": False, "error": f"CashOut недоступен: {reason or 'исход в минусе'}."}, headers=CORS_HEADERS)
             res = await db_manager.settle_bet_in_db(bet, "cashout", offer, f"CashOut ({offer} FC)")
             return await _fast_delta_response(uid, {
                 "message": f"💸 Купон #{bet_id} выкуплен! На баланс зачислено +{res['payout']} FC!",
@@ -9253,7 +9832,7 @@ async def main():
     await db_manager.init()
     await ensure_high_load_indexes()
     await init_and_load_p2p_and_clans()
-    await get_or_rotate_bm_v2()
+    await get_or_rotate_bm_v3()
     if not db_manager.use_pg:
         try:
             await db_manager.exec("PRAGMA journal_mode=WAL;")
@@ -9266,6 +9845,7 @@ async def main():
     await start_web_server()
     await setup_bot_commands()
     asyncio.create_task(db_keep_alive_worker())
+    asyncio.create_task(fast_live_poller_worker())
     asyncio.create_task(fast_unified_settlement_worker())
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("✅ Все системы активны! Запускаю поллинг Telegram...")
