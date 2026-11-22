@@ -7,13 +7,13 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --bg-dark: #0b1324;
-            --bg-card: #152138;
-            --bg-card-top: #1a2945;
-            --bg-elevated: #1f3152;
+            --bg-dark: #0a1222;
+            --bg-card: #142037;
+            --bg-card-top: #1a2946;
+            --bg-elevated: #203356;
             --bg-glass: rgba(148, 163, 184, 0.08);
             --border-glass: rgba(148, 163, 184, 0.22);
-            --border-frost: rgba(125, 211, 252, 0.34);
+            --border-frost: rgba(125, 211, 252, 0.36);
             --accent-green: #10b981;
             --accent-green-bright: #34d399;
             --accent-green-dim: rgba(16, 185, 129, 0.16);
@@ -24,7 +24,6 @@
             --accent-blue-dim: rgba(56, 189, 248, 0.15);
             --accent-ice: #bae6fd;
             --accent-crimson: #e11d48;
-            --accent-crimson-dim: rgba(225, 29, 72, 0.16);
             --accent-red: #ef4444;
             --text-main: #f8fafc;
             --text-muted: #9eb0ca;
@@ -39,7 +38,7 @@
                 radial-gradient(ellipse 95% 420px at 50% -60px, rgba(56, 189, 248, 0.18), transparent 72%),
                 radial-gradient(circle at 12% 22%, rgba(16, 185, 129, 0.08), transparent 45%),
                 radial-gradient(circle at 88% 18%, rgba(245, 158, 11, 0.07), transparent 45%),
-                linear-gradient(180deg, #0e182d 0%, #0b1324 55%, #09101f 100%);
+                linear-gradient(180deg, #0e182d 0%, #0a1222 55%, #080f1d 100%);
             background-attachment: fixed;
             color: var(--text-main);
             min-height: 100vh;
@@ -51,32 +50,32 @@
         /* ОБЪЁМНЫЙ НОВОГОДНИЙ СНЕГОПАД */
         .snow-container { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
         .snowflake {
-            position: absolute; top: -28px; color: rgba(224, 242, 254, 0.34);
+            position: absolute; top: -28px; color: rgba(224, 242, 254, 0.3);
             will-change: transform; animation: snowfall linear infinite;
-            text-shadow: 0 0 6px rgba(186, 230, 253, 0.28);
+            text-shadow: 0 0 6px rgba(186, 230, 253, 0.24);
         }
         @keyframes snowfall {
-            0% { transform: translate3d(0, -10px, 0) rotate(0deg); opacity: 0.78; }
-            50% { transform: translate3d(12px, 50vh, 0) rotate(180deg); opacity: 0.48; }
-            100% { transform: translate3d(-8px, 106vh, 0) rotate(360deg); opacity: 0.06; }
+            0% { transform: translate3d(0, -10px, 0) rotate(0deg); opacity: 0.72; }
+            50% { transform: translate3d(12px, 50vh, 0) rotate(180deg); opacity: 0.42; }
+            100% { transform: translate3d(-8px, 106vh, 0) rotate(360deg); opacity: 0.05; }
         }
 
         /* ==================== ШАПКА + МЯГКАЯ НОВОГОДНЯЯ ГИРЛЯНДА ==================== */
         .sticky-top-wrap {
             position: sticky; top: 0; z-index: 95;
-            background: linear-gradient(180deg, rgba(16, 28, 52, 0.96) 0%, rgba(13, 22, 41, 0.95) 100%);
+            background: linear-gradient(180deg, rgba(16, 28, 52, 0.96) 0%, rgba(12, 21, 39, 0.95) 100%);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border-bottom: 1px solid rgba(125, 211, 252, 0.22);
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.36);
         }
 
         .top-header-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
-            padding: 10px 14px 9px;
+            gap: 8px;
+            padding: 9px 14px 8px;
         }
         .user-identity-box {
             min-width: 0;
@@ -87,12 +86,12 @@
         .user-name-line {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             min-width: 0;
         }
         .user-name-txt {
             font-weight: 800;
-            font-size: 14.5px;
+            font-size: 14px;
             color: #fff;
             white-space: nowrap;
             overflow: hidden;
@@ -110,30 +109,30 @@
             flex-shrink: 0;
         }
         .clan-tag-pill {
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 800;
             color: #fde68a;
             background: rgba(245, 158, 11, 0.18);
             border: 1px solid rgba(245, 158, 11, 0.42);
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 6px;
             cursor: pointer;
             flex-shrink: 0;
             display: none;
         }
         .hot-hand-pill {
-            font-size: 9.5px;
+            font-size: 9px;
             font-weight: 800;
             color: #fde68a;
             background: rgba(245, 158, 11, 0.18);
             border: 1px solid rgba(245, 158, 11, 0.38);
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 6px;
             flex-shrink: 0;
             display: none;
         }
         .user-rank-sub {
-            font-size: 11px;
+            font-size: 10.5px;
             color: var(--text-muted);
             font-weight: 600;
             white-space: nowrap;
@@ -144,7 +143,7 @@
         .header-right-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             flex-shrink: 0;
         }
         .hdr-icon-btn {
@@ -152,8 +151,8 @@
             border: 1px solid rgba(148, 163, 184, 0.28);
             color: var(--text-main);
             border-radius: 10px;
-            padding: 7px 9px;
-            font-size: 11px;
+            padding: 6px 8px;
+            font-size: 10.5px;
             font-weight: 800;
             cursor: pointer;
             display: inline-flex;
@@ -176,7 +175,7 @@
             position: relative;
             background: linear-gradient(180deg, rgba(16, 185, 129, 0.22), rgba(6, 95, 70, 0.28));
             border: 1px solid rgba(52, 211, 153, 0.55);
-            padding: 6px 11px;
+            padding: 6px 10px;
             border-radius: 11px;
             text-align: right;
             cursor: pointer;
@@ -185,26 +184,25 @@
         }
         .balance-pill.pulse { transform: scale(1.06); }
         .balance-val {
-            font-size: 13.5px;
+            font-size: 13px;
             font-weight: 800;
             color: #6ee7b7;
             white-space: nowrap;
         }
 
-        /* МЯГКО ДЫШАЩАЯ НОВОГОДНЯЯ МИНИ-ГИРЛЯНДА ПОД ШАПКОЙ */
         .garland-strip {
             display: flex;
             justify-content: space-around;
             align-items: center;
-            height: 7px;
+            height: 6px;
             padding: 0 10px;
             background: rgba(10, 18, 34, 0.65);
             border-top: 1px solid rgba(148, 163, 184, 0.12);
             overflow: hidden;
         }
         .garland-bulb {
-            width: 5px;
-            height: 5px;
+            width: 4.5px;
+            height: 4.5px;
             border-radius: 50%;
             animation: garlandBreath 3.6s ease-in-out infinite;
         }
@@ -213,7 +211,7 @@
         .garland-bulb.g-emerald { background: #34d399; box-shadow: 0 0 7px rgba(52, 211, 153, 0.85); animation-delay: 1.8s; }
         .garland-bulb.g-ruby { background: #fb7185; box-shadow: 0 0 7px rgba(251, 113, 133, 0.85); animation-delay: 2.7s; }
         @keyframes garlandBreath {
-            0%, 100% { opacity: 0.42; transform: scale(0.88); }
+            0%, 100% { opacity: 0.4; transform: scale(0.88); }
             50% { opacity: 1; transform: scale(1.12); }
         }
 
@@ -229,11 +227,11 @@
 
         /* ИНФОРМАЦИОННАЯ ЛЕНТА */
         .ticker-wrap {
-            background: rgba(19, 31, 56, 0.78);
-            border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(18, 30, 54, 0.78);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
             overflow: hidden;
             white-space: nowrap;
-            padding: 5px 0;
+            padding: 4px 0;
             position: relative;
             z-index: 2;
         }
@@ -246,7 +244,7 @@
         .ticker-half { display: inline-flex; align-items: center; }
         .ticker-item {
             margin-right: 48px;
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 600;
             color: #cbd5e1;
             display: inline-block;
@@ -257,12 +255,12 @@
         }
 
         /* СЕКЦИИ И ОБЪЁМНЫЕ КАРТОЧКИ */
-        .tab-section { display: none; padding: 14px 14px 28px; position: relative; z-index: 2; }
+        .tab-section { display: none; padding: 12px 14px 28px; position: relative; z-index: 2; }
         .tab-section.active { display: block; }
 
         .section-title {
             font-size: 13.5px; font-weight: 800; color: #f1f5f9;
-            margin: 14px 0 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            margin: 13px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
         }
         .info-q-btn {
             background: rgba(56, 189, 248, 0.14);
@@ -279,8 +277,8 @@
             background: linear-gradient(180deg, #182742 0%, #132037 100%);
             border: 1px solid var(--border-glass);
             border-radius: 16px;
-            padding: 14px;
-            margin-bottom: 12px;
+            padding: 13px;
+            margin-bottom: 11px;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 6px 18px rgba(4, 10, 24, 0.35);
         }
 
@@ -296,7 +294,66 @@
             pointer-events: none;
         }
 
-        /* ЖИВАЯ СТАТИСТИКА МАТЧА И АВТОРЫ ГОЛОВ (ESPN) */
+        /* ==================== КОМПАКТНЫЙ ЦЕНТР НАГРАД НА ГЛАВНОЙ ==================== */
+        .rewards-hub-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(56, 189, 248, 0.12), #15223a);
+            border: 1px solid rgba(251, 191, 36, 0.44);
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(254, 243, 199, 0.2), 0 4px 14px rgba(4, 10, 24, 0.32);
+            transition: transform 0.12s;
+        }
+        .rewards-hub-bar:active { transform: scale(0.985); }
+        .rewards-hub-bar.all-done {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), #15223a);
+            border-color: rgba(148, 163, 184, 0.28);
+            box-shadow: none;
+        }
+        .rh-left { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .rh-ico {
+            width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
+            background: rgba(251, 191, 36, 0.16); border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+        .rh-title { font-size: 12.5px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rh-sub { font-size: 10.5px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rh-badge {
+            flex-shrink: 0; font-size: 10.5px; font-weight: 800; padding: 5px 10px; border-radius: 99px;
+            background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f1103;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        }
+        .rewards-hub-bar.all-done .rh-badge {
+            background: rgba(56, 189, 248, 0.16); color: #bae6fd; box-shadow: none;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+
+        /* ЖИВАЯ СТАТИСТИКА МАТЧА И ФАМИЛИИ АВТОРОВ ГОЛОВ В ШАПКЕ */
+        .md-scorers-header {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-top: 9px; padding-top: 8px;
+            border-top: 1px solid rgba(125, 211, 252, 0.2);
+            font-size: 11px; color: #e2e8f0; text-align: left;
+        }
+        .md-scorers-col.away { text-align: right; }
+        .md-scorer-item { padding: 1.5px 0; line-height: 1.3; }
+        .md-scorer-min { color: #fde68a; font-weight: 800; font-size: 10px; }
+
+        .match-card-scorers {
+            display: flex; justify-content: space-between; gap: 8px;
+            font-size: 10px; color: #cbd5e1;
+            padding: 5px 8px; margin-bottom: 8px;
+            background: rgba(10, 18, 34, 0.5); border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+        }
+        .match-card-scorers > div { flex: 1; line-height: 1.3; }
+        .match-card-scorers > div:last-child { text-align: right; }
+
         .match-stats-card {
             background: linear-gradient(180deg, rgba(24, 39, 66, 0.9), rgba(17, 29, 51, 0.9));
             border: 1px solid rgba(56, 189, 248, 0.25);
@@ -317,28 +374,17 @@
         }
         .stat-fill-home { background: linear-gradient(90deg, #059669, #34d399); border-radius: 99px 0 0 99px; }
         .stat-fill-away { background: linear-gradient(90deg, #0284c7, #38bdf8); border-radius: 0 99px 99px 0; }
-        .scorers-list {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-            margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-glass);
-            font-size: 10.5px; color: #e2e8f0;
-        }
-        .scorers-col.away { text-align: right; }
-        .scorer-line { margin-bottom: 2px; }
 
-        /* СТАРТОВЫЙ КВЕСТ НОВИЧКА И ЕЖЕДНЕВНЫЕ ЗАДАНИЯ КАППЕРА */
+        /* КВЕСТЫ ВНУТРИ ЦЕНТРА НАГРАД */
         .rookie-card {
             background: linear-gradient(180deg, rgba(16, 185, 129, 0.14) 0%, #152138 100%);
             border: 1px solid rgba(52, 211, 153, 0.42);
-            border-radius: 16px;
-            padding: 13px; margin-bottom: 12px;
-            box-shadow: inset 0 1px 0 rgba(167, 243, 208, 0.18), 0 6px 18px rgba(4, 10, 24, 0.3);
+            border-radius: 14px; padding: 12px; margin-bottom: 11px;
         }
         .daily-quest-card {
             background: linear-gradient(180deg, rgba(56, 189, 248, 0.14) 0%, #15223a 100%);
             border: 1px solid rgba(56, 189, 248, 0.38);
-            border-radius: 16px;
-            padding: 12px 13px; margin-bottom: 12px;
-            box-shadow: inset 0 1px 0 rgba(186, 230, 253, 0.18), 0 6px 16px rgba(4, 10, 24, 0.3);
+            border-radius: 14px; padding: 12px; margin-bottom: 11px;
         }
         .rookie-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 9px 0; }
         .rk-step {
@@ -360,28 +406,28 @@
         }
         .ladder-box.claimed { border-color: rgba(52, 211, 153, 0.45); background: var(--accent-green-dim); opacity: 0.8; }
 
-        /* ПРОМО-ПЛАШКИ (ЭКСПРЕСС ДНЯ + СУПЕРЭКСПРЕСС) */
-        .promo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 12px; }
+        /* ПРОМО-ПЛАШКИ */
+        .promo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .promo-box {
             background: linear-gradient(155deg, rgba(16, 185, 129, 0.16) 0%, #15223a 75%);
             border: 1px solid rgba(52, 211, 153, 0.38);
-            border-radius: 14px; padding: 11px 12px; cursor: pointer;
-            box-shadow: inset 0 1px 0 rgba(167, 243, 208, 0.16), 0 4px 12px rgba(4, 10, 24, 0.3);
+            border-radius: 13px; padding: 10px 11px; cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(167, 243, 208, 0.16), 0 4px 12px rgba(4, 10, 24, 0.28);
             transition: transform 0.12s;
         }
         .promo-box:active { transform: scale(0.98); }
         .promo-box.gold {
             background: linear-gradient(155deg, rgba(245, 158, 11, 0.18) 0%, #192238 75%);
             border-color: rgba(251, 191, 36, 0.42);
-            box-shadow: inset 0 1px 0 rgba(254, 243, 199, 0.18), 0 4px 12px rgba(4, 10, 24, 0.3);
+            box-shadow: inset 0 1px 0 rgba(254, 243, 199, 0.18), 0 4px 12px rgba(4, 10, 24, 0.28);
         }
-        .promo-title { font-size: 12.5px; font-weight: 800; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between; }
-        .promo-sub { font-size: 10.5px; color: #cbd5e1; }
+        .promo-title { font-size: 12px; font-weight: 800; margin-bottom: 2px; display: flex; align-items: center; justify-content: space-between; }
+        .promo-sub { font-size: 10px; color: #cbd5e1; }
 
-        .search-box-wrap { position: relative; margin-bottom: 11px; }
+        .search-box-wrap { position: relative; margin-bottom: 9px; }
         .search-input {
             width: 100%; background: #15223a; border: 1px solid rgba(125, 211, 252, 0.25);
-            border-radius: 12px; padding: 11px 34px 11px 13px; color: var(--text-main); font-size: 13px; font-weight: 500; outline: none;
+            border-radius: 12px; padding: 10px 34px 10px 13px; color: var(--text-main); font-size: 13px; font-weight: 500; outline: none;
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
         }
         .search-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18); }
@@ -392,12 +438,12 @@
         }
 
         /* ЛЕНТА ЛИГ И ФИЛЬТРЫ P2P */
-        .leagues-bar { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 4px; scrollbar-width: none; }
+        .leagues-bar { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 9px; margin-bottom: 2px; scrollbar-width: none; }
         .leagues-bar::-webkit-scrollbar { display: none; }
         .league-chip {
             background: #16243e; border: 1px solid rgba(148, 163, 184, 0.26); color: #cbd5e1;
-            padding: 7px 13px; border-radius: 99px; font-size: 12px; font-weight: 600;
-            white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 99px; font-size: 11.5px; font-weight: 600;
+            white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
         }
         .league-chip.active {
             background: linear-gradient(135deg, #38bdf8, #0284c7);
@@ -421,8 +467,8 @@
             background: linear-gradient(180deg, #182742 0%, #132037 100%);
             border: 1px solid rgba(148, 163, 184, 0.24);
             border-radius: 16px;
-            padding: 14px;
-            margin-bottom: 11px;
+            padding: 13px;
+            margin-bottom: 10px;
             position: relative;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 6px 18px rgba(4, 10, 24, 0.34);
         }
@@ -437,7 +483,7 @@
 
         .match-top-bar {
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 11px; color: var(--text-muted); margin-bottom: 10px; gap: 6px; flex-wrap: wrap;
+            font-size: 11px; color: var(--text-muted); margin-bottom: 9px; gap: 6px; flex-wrap: wrap;
         }
         .badge-top {
             background: rgba(52, 211, 153, 0.14); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.35);
@@ -461,9 +507,9 @@
         .live-dot { width: 6px; height: 6px; background: var(--accent-red); border-radius: 50%; animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        .match-clickable-area { cursor: pointer; padding: 2px 0 8px; }
-        .match-teams-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .team-name { font-size: 14.5px; font-weight: 700; flex: 1; line-height: 1.3; color: #f8fafc; }
+        .match-clickable-area { cursor: pointer; padding: 2px 0 6px; }
+        .match-teams-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .team-name { font-size: 14px; font-weight: 700; flex: 1; line-height: 1.25; color: #f8fafc; }
         .team-name.away { text-align: right; }
         .score-pill {
             background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.45);
@@ -479,10 +525,10 @@
             font-size: 11px; color: #cbd5e1;
             background: rgba(56, 189, 248, 0.08);
             border: 1px solid rgba(56, 189, 248, 0.22);
-            padding: 7px 10px; border-radius: 10px; margin-bottom: 10px; font-weight: 600;
+            padding: 6px 10px; border-radius: 10px; margin-bottom: 9px; font-weight: 600;
         }
 
-        /* ВЫРАЗИТЕЛЬНЫЕ ТАКТИЛЬНЫЕ КНОПКИ КОЭФФИЦИЕНТОВ С ЧЁТКИМ КОНТУРОМ */
+        /* ВЫРАЗИТЕЛЬНЫЕ КНОПКИ КОЭФФИЦИЕНТОВ + ЗАКРЫТЫЙ LIVE-ЗАМОК */
         .odds-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .odds-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
         .odds-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
@@ -490,12 +536,16 @@
         .odd-btn {
             background: linear-gradient(180deg, #1f3152 0%, #172540 100%);
             border: 1px solid rgba(125, 211, 252, 0.32);
-            border-radius: 11px; padding: 9px 6px; text-align: center;
+            border-radius: 11px; padding: 8px 6px; text-align: center;
             color: var(--text-main); cursor: pointer;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 2px 6px rgba(4, 10, 24, 0.3);
             transition: transform 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
         }
         .odd-btn:active { transform: scale(0.96); }
+        .odd-btn.locked-odd {
+            opacity: 0.42; pointer-events: none;
+            background: #131f35; border-color: rgba(148, 163, 184, 0.16); box-shadow: none;
+        }
         .odd-btn.selected {
             background: linear-gradient(135deg, #34d399 0%, #059669 100%) !important;
             border-color: #a7f3d0 !important;
@@ -581,7 +631,7 @@
         .sub-nav {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
             background: #121d33; border: 1px solid rgba(148, 163, 184, 0.24);
-            padding: 4px; border-radius: 12px; margin-bottom: 12px;
+            padding: 4px; border-radius: 12px; margin-bottom: 11px;
         }
         .sub-nav-btn {
             padding: 8px 4px; text-align: center; font-size: 11.5px; font-weight: 700;
@@ -776,7 +826,7 @@
         .showroom-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
         .showroom-grid-3 .fut-shield, .showroom-grid-4 .fut-shield { width: 100%; }
 
-        /* 3-УРОВНЕВЫЙ СПК + ТАБЛИЦА ШАНСОВ ДРОПА + ТАЙМЕР ЧЁРНОГО РЫНКА */
+        /* 3-УРОВНЕВЫЙ СПК + ШАНСЫ ДРОПА + ЧЁРНЫЙ РЫНОК V3 */
         .sbc-tier-card {
             background: linear-gradient(180deg, #1b2c4c 0%, #142139 100%);
             border: 1px solid rgba(148, 163, 184, 0.28);
@@ -794,6 +844,25 @@
             font-size: 10.5px; font-weight: 800; color: #fde68a;
             background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(251, 191, 36, 0.42);
             padding: 3px 8px; border-radius: 99px;
+        }
+        .bm-hist-list {
+            margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-glass);
+        }
+        .bm-hist-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 10.5px; padding: 3.5px 0; color: #cbd5e1;
+        }
+
+        /* ПРОЗРАЧНАЯ РАСШИФРОВКА КОЭФФИЦИЕНТА И БОНУСОВ В КУПОНЕ */
+        .slip-breakdown-box {
+            background: rgba(10, 18, 34, 0.58);
+            border: 1px solid rgba(125, 211, 252, 0.24);
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin: 6px 0 8px;
+            font-size: 11px;
+            color: #cbd5e1;
+            line-height: 1.45;
         }
 
         /* ==================== ПОРТ ==================== */
@@ -980,7 +1049,7 @@
         }
 
         #toast {
-            position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 350;
+            position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 350;
             background: #1a2945; border: 1.5px solid #34d399; color: #fff;
             padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 700;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.65); display: none; max-width: 92vw; text-align: center;
@@ -1011,7 +1080,7 @@
                     <span id="ui-vip-crown" style="font-size:13px;">🎄</span>
                     <span class="clan-tag-pill" id="ui-clan-tag" onclick="openClansModal()">[КЛАН]</span>
                     <span class="user-name-txt" id="ui-username">Загрузка...</span>
-                    <span class="hot-hand-pill" id="ui-hot-hand" title="Серия 3+ побед: +0.10 к кэфу">🔥 +0.10</span>
+                    <span class="hot-hand-pill" id="ui-hot-hand" title="Серия 3+ побед: +5% к чистой прибыли">🔥 +5%</span>
                 </div>
                 <div class="user-rank-sub" id="ui-rank">Зимний Сезон 2027...</div>
             </div>
@@ -1043,30 +1112,31 @@
     <div class="ticker-wrap">
         <div class="ticker-track" id="live-ticker-bar">
             <div class="ticker-half">
-                <span class="ticker-item">🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня</span>
-                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером</span>
-                <span class="ticker-item">👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта</span>
+                <span class="ticker-item">🎄 Зимний Сезон 2027 • Все подарки, Адвент-календарь и задания дня собраны в «Центре наград»</span>
+                <span class="ticker-item">🔴 Быстрые LIVE-обновления каждые 18 сек + честная 2D-линия Пуассона и Гол-уведомления в чат</span>
+                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) с анти-снайпингом (+2 мин) и историей ставок</span>
             </div>
             <div class="ticker-half">
-                <span class="ticker-item">🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня</span>
-                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером</span>
-                <span class="ticker-item">👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта</span>
+                <span class="ticker-item">🎄 Зимний Сезон 2027 • Все подарки, Адвент-календарь и задания дня собраны в «Центре наград»</span>
+                <span class="ticker-item">🔴 Быстрые LIVE-обновления каждые 18 сек + честная 2D-линия Пуассона и Гол-уведомления в чат</span>
+                <span class="ticker-item">🔨 На Чёрном рынке 12 легенд (98–99 OVR) с анти-снайпингом (+2 мин) и историей ставок</span>
             </div>
         </div>
     </div>
 
     <!-- ==================== ВКЛАДКА 1: АФИША ==================== -->
     <section id="tab-matches" class="tab-section active">
-        <div class="card frost-accent" id="bonus-banner" style="display:none; align-items:center; justify-content:space-between; padding:11px 13px; border-color:rgba(251,191,36,0.55); background:linear-gradient(135deg, rgba(225,29,72,0.18), rgba(245,158,11,0.16), #15223a); cursor:pointer;" onclick="openStreakCalendarModal()">
-            <div>
-                <div style="font-weight:800; font-size:13px; color:#fef08a;">🎄 Новогодний Адвент-подарок</div>
-                <div style="font-size:11px; color:#e2e8f0;" id="ui-bonus-desc">Нажми, чтобы открыть календарь дня</div>
+        <!-- ЕДИНЫЙ КОМПАКТНЫЙ ЦЕНТР НАГРАД -->
+        <div class="rewards-hub-bar frost-accent" id="rewards-hub-bar" onclick="openRewardsHubModal()">
+            <div class="rh-left">
+                <div class="rh-ico" id="rh-ico">🎁</div>
+                <div style="min-width:0;">
+                    <div class="rh-title" id="rh-title">Центр наград и квестов</div>
+                    <div class="rh-sub" id="rh-sub">Адвент-календарь • Задания дня</div>
+                </div>
             </div>
-            <button class="btn-main gold" style="padding:7px 12px; font-size:12px;">Забрать</button>
+            <div class="rh-badge" id="rh-badge">Открыть ➔</div>
         </div>
-
-        <div class="rookie-card frost-accent" id="rookie-quest-card" style="display:none;"></div>
-        <div class="daily-quest-card frost-accent" id="daily-quests-card" style="display:none;"></div>
 
         <div class="search-box-wrap">
             <input type="text" id="team-search-input" class="search-input" placeholder="🔎 Поиск команды или турнира..." oninput="onSearchTeamInput()">
@@ -1131,7 +1201,7 @@
                             <text x="36" y="-75" fill="#f8fafc" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(25, 36, -75)">+150 FC</text>
                             <text x="82" y="-18" fill="#6ee7b7" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(77, 82, -18)">+300 FC</text>
                             <text x="68" y="56" fill="#c7d2fe" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(128, 68, 56)">🛡 Страховка</text>
-                            <text x="0" y="88" fill="#bae6fd" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(180, 0, 88)">⚡ Буст +0.35</text>
+                            <text x="0" y="88" fill="#bae6fd" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(180, 0, 88)">⚡ Буст +15%</text>
                             <text x="-68" y="56" fill="#fde68a" font-size="8.5" font-weight="800" text-anchor="middle" transform="rotate(231, -68, 56)">🎟 Спин +100</text>
                             <text x="-82" y="-18" fill="#e9d5ff" font-size="9.5" font-weight="800" text-anchor="middle" transform="rotate(283, -82, -18)">💎 +750 FC</text>
                             <text x="-36" y="-75" fill="#fef08a" font-size="9.5" font-weight="900" text-anchor="middle" transform="rotate(334, -36, -75)">🔥 2000 FC</text>
@@ -1169,7 +1239,7 @@
             </div>
             <div id="fut-active-buffs-summary" style="font-size:11px; color:#e2e8f0; line-height:1.45;"></div>
             <div style="font-size:10.5px; color:#fde68a; margin-top:5px;">
-                🔥 В дни реальных матчей своего клуба карточки получают <b>+25% к силе баффа</b>
+                🔥 В дни реальных матчей своего клуба карты получают <b>+25% к силе баффа</b> (от кэфа 1.35)
             </div>
         </div>
 
@@ -1185,7 +1255,7 @@
 
         <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-bottom:14px;">
             <button class="btn-main blue" style="padding:10px 4px; font-size:11px;" onclick="openCollectionModal('ALL')">
-                📚 Коллекция (<span id="fut-owned-btn-cnt">0/100</span>)
+                📚 Коллекция (<span id="fut-owned-btn-cnt">0/112</span>)
             </button>
             <button class="btn-main gold" style="padding:10px 4px; font-size:11px;" onclick="openClubSetsModal()">
                 👑 Сеты Клубов
@@ -1376,6 +1446,17 @@
     </div>
 
     <!-- ==================== МОДАЛЬНЫЕ ОКНА И ШТОРКИ ==================== -->
+    <!-- НОВЫЙ МОДАЛ: ЕДИНЫЙ ЦЕНТР НАГРАД -->
+    <div class="drawer-overlay" id="rewards-hub-modal" onclick="handleOverlayClick(event, 'rewards-hub-modal')">
+        <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
+            <div class="sheet-header">
+                <b style="font-size:15px;">🎁 Центр наград и квестов</b>
+                <button class="close-x" onclick="document.getElementById('rewards-hub-modal').classList.remove('show')">✕</button>
+            </div>
+            <div id="rewards-hub-modal-body"></div>
+        </div>
+    </div>
+
     <div class="drawer-overlay" id="match-detail-modal" onclick="handleOverlayClick(event, 'match-detail-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
@@ -1427,6 +1508,7 @@
                 <span style="color:var(--text-muted);">Итоговый коэффициент:</span>
                 <b style="color:#6ee7b7; font-size:15px;" id="drawer-total-odd">1.00</b>
             </div>
+            <div class="slip-breakdown-box" id="slip-breakdown-box"></div>
             <input type="number" id="slip-stake-input" class="stake-input" value="250" min="10" oninput="updatePotentialWin()">
             <div class="preset-chips">
                 <button class="chip-btn" onclick="setSlipStake(100)">100</button>
@@ -1444,7 +1526,6 @@
         </div>
     </div>
 
-    <!-- НОВЫЙ МОДАЛ: 3-УРОВНЕВЫЙ СПК (КРАФТ КАРТОЧЕК FUT) -->
     <div class="drawer-overlay" id="sbc-modal" onclick="handleOverlayClick(event, 'sbc-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1455,7 +1536,6 @@
         </div>
     </div>
 
-    <!-- НОВЫЙ МОДАЛ: ШАНСЫ ДРОПА (?) -->
     <div class="drawer-overlay" id="drop-rates-modal" onclick="handleOverlayClick(event, 'drop-rates-modal')">
         <div class="drawer-sheet" onclick="event.stopPropagation()" style="padding-bottom:28px;">
             <div class="sheet-header">
@@ -1493,6 +1573,14 @@
                 <button class="close-x" onclick="document.getElementById('profile-settings-modal').classList.remove('show')">✕</button>
             </div>
             <div class="card">
+                <div class="insure-toggle-row active" id="goal-alerts-toggle-row" style="margin:0 0 14px;" onclick="toggleGoalAlerts()">
+                    <div>
+                        <div style="font-size:12px; font-weight:800;">⚽ Goal Alerts (Пуши о голах в чат)</div>
+                        <div style="font-size:10.5px; color:#cbd5e1;">Мгновенные уведомления о голах по твоим ставкам</div>
+                    </div>
+                    <div style="font-size:14px; font-weight:800;" id="ui-goal-alerts-state">🔔 ВКЛ</div>
+                </div>
+
                 <div style="font-size:12px; font-weight:700; margin-bottom:6px; color:#fde68a;">🎟 Активировать промокод:</div>
                 <div style="display:flex; gap:6px; margin-bottom:14px;">
                     <input type="text" id="promo-code-input" class="stake-input" style="margin:0; font-size:13px; padding:9px; text-transform:uppercase;" placeholder="Введи код (напр. START2026)">
@@ -1645,7 +1733,7 @@
             tg.expand();
             try {
                 tg.setHeaderColor('#101c34');
-                tg.setBackgroundColor('#0b1324');
+                tg.setBackgroundColor('#0a1222');
             } catch (e) {}
         }
 
@@ -1697,7 +1785,7 @@
             { day: 2, coins: 350, booster: '', label: '+350 FC' },
             { day: 3, coins: 550, booster: '', label: '+550 FC' },
             { day: 4, coins: 850, booster: '', label: '+850 FC' },
-            { day: 5, coins: 1300, booster: 'boost035', label: '+1 300 FC + ⚡ Буст +0.35' },
+            { day: 5, coins: 1300, booster: 'boost035', label: '+1 300 FC + ⚡ Буст +15%' },
             { day: 6, coins: 2000, booster: '', label: '+2 000 FC' },
             { day: 7, coins: 3500, booster: 'insure50', label: '🎁 +3 500 FC + 🛡 Страховка 50%' }
         ];
@@ -1709,7 +1797,7 @@
         };
 
         const DEFAULT_VIP_BENEFITS = [
-            '⚡ <b>+0.15 к коэффициенту</b> каждого Ординара и Экспресса автоматически',
+            '⚡ <b>+8% к чистой прибыли</b> каждого выигранного купона (при кэфе от 1.35)',
             '📦 <b>Скидка 10% на покупку всех 12 Контейнеров</b> в Портовом Аукционе',
             '🔧 <b>Шанс успешной реставрации 55%</b> (вместо 45%) + склад на <b>12 мест</b> и <b>4 витрины Шоурума</b>',
             '🌐 <b>0% комиссии на P2P-Бирже</b> (предметы и карты FUT) + <b>Бесплатное создание Клана</b>',
@@ -1741,11 +1829,11 @@
         };
 
         const DEFAULT_SPONSORS = [
-            { id: 'sp_1', name: '🟢 Winter Cup Energy', min_lvl: 1, deposit: 0, bonus: 350, task: 'Сделать минимум 1 любую ставку сегодня (Без риска)' },
-            { id: 'sp_2', name: '🔵 Gazprom Media Sport', min_lvl: 2, deposit: 150, bonus: 850, task: 'Активная ставка от 500 FC в игре (Залог 150 FC)' },
-            { id: 'sp_3', name: '🟡 CyberBet Syndicate', min_lvl: 4, deposit: 400, bonus: 1900, task: 'Иметь в игре Экспресс минимум из 2 матчей (Залог 400 FC)' },
-            { id: 'sp_4', name: '🟣 Qatar Airways VIP', min_lvl: 6, deposit: 1000, bonus: 4500, task: 'Серия от 1 победы ИЛИ собранный состав FUT (Залог 1 000 FC)' },
-            { id: 'sp_5', name: '👑 Rolex Champions Club', min_lvl: 8, deposit: 2500, bonus: 9800, task: 'Активная ставка + минимум 1 экспонат в Шоуруме (Залог 2 500 FC)' }
+            { id: 'sp_1', name: '🟢 Winter Cup Energy', min_lvl: 1, deposit: 0, bonus: 350, task: 'Сделать минимум 1 ставку с кэфом от 1.35 (Без риска)' },
+            { id: 'sp_2', name: '🔵 Gazprom Media Sport', min_lvl: 2, deposit: 150, bonus: 850, task: 'Активная ставка от 500 FC (кэф ≥ 1.35, Залог 150 FC)' },
+            { id: 'sp_3', name: '🟡 CyberBet Syndicate', min_lvl: 4, deposit: 400, bonus: 1900, task: 'Иметь в игре Экспресс от 2 матчей (Залог 400 FC)' },
+            { id: 'sp_4', name: '🟣 Qatar Airways VIP', min_lvl: 6, deposit: 1000, bonus: 4500, task: 'Серия от 1 победы ИЛИ состав FUT от 3 карт (Залог 1 000 FC)' },
+            { id: 'sp_5', name: '👑 Rolex Champions Club', min_lvl: 8, deposit: 2500, bonus: 9800, task: 'Активная ставка (≥ 1.35) + экспонат в Шоуруме (Залог 2 500 FC)' }
         ];
 
         const DEFAULT_FUT_QUICKSELL = { 1: 750, 2: 2200, 3: 6500, 4: 18000 };
@@ -1770,6 +1858,7 @@
         let COLLECTION_FILTER = 'ALL';
         let STARTUP_SUB = 'port';
         let SHOW_ALL_STADIUMS = false;
+        let OPEN_SELL_PANELS = new Set();
         let WHEEL_ROTATION = 0;
         let IS_SPINNING = false;
         let IS_OPENING_BOX = false;
@@ -1778,6 +1867,7 @@
         let STREAK_POPUP_SHOWN = false;
         let IS_LOADING_STATE = false;
         let BM_END_TS = 0;
+        let BM_RELOAD_TRIGGERED = false;
 
         function haptic(type = 'light') {
             if (!tg || !tg.HapticFeedback) return;
@@ -1849,8 +1939,16 @@
             const left = Math.max(0, BM_END_TS - Math.floor(Date.now() / 1000));
             if (left <= 0) {
                 el.textContent = '🔄 Обновление лота...';
+                if (!BM_RELOAD_TRIGGERED) {
+                    BM_RELOAD_TRIGGERED = true;
+                    setTimeout(() => {
+                        BM_RELOAD_TRIGGERED = false;
+                        loadAppState(true);
+                    }, 2200);
+                }
                 return;
             }
+            BM_RELOAD_TRIGGERED = false;
             const hrs = Math.floor(left / 3600);
             const mins = Math.floor((left % 3600) / 60);
             const secs = left % 60;
@@ -1863,8 +1961,7 @@
             if (!APP_STATE) return;
             const u = APP_STATE.user || {};
             if (tabName === 'matches') {
-                renderRookieQuestCard(u);
-                renderDailyQuestsCard(u);
+                renderRewardsHubBar(u);
                 renderLeaguesBar();
                 renderMatchesFeed();
             } else if (tabName === 'games') {
@@ -2013,7 +2110,10 @@
                     const timer = setTimeout(() => controller.abort(), 12000);
                     try {
                         const unameParam = CURRENT_TG_UNAME ? `?uname=${encodeURIComponent(CURRENT_TG_UNAME)}` : '';
-                        const resp = await fetch('/api/state/' + CURRENT_UID + unameParam, { signal: controller.signal });
+                        const resp = await fetch('/api/state/' + CURRENT_UID + unameParam, {
+                            headers: { 'X-Telegram-Init-Data': TG_INIT_DATA },
+                            signal: controller.signal
+                        });
                         clearTimeout(timer);
                         const data = await resp.json();
                         if (!data.ok) {
@@ -2082,15 +2182,7 @@
             if (hhEl) hhEl.style.display = u.hot_hand ? 'inline-block' : 'none';
 
             renderLiveTickerBar();
-
-            const bonusBanner = document.getElementById('bonus-banner');
-            if (u.can_claim_bonus) {
-                bonusBanner.style.display = 'flex';
-                const exactAmt = u.daily_bonus_amt || 200;
-                document.getElementById('ui-bonus-desc').textContent = `День ${u.streak_day || 1}/7 • Твой подарок сегодня: +${formatFC(exactAmt)}`;
-            } else {
-                bonusBanner.style.display = 'none';
-            }
+            renderRewardsHubBar(u);
 
             if (APP_STATE.daily_express) {
                 document.getElementById('ui-exp-day-odd').textContent = 'Кэф ' + APP_STATE.daily_express.total_odd;
@@ -2123,6 +2215,7 @@
             renderSpecificTab(ACTIVE_TAB);
             renderSlipUI();
 
+            if (document.getElementById('rewards-hub-modal').classList.contains('show')) renderRewardsHubModalBody();
             if (document.getElementById('vip-modal').classList.contains('show')) renderVipClubModalBody();
             if (document.getElementById('tournament-modal').classList.contains('show')) renderTournamentModalBody();
             if (document.getElementById('signals-modal').classList.contains('show')) renderCopySignalsModalBody();
@@ -2147,6 +2240,9 @@
                     if (document.getElementById('all-markets-modal').classList.contains('show')) {
                         renderAllMarketsModalBody();
                     }
+                } else {
+                    // Матч завершился и был снят с линии
+                    closeMatchDetail();
                 }
             }
         }
@@ -2157,9 +2253,9 @@
             const list = (APP_STATE.live_ticker && APP_STATE.live_ticker.length)
                 ? APP_STATE.live_ticker
                 : [
-                    '🎄 Зимний Сезон 2027 • Выполняй 3 Ежедневных задания каппера и забирай сундук дня',
-                    '🔨 На Чёрном рынке 12 легенд (98–99 OVR) со свободными ставками и таймером',
-                    '👕 В Элитном паке FUT строго 94–97 OVR, а в СПК доступны 3 раздельных рецепта крафта'
+                    '🎄 Зимний Сезон 2027 • Все подарки, Адвент-календарь и задания дня собраны в «Центре наград»',
+                    '🔴 Быстрые LIVE-обновления каждые 18 сек + честная 2D-линия Пуассона и Гол-уведомления в чат',
+                    '🔨 На Чёрном рынке 12 легенд (98–99 OVR) с анти-снайпингом (+2 мин) и историей ставок'
                 ];
             const sig = list.join('||');
             if (sig === LAST_TICKER_SIGNATURE) return;
@@ -2169,7 +2265,160 @@
             bar.innerHTML = `<div class="ticker-half">${itemsHtml}</div><div class="ticker-half">${itemsHtml}</div>`;
         }
 
-        /* ==================== ВКЛАДКА «🏆 КЛУБ» + ЧЁРНЫЙ РЫНОК V2 ==================== */
+        /* ==================== ЕДИНЫЙ ЦЕНТР НАГРАД (АДВЕНТ + КВЕСТ НОВИЧКА + ЗАДАНИЯ ДНЯ) ==================== */
+        function renderRewardsHubBar(u) {
+            const bar = document.getElementById('rewards-hub-bar');
+            if (!bar || !u) return;
+
+            const rq = u.rookie_quest || { done_count: 0, claimed: 1 };
+            const dq = u.daily_quests || { done_count: 0, claimed: 1 };
+
+            const readyItems = [];
+            if (u.can_claim_bonus) readyItems.push(`Адвент +${formatFC(u.daily_bonus_amt || 200)}`);
+            if (rq.claimed === 0 && (rq.done_count || 0) >= 3) readyItems.push('Квест новичка (+1 000 FC)');
+            if (dq.claimed === 0 && (dq.done_count || 0) >= 3) readyItems.push('Сундук дня');
+
+            const icoEl = document.getElementById('rh-ico');
+            const titleEl = document.getElementById('rh-title');
+            const subEl = document.getElementById('rh-sub');
+            const badgeEl = document.getElementById('rh-badge');
+
+            if (readyItems.length > 0) {
+                bar.classList.remove('all-done');
+                icoEl.textContent = '🎁';
+                titleEl.textContent = `Доступно наград: ${readyItems.length}`;
+                subEl.textContent = readyItems.join(' • ');
+                badgeEl.textContent = 'Забрать ➔';
+            } else {
+                bar.classList.add('all-done');
+                icoEl.textContent = '🎯';
+                titleEl.textContent = 'Центр наград и квестов';
+                const parts = [`Адвент: День ${u.streak_day || 1}/7`];
+                if (dq.claimed === 0) parts.push(`Задания дня: ${dq.done_count || 0}/3`);
+                if (rq.claimed === 0) parts.push(`Старт: ${rq.done_count || 0}/3`);
+                subEl.textContent = parts.join(' • ');
+                badgeEl.textContent = 'Открыть';
+            }
+        }
+
+        function openRewardsHubModal() {
+            haptic('light');
+            renderRewardsHubModalBody();
+            document.getElementById('rewards-hub-modal').classList.add('show');
+        }
+
+        function renderRewardsHubModalBody() {
+            const box = document.getElementById('rewards-hub-modal-body');
+            if (!box || !APP_STATE || !APP_STATE.user) return;
+            const u = APP_STATE.user;
+            const rq = u.rookie_quest || { done_count: 0, claimed: 1 };
+            const dq = u.daily_quests || { bets: 0, exp: 0, port: 0, done_count: 0, claimed: 1 };
+
+            const adventHtml = `
+                <div class="card frost-accent" style="border-color:rgba(251,191,36,0.5); background:linear-gradient(135deg, rgba(225,29,72,0.16), rgba(245,158,11,0.14), #15223a); margin-bottom:11px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div>
+                            <div style="font-weight:800; font-size:13px; color:#fef08a;">🎄 Новогодний Адвент-календарь</div>
+                            <div style="font-size:11px; color:#e2e8f0; margin-top:2px;">
+                                ${u.can_claim_bonus ? `День ${u.streak_day || 1}/7 готов: <b>+${formatFC(u.daily_bonus_amt || 200)}</b>` : `День ${u.streak_day || 1}/7 уже получен • Заходи завтра`}
+                            </div>
+                        </div>
+                        <button class="btn-main ${u.can_claim_bonus ? 'gold' : 'ghost'}" style="padding:8px 11px; font-size:11px; white-space:nowrap;" onclick="document.getElementById('rewards-hub-modal').classList.remove('show'); openStreakCalendarModal()">
+                            ${u.can_claim_bonus ? 'Забрать' : 'Календарь'}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            let rookieHtml = '';
+            if (rq.claimed === 0) {
+                const doneCnt = rq.done_count || 0;
+                const claimBtn = doneCnt >= 3
+                    ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimRookieQuestReward()">🎁 Забрать +1 000 FC + Карточку FUT</button>`
+                    : `<div style="font-size:10.5px; color:#cbd5e1; text-align:center;">Приз: <b>+1 000 FC + Золотая карта FUT</b> (ставка от кэфа 1.35)</div>`;
+
+                rookieHtml = `
+                    <div class="rookie-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <b style="font-size:12.5px; color:#6ee7b7;">🚀 Квест новичка (${doneCnt}/3)</b>
+                            <span style="font-size:11px; font-weight:800; color:#fde68a;">+1 000 FC + 🃏 FUT</span>
+                        </div>
+                        <div class="rookie-steps">
+                            <div class="rk-step ${rq.bet ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show')">
+                                ${rq.bet ? '✅' : '1.'}<br>Ставка ≥1.35
+                            </div>
+                            <div class="rk-step ${rq.box ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show'); switchTab('startup')">
+                                ${rq.box ? '✅' : '2.'}<br>Контейнер
+                            </div>
+                            <div class="rk-step ${rq.spin ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show'); switchTab('games'); switchClubSub('extras', document.querySelectorAll('#tab-games .sub-nav-btn')[3])">
+                                ${rq.spin ? '✅' : '3.'}<br>Рулетка
+                            </div>
+                        </div>
+                        ${claimBtn}
+                    </div>
+                `;
+            }
+
+            let dailyHtml = '';
+            if (dq.claimed === 0) {
+                const doneCnt = dq.done_count || 0;
+                const betsDone = (dq.bets || 0) >= 2;
+                const expDone = (dq.exp || 0) >= 1;
+                const portDone = (dq.port || 0) >= 1;
+                const claimBtn = doneCnt >= 3
+                    ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimDailyQuests()">🎁 Открыть сундук дня (+500 FC + Бустер)</button>`
+                    : `<div style="font-size:10px; color:#cbd5e1; text-align:center;">Обновление в 00:00 МСК • Награда: <b>+500 FC + Бустер</b> (или +750 FC)</div>`;
+
+                dailyHtml = `
+                    <div class="daily-quest-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <b style="font-size:12.5px; color:#bae6fd;">🎯 Задания дня (${doneCnt}/3)</b>
+                            <span style="font-size:10.5px; font-weight:800; color:#fde68a;">🎁 Сундук дня</span>
+                        </div>
+                        <div class="rookie-steps">
+                            <div class="rk-step ${betsDone ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show')">
+                                ${betsDone ? '✅' : `${dq.bets || 0}/2`}<br>2 ставки ≥1.35
+                            </div>
+                            <div class="rk-step ${expDone ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show'); loadDailyExpressToSlip()">
+                                ${expDone ? '✅' : '0/1'}<br>Экспресс 3+
+                            </div>
+                            <div class="rk-step ${portDone ? 'done' : ''}" onclick="document.getElementById('rewards-hub-modal').classList.remove('show'); switchTab('startup')">
+                                ${portDone ? '✅' : '0/1'}<br>Порт / Спин
+                            </div>
+                        </div>
+                        ${claimBtn}
+                    </div>
+                `;
+            } else {
+                dailyHtml = `
+                    <div class="card" style="text-align:center; padding:12px; font-size:11.5px; color:#6ee7b7;">
+                        ✅ Все задания сегодняшнего дня выполнены! Новые появятся в 00:00 МСК.
+                    </div>
+                `;
+            }
+
+            box.innerHTML = adventHtml + rookieHtml + dailyHtml;
+        }
+
+        async function claimRookieQuestReward() {
+            haptic('medium');
+            const res = await apiAction({ action: 'claim_rookie_quest' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+            if (res.card) {
+                document.getElementById('rewards-hub-modal').classList.remove('show');
+                showCardPreviewModal(res.card, res.message);
+            }
+        }
+
+        async function claimDailyQuests() {
+            haptic('medium');
+            const res = await apiAction({ action: 'claim_daily_quests' });
+            if (!res.ok) return showToast(res.error, true);
+            showToast(res.message);
+        }
+
+        /* ==================== ВКЛАДКА «🏆 КЛУБ» + ЧЁРНЫЙ РЫНОК V3 ==================== */
         function buildCopySignalsHtml() {
             const signals = (APP_STATE && APP_STATE.copy_signals) ? APP_STATE.copy_signals : [];
             const sigHtml = signals.length === 0
@@ -2227,7 +2476,7 @@
                         <div style="font-size:10.5px; color:#6ee7b7; font-weight:800;">${myClan.ico || '🛡️'} МОЙ СИНДИКАТ • ШТАБ УР.${myClan.hq_level}/5</div>
                         <div style="font-size:18px; font-weight:800; color:#fff; margin:4px 0;">[${myClan.tag}] ${myClan.name}</div>
                         <div style="font-size:11px; color:#fde68a; font-weight:700; margin-bottom:9px;">
-                            Командный бафф: +${myClan.odd_boost || 0.05} к Экспрессам • +${myClan.arena_pct || 5}% к доходу Арены
+                            Командный бафф: +${myClan.profit_pct || 2}% к прибыли Экспрессов • +${myClan.arena_pct || 5}% к доходу Арены
                         </div>
                         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:rgba(10,18,34,0.55); border:1px solid rgba(148,163,184,0.18); padding:8px; border-radius:10px; margin-bottom:9px;">
                             <div><span style="font-size:9.5px; color:var(--text-muted); display:block;">Казна</span><b style="color:#6ee7b7; font-size:11.5px;">${formatFC(myClan.treasury)}</b></div>
@@ -2252,7 +2501,7 @@
                     <div class="card frost-accent" style="margin-bottom:12px;">
                         <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;">🛡️ Основать Синдикат</div>
                         <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px; line-height:1.4;">
-                            Участники клана получают до <b>+0.25 к кэфам экспрессов</b> и <b>+20% к доходу Арены</b>, а с каждого выигрыша бот начисляет +3% бонусом в казну клана.
+                            Участники клана получают до <b>+6% к прибыли экспрессов</b> и <b>+20% к доходу Арены</b>, а с каждого выигрыша бот начисляет +3% бонусом в казну клана.
                         </div>
                         <div style="display:grid; grid-template-columns:72px 1fr 58px; gap:6px; margin-bottom:8px;">
                             <input type="text" id="clan-tag-inp" class="stake-input" style="margin:0; padding:8px; font-size:12px; text-transform:uppercase;" maxlength="4" placeholder="ТЕГ">
@@ -2285,7 +2534,7 @@
                                     #${c.place} ${c.ico || '🛡️'} <span style="color:#fde68a;">[${c.tag}]</span> ${c.name}
                                 </div>
                                 <div style="font-size:10.5px; color:var(--text-muted);">
-                                    Ур.${c.hq_level} (+${c.odd_boost} кэф) • 👥 ${c.members_count}/${c.max_members} • 🏆 <b style="color:var(--accent-blue);">${c.points} PTS</b>
+                                    Ур.${c.hq_level} (+${c.profit_pct || 2}% приб.) • 👥 ${c.members_count}/${c.max_members} • 🏆 <b style="color:var(--accent-blue);">${c.points} PTS</b>
                                 </div>
                             </div>
                             <div>
@@ -2379,6 +2628,18 @@
                 const leaderClick = bm.leader_id ? `onclick="inspectPlayer('${bm.leader_id}')"` : '';
                 const ovrVal = bm.card.ovr || 99;
                 const isMeLeader = (bm.leader_id && u.user_id && bm.leader_id === u.user_id);
+                const hist = bm.bids_history || [];
+                const histHtml = hist.length > 0
+                    ? `<div class="bm-hist-list">
+                         <div style="font-size:10px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">Последние ставки по лоту:</div>
+                         ${hist.map((h, i) => `
+                             <div class="bm-hist-row">
+                                 <span>${i === 0 ? '👑' : '•'} <b class="player-link" style="color:${i === 0 ? '#fde68a' : '#e2e8f0'};" onclick="inspectPlayer('${h.user_id}')">${h.name}</b></span>
+                                 <span><b style="color:#6ee7b7;">${formatFC(h.amount)}</b> <span style="color:var(--text-muted); font-size:9.5px;">${h.time || ''}</span></span>
+                             </div>
+                         `).join('')}
+                       </div>`
+                    : '';
 
                 bmBox.innerHTML = `
                     <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
@@ -2395,7 +2656,7 @@
                             <div style="font-size:10.5px; color:#fde68a; font-weight:800;">ЭКСКЛЮЗИВНЫЙ ЛОТ ${ovrVal} OVR • ПУЛ ${bm.pool_count || 12} ЛЕГЕНД</div>
                             <div style="font-size:14.5px; font-weight:800; margin:2px 0;">${bm.card.name}</div>
                             <div style="font-size:11px; color:#6ee7b7; font-weight:700; margin-bottom:4px;">⚡ ${bm.card.desc}</div>
-                            <div style="font-size:10px; color:#cbd5e1;">🔔 Если твою ставку перебьют — бот пришлёт уведомление и вернёт FC.</div>
+                            <div style="font-size:10px; color:#cbd5e1;">⏱ Анти-снайпинг: ставка за &lt;2 мин продлевает торги на +2 мин.</div>
                         </div>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(10,18,34,0.55); border:1px solid var(--border-glass); padding:8px 10px; border-radius:10px; font-size:11.5px; margin-bottom:9px;">
@@ -2416,6 +2677,7 @@
                             </div>
                           `
                     }
+                    ${histHtml}
                 `;
             }
 
@@ -2598,12 +2860,13 @@
             const box = document.getElementById('club-sets-body');
             if (!box || !APP_STATE || !APP_STATE.user) return;
             const sets = APP_STATE.user.club_sets || [];
-            const setsBoost = (APP_STATE.user.fut_buffs && APP_STATE.user.fut_buffs.sets_odd_boost) ? APP_STATE.user.fut_buffs.sets_odd_boost : 0;
+            const setsBoost = (APP_STATE.user.fut_buffs && APP_STATE.user.fut_buffs.sets_profit_pct) ? APP_STATE.user.fut_buffs.sets_profit_pct : 0;
 
             const rowsHtml = sets.map(s => {
+                const pctVal = s.profit_pct || 1.5;
                 let btnHtml = `<span style="font-size:11px; color:var(--text-muted); font-weight:700;">${s.have}/${s.req}</span>`;
                 if (s.claimed) {
-                    btnHtml = `<span style="font-size:11px; color:#6ee7b7; font-weight:800;">✅ Активен (+${s.odd})</span>`;
+                    btnHtml = `<span style="font-size:11px; color:#6ee7b7; font-weight:800;">✅ Активен (+${pctVal}%)</span>`;
                 } else if (s.can_claim) {
                     btnHtml = `<button class="btn-main gold" style="padding:7px 11px; font-size:11px;" onclick="claimClubSetReward('${s.id}')">Забрать +${formatFC(s.reward)}</button>`;
                 }
@@ -2612,7 +2875,7 @@
                         <div>
                             <div style="font-size:12.5px; font-weight:800;">${s.title}</div>
                             <div style="font-size:10.5px; color:var(--text-muted);">
-                                ${s.req} карты клуба «${s.club}» • <b style="color:#fde68a;">+${formatFC(s.reward)}</b> и <b style="color:#6ee7b7;">+${s.odd} к кэфам</b>
+                                ${s.req} карты клуба «${s.club}» • <b style="color:#fde68a;">+${formatFC(s.reward)}</b> и <b style="color:#6ee7b7;">+${pctVal}% к прибыли</b>
                             </div>
                         </div>
                         <div>${btnHtml}</div>
@@ -2622,7 +2885,7 @@
 
             box.innerHTML = `
                 <div class="card" style="text-align:center; padding:10px; margin-bottom:10px; font-size:11.5px;">
-                    Постоянный бонус от закрытых Сетов: <b style="color:#6ee7b7;">+${setsBoost} к коэффициентам ставок</b>
+                    Постоянный бонус от закрытых Сетов: <b style="color:#6ee7b7;">+${setsBoost}% к чистой прибыли</b> (от кэфа 1.35)
                 </div>
                 ${rowsHtml}
             `;
@@ -2778,7 +3041,7 @@
 
                 <div class="card" style="padding:11px; margin-bottom:9px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; font-size:12px;">
-                        <b>👕 Состав FUT (${p.owned_cards_count}/100 карт)</b>
+                        <b>👕 Состав FUT (${p.owned_cards_count}/${p.total_cards_count || 112} карт)</b>
                         <span style="color:#6ee7b7; font-weight:700;">Сыгранность: ${p.chemistry}%</span>
                     </div>
                     <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px;">
@@ -2789,7 +3052,7 @@
                 <div class="card" style="padding:11px; margin-bottom:9px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; font-size:12px;">
                         <b>🏛 Шоурум находок</b>
-                        <span style="font-size:10.5px; color:#fde68a; font-weight:700;">+${p.showroom_daily_fc} FC/д • +${p.showroom_odd_boost} кэф</span>
+                        <span style="font-size:10.5px; color:#fde68a; font-weight:700;">+${p.showroom_daily_fc} FC/д • +${p.showroom_profit_pct || 0}% приб.</span>
                     </div>
                     ${showroomHtml}
                 </div>
@@ -2855,95 +3118,6 @@
             renderVipClubModalBody();
         }
 
-        function renderRookieQuestCard(u) {
-            const box = document.getElementById('rookie-quest-card');
-            if (!box) return;
-            const rq = u.rookie_quest;
-            if (!rq || rq.claimed === 1) {
-                box.style.display = 'none';
-                return;
-            }
-            box.style.display = 'block';
-            const doneCnt = rq.done_count || 0;
-            const claimBtn = doneCnt >= 3
-                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimRookieQuestReward()">🎁 Забрать +1 000 FC + Карточку FUT</button>`
-                : `<div style="font-size:10.5px; color:#cbd5e1; text-align:center;">Выполни 3 простых шага и забирай стартовый приз <b>+1 000 FC + Карточку FUT</b></div>`;
-
-            box.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:12.5px; color:#6ee7b7;">🚀 Квест новичка (${doneCnt}/3)</b>
-                    <span style="font-size:11px; font-weight:800; color:#fde68a;">+1 000 FC + 🃏 FUT</span>
-                </div>
-                <div class="rookie-steps">
-                    <div class="rk-step ${rq.bet ? 'done' : ''}" onclick="window.scrollTo({top:260, behavior:'smooth'})">
-                        ${rq.bet ? '✅' : '1.'} Ставка
-                    </div>
-                    <div class="rk-step ${rq.box ? 'done' : ''}" onclick="switchTab('startup')">
-                        ${rq.box ? '✅' : '2.'} Порт
-                    </div>
-                    <div class="rk-step ${rq.spin ? 'done' : ''}" onclick="switchTab('games'); switchClubSub('extras', document.querySelectorAll('#tab-games .sub-nav-btn')[3])">
-                        ${rq.spin ? '✅' : '3.'} Рулетка
-                    </div>
-                </div>
-                ${claimBtn}
-            `;
-        }
-
-        async function claimRookieQuestReward() {
-            haptic('medium');
-            const res = await apiAction({ action: 'claim_rookie_quest' });
-            if (!res.ok) return showToast(res.error, true);
-            showToast(res.message);
-            if (res.card) {
-                showCardPreviewModal(res.card, res.message);
-            }
-        }
-
-        function renderDailyQuestsCard(u) {
-            const box = document.getElementById('daily-quests-card');
-            if (!box) return;
-            const dq = u.daily_quests;
-            if (!dq || dq.claimed === 1) {
-                box.style.display = 'none';
-                return;
-            }
-            box.style.display = 'block';
-            const doneCnt = dq.done_count || 0;
-            const betsDone = (dq.bets || 0) >= 2;
-            const expDone = (dq.exp || 0) >= 1;
-            const portDone = (dq.port || 0) >= 1;
-
-            const claimBtn = doneCnt >= 3
-                ? `<button class="btn-main gold btn-block" style="padding:9px; font-size:12px;" onclick="claimDailyQuests()">🎁 Открыть сундук дня (+500 FC + Бустер)</button>`
-                : `<div style="font-size:10px; color:#cbd5e1; text-align:center;">Обновляются в 00:00 МСК • Награда: <b>+500 FC + Бустер</b> (или +750 FC)</div>`;
-
-            box.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:12.5px; color:#bae6fd;">🎯 Задания дня (${doneCnt}/3)</b>
-                    <span style="font-size:10.5px; font-weight:800; color:#fde68a;">🎁 Сундук дня</span>
-                </div>
-                <div class="rookie-steps">
-                    <div class="rk-step ${betsDone ? 'done' : ''}" onclick="window.scrollTo({top:280, behavior:'smooth'})">
-                        ${betsDone ? '✅' : `${dq.bets || 0}/2`}<br>2 ставки
-                    </div>
-                    <div class="rk-step ${expDone ? 'done' : ''}" onclick="loadDailyExpressToSlip()">
-                        ${expDone ? '✅' : '0/1'}<br>Экспресс 3+
-                    </div>
-                    <div class="rk-step ${portDone ? 'done' : ''}" onclick="switchTab('startup')">
-                        ${portDone ? '✅' : '0/1'}<br>Порт / Спин
-                    </div>
-                </div>
-                ${claimBtn}
-            `;
-        }
-
-        async function claimDailyQuests() {
-            haptic('medium');
-            const res = await apiAction({ action: 'claim_daily_quests' });
-            if (!res.ok) return showToast(res.error, true);
-            showToast(res.message);
-        }
-
         function openStreakCalendarModal() {
             if (!APP_STATE || !APP_STATE.user) return;
             haptic('light');
@@ -2996,7 +3170,7 @@
             document.getElementById('streak-modal').classList.remove('show');
         }
 
-        /* ==================== ВКЛАДКА «📦 ПОРТ» (СЕТКА 2×2 ДЛЯ 4 ВИТРИН, БЕЗ РЕДИРЕКТА, БЫСТРАЯ ПРОДАЖА) ==================== */
+        /* ==================== ВКЛАДКА «📦 ПОРТ» (СОХРАНЕНИЕ РАСКРЫТЫХ ПАНЕЛЕЙ + 2×2 ДЛЯ VIP) ==================== */
         function setP2PFilter(filterKey) {
             haptic('light');
             P2P_FILTER = filterKey;
@@ -3008,7 +3182,14 @@
         function toggleStorageSellPanel(itemUid) {
             haptic('light');
             const el = document.getElementById('sell-panel-' + itemUid);
-            if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+            if (!el) return;
+            if (OPEN_SELL_PANELS.has(itemUid)) {
+                OPEN_SELL_PANELS.delete(itemUid);
+                el.style.display = 'none';
+            } else {
+                OPEN_SELL_PANELS.add(itemUid);
+                el.style.display = 'block';
+            }
         }
 
         function renderStartupTab(u) {
@@ -3021,7 +3202,7 @@
             const wrEl = document.getElementById('st-wrenches-cnt');
             if (wrEl) wrEl.textContent = wrenchesCnt + ' шт.';
 
-            const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], can_claim_showroom: false, profit: 0, showroom_daily_fc: 0, showroom_odd_boost: 0 };
+            const st = (u && u.startup) ? u.startup : { storage: [], showroom: [], can_claim_showroom: false, profit: 0, showroom_daily_fc: 0, showroom_profit_pct: 0 };
             const rawCat = (APP_STATE && APP_STATE.containers_catalog && Object.keys(APP_STATE.containers_catalog).length)
                 ? APP_STATE.containers_catalog
                 : DEFAULT_CONTAINERS_CATALOG;
@@ -3083,12 +3264,13 @@
                             </div>
                         `;
                     }
+                    const sPct = item.show_pct || 1.0;
                     return `
                         <div class="fut-shield tier-4" style="width:100%; padding:10px 7px;" onclick="fromShowroomItem('${item.uid}')">
                             <div style="font-size:8.5px; color:#fde68a; font-weight:800;">ЭКСПОНАТ #${idx + 1}</div>
                             <div style="font-size:22px; margin:5px 0;">${item.ico}</div>
                             <div style="font-size:10.5px; font-weight:700; line-height:1.2; min-height:24px; color:#fff;">${item.name}</div>
-                            <div class="shield-buff" style="margin-top:5px;">+${item.show_inc} FC/д • +${item.show_odd} кэф</div>
+                            <div class="shield-buff" style="margin-top:5px;">+${item.show_inc} FC/д • +${sPct}% приб.</div>
                         </div>
                     `;
                 }).join('');
@@ -3122,6 +3304,7 @@
                         const expVal = it.expected_restore || Math.round(it.value * 1.52);
                         const qsBasePrice = it.quick_sell_price || Math.max(40, Math.round(it.value * 0.90));
                         const maxP2pPrice = Math.max(500, Math.round(it.value * 2.5));
+                        const isSellOpen = OPEN_SELL_PANELS.has(it.uid);
                         const demandBadge = it.is_in_demand
                             ? `<span class="rarity-pill rarity-2" style="margin-left:4px;">Спрос +15%</span>`
                             : '';
@@ -3172,11 +3355,11 @@
                                         🏛 В Шоурум (+${it.show_inc}/д)
                                     </button>
                                     <button class="btn-main" style="padding:8px 6px; font-size:10.5px;" onclick="toggleStorageSellPanel('${it.uid}')">
-                                        💰 Продать / P2P ▾
+                                        💰 Продать / P2P ${isSellOpen ? '▴' : '▾'}
                                     </button>
                                 </div>
 
-                                <div id="sell-panel-${it.uid}" style="display:none; margin-top:8px;">
+                                <div id="sell-panel-${it.uid}" style="display:${isSellOpen ? 'block' : 'none'}; margin-top:8px;">
                                     <div style="background:rgba(10,18,34,0.55); border:1px solid rgba(148,163,184,0.2); padding:8px; border-radius:10px; margin-bottom:8px;">
                                         <div style="font-size:10px; font-weight:700; color:#cbd5e1; margin-bottom:5px;">Продать скупщику в порту:</div>
                                         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
@@ -3205,7 +3388,7 @@
                     <div class="card" style="padding:12px; margin-bottom:10px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                             <b style="font-size:13px;">🏛 Личный Шоурум (${st.showroom.length}/${maxShowroom})</b>
-                            <span style="font-size:11px; color:#6ee7b7; font-weight:700;">+${st.showroom_daily_fc} FC/д • +${st.showroom_odd_boost} к кэфам</span>
+                            <span style="font-size:11px; color:#6ee7b7; font-weight:700;">+${st.showroom_daily_fc} FC/д • +${st.showroom_profit_pct || 0}% приб.</span>
                         </div>
                         <div class="${showroomGridClass}">${showroomSlots}</div>
                         ${showroomClaimBtn}
@@ -3258,7 +3441,7 @@
                         const isCard = (it._lot_type === 'fut_card');
                         const subDesc = isCard
                             ? `Карточка FUT • <b style="color:#6ee7b7;">${it.desc || ''}</b>`
-                            : `Шоурум: +${it.show_inc} FC/д, +${it.show_odd} к кэфам`;
+                            : `Шоурум: +${it.show_inc} FC/д, +${it.show_pct || 1}% к прибыли`;
                         return `
                             <div class="card" style="padding:12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
                                 <div style="font-size:26px;">${it.ico}</div>
@@ -3285,6 +3468,7 @@
 
         async function quickSellDroppedItem(itemUid) {
             haptic('medium');
+            OPEN_SELL_PANELS.delete(itemUid);
             const res = await apiAction({ action: 'startup_sell_npc', item_uid: itemUid, tactic: 'base' });
             document.getElementById('pack-modal').classList.remove('show');
             if (!res.ok) return showToast(res.error, true);
@@ -3389,6 +3573,7 @@
 
         async function sellStartupItemNpc(itemUid, tactic) {
             haptic('medium');
+            OPEN_SELL_PANELS.delete(itemUid);
             const res = await apiAction({ action: 'startup_sell_npc', item_uid: itemUid, tactic: tactic });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
@@ -3396,6 +3581,7 @@
 
         async function toShowroomItem(itemUid) {
             haptic('light');
+            OPEN_SELL_PANELS.delete(itemUid);
             const res = await apiAction({ action: 'startup_to_showroom', item_uid: itemUid });
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
@@ -3414,6 +3600,7 @@
             const price = parseInt((inp && inp.value) || '0', 10);
             const res = await apiAction({ action: 'p2p_list_item', item_uid: itemUid, price: price });
             if (!res.ok) return showToast(res.error, true);
+            OPEN_SELL_PANELS.delete(itemUid);
             showToast(res.message);
             switchStartupSub('p2p', document.getElementById('st-nav-p2p'));
         }
@@ -3443,7 +3630,8 @@
             if (!res.ok) return showToast(res.error, true);
             showToast(res.message);
         }
-        /* ==================== АФИША, ЖИВАЯ СТАТИСТИКА ESPN И СТРОГАЯ ХРОНОЛОГИЯ ==================== */
+        // === КОНЕЦ ЧАСТИ 1 ЭТАПА 4 ===
+        /* ==================== АФИША, ФАМИЛИИ АВТОРОВ ГОЛОВ И 2D LIVE-ЛИНИЯ ==================== */
         function onSearchTeamInput() {
             const inp = document.getElementById('team-search-input');
             SEARCH_QUERY = (inp.value || '').trim().toLowerCase();
@@ -3514,7 +3702,7 @@
             if (SELECTED_LEAGUE === 'top') {
                 document.getElementById('current-feed-title').textContent = '⚽ Ближайшие матчи и LIVE';
             } else if (SELECTED_LEAGUE === 'live') {
-                document.getElementById('current-feed-title').textContent = '🔴 Прямой эфир (+2 Гола = Победа)';
+                document.getElementById('current-feed-title').textContent = '🔴 Прямой эфир (2D-линия LIVE)';
                 list = list.filter(m => m.is_live);
             } else if (SELECTED_LEAGUE === 'today') {
                 document.getElementById('current-feed-title').textContent = '📅 Матчи сегодня';
@@ -3552,6 +3740,32 @@
             return m ? parseInt(m[1], 10) : 45;
         }
 
+        function buildOddCellHtml(m, pickCode, mktText, fullLabel, oddVal) {
+            const num = parseFloat(oddVal || 0);
+            if (!num || num <= 1.0) {
+                return `<div class="odd-btn locked-odd"><span class="mkt">${mktText}</span><span class="k">🔒</span></div>`;
+            }
+            const safeTeams = escQuotes(m.teams);
+            return `
+                <div class="odd-btn ${isOddSelected(m.event_id, pickCode) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${pickCode}','${escQuotes(fullLabel)}','${num}','${safeTeams}', ${m.is_live})">
+                    <span class="mkt">${mktText}</span><span class="k">${num}</span>
+                </div>
+            `;
+        }
+
+        function buildCompactCardScorersHtml(scorers) {
+            if (!scorers || !scorers.length) return '';
+            const hList = scorers.filter(s => s.side === 'home').map(s => `⚽ ${s.minute} <b>${s.player}</b>`).join('<br>');
+            const aList = scorers.filter(s => s.side === 'away').map(s => `<b>${s.player}</b> ${s.minute} ⚽`).join('<br>');
+            if (!hList && !aList) return '';
+            return `
+                <div class="match-card-scorers">
+                    <div>${hList || ''}</div>
+                    <div>${aList || ''}</div>
+                </div>
+            `;
+        }
+
         function renderMatchesFeed() {
             const box = document.getElementById('matches-container');
             if (!box || !APP_STATE) return;
@@ -3567,7 +3781,7 @@
 
             box.innerHTML = list.map(m => {
                 const isFav = favClub && m.teams.includes(favClub);
-                const modBadge = m.is_match_of_day ? `<span class="badge-mod">Матч дня +8%</span>` : '';
+                const modBadge = (m.is_match_of_day && !m.is_live) ? `<span class="badge-mod">Матч дня +8%</span>` : '';
                 const favBadge = isFav ? `<span class="badge-top">⭐ +10%</span>` : '';
 
                 let rightStatus = `<span style="color:#cbd5e1; font-weight:600;">${m.short_date}</span>`;
@@ -3582,24 +3796,16 @@
                     ? `<div class="score-pill">${m.live_score}</div>`
                     : `<div class="score-pill vs-badge">${m.short_date.split(' ')[1] || 'VS'}</div>`;
 
-                const o = m.odds;
-                const safeTeams = escQuotes(m.teams);
-                const safeH = escQuotes(m.home_team);
-                const safeA = escQuotes(m.away_team);
+                const o = m.odds || {};
                 const liveMin = m.is_live ? extractLiveMinuteClient(m.live_detail) : 0;
+                const scorersCompact = m.is_live ? buildCompactCardScorersHtml(m.scorers || []) : '';
 
                 const oddsRow = (m.is_live && liveMin >= 85)
                     ? `<div style="text-align:center; font-size:11px; color:var(--text-muted); padding:5px 0;">Конец матча (${m.live_detail}) • Прием ставок закрыт</div>`
                     : `<div class="odds-grid">
-                         <div class="odd-btn ${isOddSelected(m.event_id, 'p1') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p1','П1 (${safeH})','${o.p1}','${safeTeams}', ${m.is_live})">
-                             <span class="mkt">П1</span><span class="k">${o.p1}</span>
-                         </div>
-                         <div class="odd-btn ${isOddSelected(m.event_id, 'x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x','Ничья','${o.x}','${safeTeams}', ${m.is_live})">
-                             <span class="mkt">Х</span><span class="k">${o.x}</span>
-                         </div>
-                         <div class="odd-btn ${isOddSelected(m.event_id, 'p2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p2','П2 (${safeA})','${o.p2}','${safeTeams}', ${m.is_live})">
-                             <span class="mkt">П2</span><span class="k">${o.p2}</span>
-                         </div>
+                         ${buildOddCellHtml(m, 'p1', 'П1', `П1 (${m.home_team})`, o.p1)}
+                         ${buildOddCellHtml(m, 'x', 'Х', 'Ничья', o.x)}
+                         ${buildOddCellHtml(m, 'p2', 'П2', `П2 (${m.away_team})`, o.p2)}
                        </div>`;
 
                 const cardClasses = `match-card ${m.is_live ? 'is-live' : (m.is_match_of_day ? 'is-mod frost-accent' : '')}`;
@@ -3616,6 +3822,7 @@
                                 ${scoreCenter}
                                 <div class="team-name away">${m.away_team}</div>
                             </div>
+                            ${scorersCompact}
                             <div class="match-open-bar">
                                 <span>${m.is_live ? `Счёт: <b style="color:#fff;">${m.live_score}</b> (${m.live_detail})` : `Ожидание ИИ: <b style="color:#fff;">${m.best_score}</b> (${m.exp_goals} xG)`}</span>
                                 <span style="color:var(--accent-blue); font-weight:700;">Статистика и роспись ➔</span>
@@ -3631,6 +3838,15 @@
             haptic('light');
             renderLiveCenterWidgetBody();
             document.getElementById('live-widget-modal').classList.add('show');
+        }
+
+        function buildCashoutBtnHtml(b) {
+            const offer = Number(b.cashout_offer || 0);
+            if (offer > 0) {
+                return `<button class="btn-main gold" style="padding:6px 10px; font-size:10.5px; white-space:nowrap;" onclick="cashoutBet(${b.bet_id})">💸 ${formatFC(offer)}</button>`;
+            }
+            const reasonSafe = escQuotes(b.cashout_reason || 'CashOut временно недоступен');
+            return `<button class="btn-main ghost" style="padding:6px 9px; font-size:10.5px; opacity:0.65; white-space:nowrap;" onclick="showToast('🔒 ${reasonSafe}', true)">🔒 CashOut</button>`;
         }
 
         function renderLiveCenterWidgetBody() {
@@ -3650,17 +3866,20 @@
                     ? `<div class="score-pill">${m.live_score}</div>`
                     : `<div class="score-pill vs-badge">VS</div>`;
 
+                const scCompact = m.is_live ? buildCompactCardScorersHtml(m.scorers || []) : '';
+
                 return `
                     <div class="card" style="padding:12px; margin-bottom:9px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:8px;">
                             <span style="color:var(--text-muted);">${m.league_title}</span>
                             ${statusBadge}
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:7px;">
                             <b style="flex:1; font-size:13.5px;">${m.home_team}</b>
                             ${centerTablo}
                             <b style="flex:1; font-size:13.5px; text-align:right;">${m.away_team}</b>
                         </div>
+                        ${scCompact}
                         <button class="btn-main blue btn-block" style="padding:8px; font-size:11.5px; margin-top:4px;" onclick="document.getElementById('live-widget-modal').classList.remove('show'); openMatchDetail('${m.league_key}','${m.event_id}')">
                             Открыть статистику и роспись ➔
                         </button>
@@ -3669,21 +3888,21 @@
             }).join('');
 
             const trackerHtml = activeBets.length
-                ? activeBets.slice(0, 3).map(b => `
-                    <div class="stadium-row">
-                        <div>
+                ? activeBets.slice(0, 4).map(b => `
+                    <div class="stadium-row" style="gap:8px;">
+                        <div style="min-width:0; flex:1;">
                             <div style="font-size:12px; font-weight:800;">Купон #${b.bet_id} (Кэф ${b.odds})</div>
-                            <div style="font-size:11px; color:#6ee7b7;">${b.match_title}</div>
+                            <div style="font-size:11px; color:#6ee7b7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${b.match_title}</div>
                             <div style="font-size:10px; color:var(--text-muted);">Ставка: ${b.amount} FC ➔ Выплата: <b>${b.potential_win} FC</b></div>
                         </div>
-                        <button class="btn-main gold" style="padding:6px 10px; font-size:11px;" onclick="cashoutBet(${b.bet_id})">CashOut</button>
+                        ${buildCashoutBtnHtml(b)}
                     </div>
                 `).join('')
                 : `<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted);">Нет активных купонов в игре.</div>`;
 
             box.innerHTML = `
                 <div style="font-size:11px; color:#cbd5e1; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>Правило «+2 Гола = Досрочная победа П1/П2» активно</span>
+                    <span>${liveMatches.length ? `🔴 В эфире сейчас: ${liveMatches.length}` : 'Ближайшие матчи линии'} • Автообновление 15с</span>
                     <span style="color:var(--accent-blue); cursor:pointer; font-weight:700;" onclick="loadAppState()">🔄 Обновить</span>
                 </div>
                 ${matchesHtml}
@@ -3692,82 +3911,81 @@
             `;
         }
 
-        /* ==================== ВНУТРЕННИЙ ЭКРАН МАТЧА + ЖИВАЯ СТАТИСТИКА ESPN ==================== */
-        function buildMatchStatsAndScorersHtml(eventId) {
+        /* ==================== ВНУТРЕННИЙ ЭКРАН МАТЧА: АВТОРЫ ГОЛОВ В ШАПКЕ + СТАТИСТИКА ESPN ==================== */
+        function buildMatchHeaderScorersHtml(m) {
+            const det = MATCH_ESPN_CACHE[String(m.event_id)];
+            const scorers = (det && det.scorers && det.scorers.length) ? det.scorers : (m.scorers || []);
+            if (!scorers.length) return '';
+
+            const hGoals = scorers.filter(s => s.side === 'home')
+                .map(s => `<div class="md-scorer-item">⚽ <span class="md-scorer-min">${s.minute}</span> <b>${s.player}</b></div>`).join('');
+            const aGoals = scorers.filter(s => s.side === 'away')
+                .map(s => `<div class="md-scorer-item"><b>${s.player}</b> <span class="md-scorer-min">${s.minute}</span> ⚽</div>`).join('');
+            if (!hGoals && !aGoals) return '';
+
+            return `
+                <div class="md-scorers-header">
+                    <div class="md-scorers-col">${hGoals || '<span style="color:var(--text-muted);">—</span>'}</div>
+                    <div class="md-scorers-col away">${aGoals || '<span style="color:var(--text-muted);">—</span>'}</div>
+                </div>
+            `;
+        }
+
+        function buildMatchStatsOnlyHtml(eventId) {
             const det = MATCH_ESPN_CACHE[String(eventId)];
-            if (!det) return '';
+            if (!det || !det.stats) return '';
             const st = det.stats;
-            const scorers = det.scorers || [];
 
-            let barsHtml = '';
-            if (st) {
-                const metrics = [
-                    { key: 'possession', label: 'Владение мячом', suffix: '%' },
-                    { key: 'shots', label: 'Удары всего', suffix: '' },
-                    { key: 'shots_on_target', label: 'Удары в створ', suffix: '' },
-                    { key: 'corners', label: 'Угловые', suffix: '' }
-                ];
-                const nonZeroAny = metrics.some(mt => {
-                    const pair = st[mt.key] || ['0', '0'];
-                    return (parseFloat(pair[0]) || 0) > 0 || (parseFloat(pair[1]) || 0) > 0;
-                });
+            const metrics = [
+                { key: 'possession', label: 'Владение мячом', suffix: '%' },
+                { key: 'shots', label: 'Удары всего', suffix: '' },
+                { key: 'shots_on_target', label: 'Удары в створ', suffix: '' },
+                { key: 'corners', label: 'Угловые', suffix: '' }
+            ];
+            const nonZeroAny = metrics.some(mt => {
+                const pair = st[mt.key] || ['0', '0'];
+                return (parseFloat(pair[0]) || 0) > 0 || (parseFloat(pair[1]) || 0) > 0;
+            });
+            if (!nonZeroAny) return '';
 
-                if (nonZeroAny) {
-                    barsHtml = metrics.map(mt => {
-                        const pair = st[mt.key] || ['0', '0'];
-                        const vH = parseFloat(pair[0]) || 0;
-                        const vA = parseFloat(pair[1]) || 0;
-                        const sum = vH + vA;
-                        const pctH = sum > 0 ? Math.round((vH / sum) * 100) : 50;
-                        const pctA = 100 - pctH;
-                        return `
-                            <div class="stat-bar-row">
-                                <div class="stat-bar-head">
-                                    <span style="color:#6ee7b7;">${vH}${mt.suffix}</span>
-                                    <span class="lbl">${mt.label}</span>
-                                    <span style="color:#7dd3fc;">${vA}${mt.suffix}</span>
-                                </div>
-                                <div class="stat-bar-track">
-                                    <div class="stat-fill-home" style="width:${pctH}%;"></div>
-                                    <div class="stat-fill-away" style="width:${pctA}%;"></div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
+            let barsHtml = metrics.map(mt => {
+                const pair = st[mt.key] || ['0', '0'];
+                const vH = parseFloat(pair[0]) || 0;
+                const vA = parseFloat(pair[1]) || 0;
+                const sum = vH + vA;
+                const pctH = sum > 0 ? Math.round((vH / sum) * 100) : 50;
+                const pctA = 100 - pctH;
+                return `
+                    <div class="stat-bar-row">
+                        <div class="stat-bar-head">
+                            <span style="color:#6ee7b7;">${vH}${mt.suffix}</span>
+                            <span class="lbl">${mt.label}</span>
+                            <span style="color:#7dd3fc;">${vA}${mt.suffix}</span>
+                        </div>
+                        <div class="stat-bar-track">
+                            <div class="stat-fill-home" style="width:${pctH}%;"></div>
+                            <div class="stat-fill-away" style="width:${pctA}%;"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
 
-                    const yPair = st.yellow_cards || ['0', '0'];
-                    const rPair = st.red_cards || ['0', '0'];
-                    if (Number(yPair[0]) || Number(yPair[1]) || Number(rPair[0]) || Number(rPair[1])) {
-                        barsHtml += `
-                            <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#cbd5e1; margin-top:6px; padding-top:6px; border-top:1px solid var(--border-glass);">
-                                <span>🟨 ${yPair[0]} &nbsp; 🟥 ${rPair[0]}</span>
-                                <span>Карточки</span>
-                                <span>🟨 ${yPair[1]} &nbsp; 🟥 ${rPair[1]}</span>
-                            </div>
-                        `;
-                    }
-                }
-            }
-
-            let scorersHtml = '';
-            if (scorers.length > 0) {
-                const hGoals = scorers.filter(s => s.side === 'home').map(s => `<div class="scorer-line">⚽ ${s.minute} <b>${s.player}</b></div>`).join('');
-                const aGoals = scorers.filter(s => s.side === 'away').map(s => `<div class="scorer-line"><b>${s.player}</b> ${s.minute} ⚽</div>`).join('');
-                scorersHtml = `
-                    <div class="scorers-list">
-                        <div class="scorers-col">${hGoals || '<span style="color:var(--text-muted);">—</span>'}</div>
-                        <div class="scorers-col away">${aGoals || '<span style="color:var(--text-muted);">—</span>'}</div>
+            const yPair = st.yellow_cards || ['0', '0'];
+            const rPair = st.red_cards || ['0', '0'];
+            if (Number(yPair[0]) || Number(yPair[1]) || Number(rPair[0]) || Number(rPair[1])) {
+                barsHtml += `
+                    <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#cbd5e1; margin-top:6px; padding-top:6px; border-top:1px solid var(--border-glass);">
+                        <span>🟨 ${yPair[0]} &nbsp; 🟥 ${rPair[0]}</span>
+                        <span>Карточки</span>
+                        <span>🟨 ${yPair[1]} &nbsp; 🟥 ${rPair[1]}</span>
                     </div>
                 `;
             }
-
-            if (!barsHtml && !scorersHtml) return '';
 
             return `
                 <div class="match-stats-card">
                     <div style="font-size:11px; font-weight:800; color:#bae6fd; margin-bottom:8px;">📊 Живая статистика матча (ESPN)</div>
                     ${barsHtml}
-                    ${scorersHtml}
                 </div>
             `;
         }
@@ -3787,12 +4005,21 @@
                 const resp = await fetch(`/api/match_ai/${leagueKey}/${eventId}`);
                 const data = await resp.json();
                 if (data.ok) {
+                    if (data.is_finished) {
+                        closeMatchDetail();
+                        showToast('🏁 Матч только что завершился!');
+                        loadAppState(true);
+                        return;
+                    }
                     MATCH_AI_CACHE[m.event_id] = data.ai_analysis;
                     if (data.espn_stats || (data.espn_scorers && data.espn_scorers.length)) {
                         MATCH_ESPN_CACHE[String(m.event_id)] = {
                             stats: data.espn_stats || null,
                             scorers: data.espn_scorers || []
                         };
+                        if (data.espn_scorers && data.espn_scorers.length) {
+                            m.scorers = data.espn_scorers;
+                        }
                     }
                     if (data.live_score) m.live_score = data.live_score;
                     if (data.live_detail) m.live_detail = data.live_detail;
@@ -3805,17 +4032,16 @@
         }
 
         function renderMatchDetailBody(m, aiHtml) {
-            const o = m.odds;
+            const o = m.odds || {};
             const p = m.probs || {};
             const safeTeams = escQuotes(m.teams);
-            const safeH = escQuotes(m.home_team);
-            const safeA = escQuotes(m.away_team);
             const battle = m.ai_battle || {};
             const liveMin = m.is_live ? extractLiveMinuteClient(m.live_detail) : 0;
-            const statsBlockHtml = buildMatchStatsAndScorersHtml(m.event_id);
+            const headerScorersHtml = buildMatchHeaderScorersHtml(m);
+            const statsBlockHtml = buildMatchStatsOnlyHtml(m.event_id);
 
             const scoreHeader = m.is_live
-                ? `<div style="font-size:21px; font-weight:800; color:#fecaca; margin:3px 0;">${m.live_score}</div>
+                ? `<div style="font-size:22px; font-weight:900; color:#fecaca; margin:2px 0;">${m.live_score}</div>
                    <div style="font-size:10px; color:#fecaca; font-weight:700;">LIVE (${m.live_detail})</div>`
                 : `<div style="font-size:13.5px; font-weight:800; color:#bae6fd; margin:3px 0;">${m.short_date}</div>
                    <div style="font-size:10.5px; color:#fde68a; font-weight:700;">Прогноз ИИ: ${m.best_score}</div>`;
@@ -3860,53 +4086,35 @@
 
                 const popTotals = (m.popular_totals && m.popular_totals.length) ? m.popular_totals : (m.totals_markets || []).slice(0, 3);
                 const popTotalsRows = popTotals.map(t => {
-                    const btnTb = t.tb_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, t.tb_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tb_code}','${escQuotes(t.tb_label)}','${t.tb_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${t.tb_label}</span><span class="k">${t.tb_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТБ ${t.line}</span><span class="k">🔒</span></div>`;
-                    const btnTm = t.tm_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, t.tm_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tm_code}','${escQuotes(t.tm_label)}','${t.tm_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${t.tm_label}</span><span class="k">${t.tm_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТМ ${t.line}</span><span class="k">🔒</span></div>`;
+                    const btnTb = t.tb_code
+                        ? buildOddCellHtml(m, t.tb_code, t.tb_label, t.tb_label, t.tb_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">ТБ ${t.line}</span><span class="k">🔒</span></div>`;
+                    const btnTm = t.tm_code
+                        ? buildOddCellHtml(m, t.tm_code, t.tm_label, t.tm_label, t.tm_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">ТМ ${t.line}</span><span class="k">🔒</span></div>`;
                     return btnTb + btnTm;
                 }).join('');
 
-                const exactRows = (m.exact_scores || []).slice(0, 8).map(es => `
-                    <div class="odd-btn ${isOddSelected(m.event_id, es.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${es.pick_code}','${escQuotes(es.label)}','${es.odds}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">${es.score}</span><span class="k">${es.odds}</span>
-                    </div>
-                `).join('');
+                const exactRows = (m.exact_scores || []).slice(0, 8).map(es =>
+                    buildOddCellHtml(m, es.pick_code, es.score, es.label, es.odds)
+                ).join('');
 
                 marketsHtml = `
-                    <div class="section-title" style="font-size:13px;">Основной исход (При +2 голах П1/П2 — досрочная победа)</div>
+                    <div class="section-title" style="font-size:13px;">Основной исход (Расчёт по финальному свистку)</div>
                     <div class="odds-grid cols-3">
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'p1') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p1','П1 (${safeH})','${o.p1}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">П1 (${p.p1 || 50}%)</span><span class="k">${o.p1}</span>
-                        </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x','Ничья','${o.x}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">Ничья (${p.x || 25}%)</span><span class="k">${o.x}</span>
-                        </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'p2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','p2','П2 (${safeA})','${o.p2}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">П2 (${p.p2 || 25}%)</span><span class="k">${o.p2}</span>
-                        </div>
+                        ${buildOddCellHtml(m, 'p1', `П1 (${p.p1 || 0}%)`, `П1 (${m.home_team})`, o.p1)}
+                        ${buildOddCellHtml(m, 'x', `Х (${p.x || 0}%)`, 'Ничья', o.x)}
+                        ${buildOddCellHtml(m, 'p2', `П2 (${p.p2 || 0}%)`, `П2 (${m.away_team})`, o.p2)}
                     </div>
 
                     <div class="section-title" style="font-size:13px;">${m.is_live ? 'Двойной шанс и Фора (0)' : 'Двойной шанс, Фора (0) и Обе забьют'}</div>
                     <div class="odds-grid ${m.is_live ? 'cols-2' : 'cols-3'}" style="margin-bottom:6px;">
-                        <div class="odd-btn ${isOddSelected(m.event_id, '1x') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','1x','1Х (${safeH})','${o['1x']}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">1Х</span><span class="k">${o['1x']}</span>
-                        </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'x2') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','x2','Х2 (${safeA})','${o['x2']}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">Х2</span><span class="k">${o['x2']}</span>
-                        </div>
-                        ${!m.is_live ? `<div class="odd-btn ${isOddSelected(m.event_id, 'btts') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts','Обе забьют: Да','${o.btts}','${safeTeams}', false)"><span class="mkt">ОЗ: Да</span><span class="k">${o.btts}</span></div>` : ''}
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'f10') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f10','Фора 1 (0)','${o.f10}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">Фора 1 (0)</span><span class="k">${o.f10}</span>
-                        </div>
-                        <div class="odd-btn ${isOddSelected(m.event_id, 'f20') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','f20','Фора 2 (0)','${o.f20}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">Фора 2 (0)</span><span class="k">${o.f20}</span>
-                        </div>
-                        ${!m.is_live ? `<div class="odd-btn ${isOddSelected(m.event_id, 'btts_no') ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','btts_no','Обе забьют: Нет','${o.btts_no}','${safeTeams}', false)"><span class="mkt">ОЗ: Нет</span><span class="k">${o.btts_no}</span></div>` : ''}
+                        ${buildOddCellHtml(m, '1x', '1Х', `1Х (${m.home_team})`, o['1x'])}
+                        ${buildOddCellHtml(m, 'x2', 'Х2', `Х2 (${m.away_team})`, o['x2'])}
+                        ${!m.is_live ? buildOddCellHtml(m, 'btts', 'ОЗ: Да', 'Обе забьют: Да', o.btts) : ''}
+                        ${buildOddCellHtml(m, 'f10', 'Фора 1 (0)', 'Фора 1 (0)', o.f10)}
+                        ${buildOddCellHtml(m, 'f20', 'Фора 2 (0)', 'Фора 2 (0)', o.f20)}
+                        ${!m.is_live ? buildOddCellHtml(m, 'btts_no', 'ОЗ: Нет', 'Обе забьют: Нет', o.btts_no) : ''}
                     </div>
 
                     <div class="section-title" style="font-size:13px;">Популярные Тоталы</div>
@@ -3924,10 +4132,11 @@
             document.getElementById('md-body').innerHTML = `
                 <div class="card frost-accent" style="text-align:center; padding:12px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                        <div style="flex:1; font-weight:800; font-size:14px;">${m.home_team}</div>
+                        <div style="flex:1; font-weight:800; font-size:14px; text-align:left;">${m.home_team}</div>
                         <div>${scoreHeader}</div>
-                        <div style="flex:1; font-weight:800; font-size:14px;">${m.away_team}</div>
+                        <div style="flex:1; font-weight:800; font-size:14px; text-align:right;">${m.away_team}</div>
                     </div>
+                    ${headerScorersHtml}
                 </div>
 
                 ${statsBlockHtml}
@@ -3971,20 +4180,16 @@
             const box = document.getElementById('all-markets-body');
             const m = CURRENT_OPEN_MATCH;
             if (!box || !m) return;
-            const safeTeams = escQuotes(m.teams);
 
             if (ALL_MARKETS_TAB === 'totals') {
                 const rows = (m.totals_markets || []).map(t => {
-                    const isWhole = t.line.endsWith('.0');
-                    const noteTag = isWhole ? ' (Возврат)' : '';
-                    const bTb = t.tb_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, t.tb_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tb_code}','${escQuotes(t.tb_label)}','${t.tb_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${t.tb_label}${noteTag}</span><span class="k">${t.tb_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТБ ${t.line}</span><span class="k">🔒</span></div>`;
-                    const bTm = t.tm_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, t.tm_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${t.tm_code}','${escQuotes(t.tm_label)}','${t.tm_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${t.tm_label}</span><span class="k">${t.tm_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">ТМ ${t.line}</span><span class="k">🔒</span></div>`;
+                    const noteTag = t.line.endsWith('.0') ? ' (Возвр.)' : '';
+                    const bTb = t.tb_code
+                        ? buildOddCellHtml(m, t.tb_code, `${t.tb_label}${noteTag}`, t.tb_label, t.tb_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">ТБ ${t.line}</span><span class="k">🔒</span></div>`;
+                    const bTm = t.tm_code
+                        ? buildOddCellHtml(m, t.tm_code, t.tm_label, t.tm_label, t.tm_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">ТМ ${t.line}</span><span class="k">🔒</span></div>`;
                     return bTb + bTm;
                 }).join('');
                 box.innerHTML = `
@@ -3993,14 +4198,12 @@
                 `;
             } else if (ALL_MARKETS_TAB === 'itb') {
                 const rows = (m.itb_markets || []).map(it => {
-                    const b1 = it.itb1_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, it.itb1_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb1_code}','${escQuotes(it.itb1_label)}','${it.itb1_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">${it.itb1_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">🔒</span></div>`;
-                    const b2 = it.itb2_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, it.itb2_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${it.itb2_code}','${escQuotes(it.itb2_label)}','${it.itb2_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">${it.itb2_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">🔒</span></div>`;
+                    const b1 = it.itb1_code
+                        ? buildOddCellHtml(m, it.itb1_code, `🏠 ИТБ1 > ${it.line}`, it.itb1_label, it.itb1_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">🏠 ИТБ1 > ${it.line}</span><span class="k">🔒</span></div>`;
+                    const b2 = it.itb2_code
+                        ? buildOddCellHtml(m, it.itb2_code, `✈️ ИТБ2 > ${it.line}`, it.itb2_label, it.itb2_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">✈️ ИТБ2 > ${it.line}</span><span class="k">🔒</span></div>`;
                     return b1 + b2;
                 }).join('');
                 box.innerHTML = `
@@ -4009,30 +4212,24 @@
                 `;
             } else if (ALL_MARKETS_TAB === 'handicaps') {
                 const rows = (m.handicaps_markets || []).map(h => {
-                    const b1 = h.h1_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, h.h1_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${h.h1_code}','${escQuotes(h.h1_label)}','${h.h1_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${h.h1_label}</span><span class="k">${h.h1_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">Фора 1</span><span class="k">🔒</span></div>`;
-                    const b2 = h.h2_code ? `
-                        <div class="odd-btn ${isOddSelected(m.event_id, h.h2_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${h.h2_code}','${escQuotes(h.h2_label)}','${h.h2_odd}','${safeTeams}', ${m.is_live})">
-                            <span class="mkt">${h.h2_label}</span><span class="k">${h.h2_odd}</span>
-                        </div>` : `<div class="odd-btn" style="opacity:0.35; pointer-events:none;"><span class="mkt">Фора 2</span><span class="k">🔒</span></div>`;
+                    const b1 = h.h1_code
+                        ? buildOddCellHtml(m, h.h1_code, h.h1_label, h.h1_label, h.h1_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">Фора 1</span><span class="k">🔒</span></div>`;
+                    const b2 = h.h2_code
+                        ? buildOddCellHtml(m, h.h2_code, h.h2_label, h.h2_label, h.h2_odd)
+                        : `<div class="odd-btn locked-odd"><span class="mkt">Фора 2</span><span class="k">🔒</span></div>`;
                     return b1 + b2;
                 }).join('');
                 box.innerHTML = rows
                     ? `<div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;">Линейка Фор (от -2.5 до +2.5):</div><div class="odds-grid cols-2">${rows}</div>`
                     : `<div class="card" style="text-align:center; font-size:12px; color:var(--text-muted); padding:18px;">Форы доступны до стартового свистка. В LIVE открыты Тоталы до 6.5 и ИТБ.</div>`;
             } else {
-                const rows = (m.specials_markets || []).map(sp => `
-                    <div class="odd-btn ${isOddSelected(m.event_id, sp.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${sp.pick_code}','${escQuotes(sp.label)}','${sp.odds}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">${sp.label}</span><span class="k">${sp.odds}</span>
-                    </div>
-                `).join('');
-                const bhRows = (m.half_markets || []).map(hm => `
-                    <div class="odd-btn ${isOddSelected(m.event_id, hm.pick_code) ? 'selected' : ''}" onclick="togglePick('${m.league_key}','${m.event_id}','${hm.pick_code}','${escQuotes(hm.label)}','${hm.odds}','${safeTeams}', ${m.is_live})">
-                        <span class="mkt">${hm.label}</span><span class="k">${hm.odds}</span>
-                    </div>
-                `).join('');
+                const rows = (m.specials_markets || []).map(sp =>
+                    buildOddCellHtml(m, sp.pick_code, sp.label, sp.label, sp.odds)
+                ).join('');
+                const bhRows = (m.half_markets || []).map(hm =>
+                    buildOddCellHtml(m, hm.pick_code, hm.label, hm.label, hm.odds)
+                ).join('');
                 box.innerHTML = (rows || bhRows)
                     ? `
                         <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;">Конструктор (Bet Builder) и спец-исходы:</div>
@@ -4051,7 +4248,7 @@
             renderSlipUI();
         }
 
-        /* ==================== КУПОН СТАВОК ==================== */
+        /* ==================== КУПОН СТАВОК С ПРОЗРАЧНОЙ РАСШИФРОВКОЙ БОНУСОВ ==================== */
         function getClientExpressBoost(count) {
             if (count >= 10) return { mult: 1.50, pct: 50, nextTxt: '🔥 Мега-Экспресс (+50% к кэфу) + 🛡 Кэшбэк 50% при 1 промахе' };
             if (count >= 8) return { mult: 1.35, pct: 35, nextTxt: '🔥 Буст +35% к кэфу + 🛡 Кэшбэк 50% при 1 промахе' };
@@ -4067,6 +4264,7 @@
             haptic('light');
             const evStr = String(event_id);
             const oddNum = parseFloat(oddVal);
+            if (!oddNum || oddNum <= 1.0) return;
             COPIED_FROM_UID = 0;
             COPIED_FROM_BET_ID = 0;
 
@@ -4097,22 +4295,28 @@
             return SLIP_ITEMS.some(i => String(i.event_id) === String(event_id) && i.pick_code === pick_code);
         }
 
-        function calculateSlipOdd() {
-            if (!SLIP_ITEMS.length) return 1.0;
-            const raw = SLIP_ITEMS.reduce((acc, it) => acc * it.oddVal, 1.0);
+        function getSlipCalcDetails() {
+            if (!SLIP_ITEMS.length) return { baseOdd: 1.0, finalOdd: 1.0, expPct: 0, profitBonusPct: 0, eligible: false };
+            const baseOdd = SLIP_ITEMS.reduce((acc, it) => acc * it.oddVal, 1.0);
             const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
-            let boosted = raw * boostInfo.mult;
+            const finalOdd = Math.round(baseOdd * boostInfo.mult * 100) / 100;
+            const minOdd = (APP_STATE && APP_STATE.min_odd_for_bonuses) ? Number(APP_STATE.min_odd_for_bonuses) : 1.35;
+            const eligible = finalOdd >= minOdd;
 
-            const u = (APP_STATE && APP_STATE.user) ? APP_STATE.user : {};
-            const buffs = u.fut_buffs || {};
-            let bonus = Number(buffs.lab_odd_boost || 0);
-            if (SLIP_ITEMS.length > 1) {
-                bonus += Number(buffs.express_odd_boost || 0);
+            let profitBonusPct = 0;
+            if (eligible && APP_STATE && APP_STATE.user) {
+                const u = APP_STATE.user;
+                const buffs = u.fut_buffs || {};
+                profitBonusPct += Number(buffs.profile_profit_pct || 0);
+                if (SLIP_ITEMS.length > 1) {
+                    profitBonusPct += Number(buffs.express_profit_pct || 0);
+                }
+                if (u.active_booster === 'boost035') {
+                    profitBonusPct += 15;
+                }
+                profitBonusPct = Math.min(65, Math.round(profitBonusPct * 10) / 10);
             }
-            if (u.active_booster === 'boost035') {
-                bonus += 0.35;
-            }
-            return boosted + bonus;
+            return { baseOdd: Math.round(baseOdd * 100) / 100, finalOdd, expPct: boostInfo.pct, profitBonusPct, eligible, minOdd };
         }
 
         function renderSlipUI() {
@@ -4126,16 +4330,13 @@
             bar.style.display = 'flex';
             const matchModalOpen = document.getElementById('match-detail-modal').classList.contains('show') ||
                                    document.getElementById('all-markets-modal').classList.contains('show');
-            if (matchModalOpen) {
-                bar.classList.add('over-modal');
-            } else {
-                bar.classList.remove('over-modal');
-            }
+            if (matchModalOpen) bar.classList.add('over-modal');
+            else bar.classList.remove('over-modal');
 
+            const calc = getSlipCalcDetails();
             document.getElementById('slip-count').textContent = SLIP_ITEMS.length;
-            document.getElementById('slip-total-odd').textContent = calculateSlipOdd().toFixed(2);
-            const boostInfo = getClientExpressBoost(SLIP_ITEMS.length);
-            const boostBadge = boostInfo.pct > 0 ? ` (+${boostInfo.pct}%)` : '';
+            document.getElementById('slip-total-odd').textContent = calc.finalOdd.toFixed(2);
+            const boostBadge = calc.expPct > 0 ? ` (+${calc.expPct}%)` : '';
             document.getElementById('slip-mode-label').textContent = SLIP_ITEMS.length > 1 ? `• Экспресс${boostBadge}` : '• Ординар';
         }
 
@@ -4169,7 +4370,6 @@
                 </div>
             `).join('');
 
-            document.getElementById('drawer-total-odd').textContent = calculateSlipOdd().toFixed(2);
             updatePotentialWin();
             document.getElementById('slip-drawer').classList.add('show');
         }
@@ -4213,8 +4413,23 @@
 
         function updatePotentialWin() {
             const stake = parseInt(document.getElementById('slip-stake-input').value || '0', 10);
-            const odd = calculateSlipOdd();
-            document.getElementById('drawer-payout').textContent = formatFC(Math.round(stake * odd));
+            const calc = getSlipCalcDetails();
+            document.getElementById('drawer-total-odd').textContent = calc.finalOdd.toFixed(2);
+
+            const rawProfit = Math.max(0, stake * (calc.finalOdd - 1.0));
+            const estPayout = Math.round(stake + rawProfit * (1 + calc.profitBonusPct / 100));
+            document.getElementById('drawer-payout').textContent = formatFC(estPayout);
+
+            const bdBox = document.getElementById('slip-breakdown-box');
+            if (bdBox) {
+                const expPart = calc.expPct > 0 ? ` • Экспресс <b style="color:#7dd3fc;">+${calc.expPct}%</b>` : '';
+                const profPart = calc.eligible
+                    ? (calc.profitBonusPct > 0
+                        ? `<br>Бонусы профиля + FUT: <b style="color:#6ee7b7;">+${calc.profitBonusPct}% к чистой прибыли</b>`
+                        : `<br>Бонусы к прибыли (от кэфа ${calc.minOdd}): <b style="color:#6ee7b7;">активны</b>`)
+                    : `<br><span style="color:#fde68a;">⚠️ При кэфе ниже ${calc.minOdd} бонусы профиля и квесты не активируются</span>`;
+                bdBox.innerHTML = `База: <b style="color:#fff;">${calc.baseOdd.toFixed(2)}</b>${expPart}${profPart}`;
+            }
 
             const insCost = Math.round(stake * 0.10);
             const insBox = document.getElementById('slip-insure-box');
@@ -4418,6 +4633,7 @@
         function renderFutTab(u, catalog) {
             const eqCards = u.equipped_cards || {};
             const ownedIds = u.owned_cards || [];
+            const totalPool = u.total_cards_count || 112;
             const reserveIds = u.reserve_cards || [];
             const capRole = u.captain_role || 'FW';
             const chem = u.chemistry || 0;
@@ -4425,12 +4641,12 @@
 
             document.getElementById('fut-chem-label').textContent = `⚡ Сыгранность: ${chem}%`;
             document.getElementById('fut-chem-bar').style.width = `${chem}%`;
-            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length}/100`;
+            document.getElementById('fut-owned-btn-cnt').textContent = `${ownedIds.length}/${totalPool}`;
             document.getElementById('fut-reserve-cnt').textContent = `${reserveIds.length}`;
 
             document.getElementById('fut-active-buffs-summary').innerHTML = `
-                • Форвард (Тоталы): <b style="color:#6ee7b7;">+${buffs.totals_profit_pct || 0}%</b> | Плеймейкер (1Х2): <b style="color:#6ee7b7;">+${buffs.outcomes_profit_pct || 0}%</b><br>
-                • Защитник (Форы/ОЗ): <b style="color:#6ee7b7;">+${buffs.handicap_profit_pct || 0}%</b> | Вратарь (Кэшбэк): <b style="color:#fde68a;">${buffs.loss_cashback_pct || 0}%</b> | Тренер+Клан: <b style="color:#7dd3fc;">+${buffs.express_odd_boost || 0}</b>
+                • Тоталы: <b style="color:#6ee7b7;">+${buffs.totals_profit_pct || 0}%</b> | 1Х2: <b style="color:#6ee7b7;">+${buffs.outcomes_profit_pct || 0}%</b> | Форы/ОЗ: <b style="color:#6ee7b7;">+${buffs.handicap_profit_pct || 0}%</b><br>
+                • Вратарь (Кэшбэк): <b style="color:#fde68a;">${buffs.loss_cashback_pct || 0}%</b> | Тренер+Клан (Экспресс): <b style="color:#7dd3fc;">+${buffs.express_profit_pct || 0}%</b>
             `;
 
             document.getElementById('fut-pitch-formation').innerHTML = `
@@ -4471,7 +4687,7 @@
 
             box.innerHTML = `
                 <div style="font-size:11.5px; color:#cbd5e1; margin-bottom:10px; line-height:1.4;">
-                    В СПК участвуют <b>только резервные карты</b> выбранной редкости — стартовый состав и более редкие карты защищены от случайного сжигания.
+                    В СПК сдаются <b>только резервные карты 1-го ★ уровня</b> выбранной редкости — основа и прокачанные карты защищены.
                 </div>
 
                 <div class="sbc-tier-card">
@@ -4480,7 +4696,7 @@
                         <span style="font-size:11px; font-weight:800; color:${c1 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c1}/3</span>
                     </div>
                     <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
-                        Сдаёшь: <b>3 Базовые карты (84–87)</b> ➔ Получаешь: <b style="color:#fde68a;">1 гарантированную Золотую (88–93)</b>
+                        Сдаёшь: <b>3 Базовые (84–87)</b> ➔ Получаешь: <b style="color:#fde68a;">1 гарантированную Золотую (88–93)</b>
                     </div>
                     <button class="btn-main ${c1 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(1)">
                         🔄 Обменять 3×84–87 ➔ Золотую (88–93)
@@ -4493,7 +4709,7 @@
                         <span style="font-size:11px; font-weight:800; color:${c2 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c2}/3</span>
                     </div>
                     <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
-                        Сдаёшь: <b>3 Золотые карты (88–93)</b> ➔ Получаешь: <b style="color:#7dd3fc;">1 гарантированную Элитную TOTY/ICON (94–97)</b>
+                        Сдаёшь: <b>3 Золотые (88–93)</b> ➔ Получаешь: <b style="color:#7dd3fc;">1 гарантированную Элитную (94–97)</b>
                     </div>
                     <button class="btn-main gold ${c2 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(2)">
                         🔄 Обменять 3×88–93 ➔ Элитную (94–97)
@@ -4506,7 +4722,7 @@
                         <span style="font-size:11px; font-weight:800; color:${c3 >= 3 ? '#6ee7b7' : 'var(--text-muted)'};">Резерв: ${c3}/3</span>
                     </div>
                     <div style="font-size:11px; color:#cbd5e1; margin-bottom:9px;">
-                        Сдаёшь: <b>3 Элитные карты (94–97)</b> ➔ Получаешь: <b style="color:#6ee7b7;">Топ-легенду 96–97 OVR + возврат 5 000 FC</b>
+                        Сдаёшь: <b>3 Элитные (94–97)</b> ➔ Получаешь: <b style="color:#6ee7b7;">Топ-легенду 96–97 OVR + 5 000 FC</b>
                     </div>
                     <button class="btn-main blue ${c3 >= 3 ? '' : 'disabled'} btn-block" style="margin-top:0; padding:9px; font-size:12px;" onclick="craftFutSbc(3)">
                         🔄 Обменять 3×94–97 ➔ Топ 96–97 + 5 000 FC
@@ -4540,6 +4756,7 @@
             const qsMap = APP_STATE.fut_quicksell_prices || DEFAULT_FUT_QUICKSELL;
             const maxP2pMap = APP_STATE.fut_p2p_max_prices || DEFAULT_FUT_P2P_MAX;
             const ownedIds = u.owned_cards || [];
+            const totalPool = u.total_cards_count || 112;
             const rbt = u.reserve_by_tier || { '1': 0, '2': 0, '3': 0 };
             const anySbcReady = (Number(rbt['1'] || 0) >= 3 || Number(rbt['2'] || 0) >= 3 || Number(rbt['3'] || 0) >= 3);
             const eqCards = u.equipped_cards || {};
@@ -4565,7 +4782,7 @@
             }
 
             const roles = [
-                { k: 'ALL', lbl: `Все (${ownedIds.length}/100)` },
+                { k: 'ALL', lbl: `Все (${ownedIds.length}/${totalPool})` },
                 { k: 'FW', lbl: 'FW' },
                 { k: 'MID', lbl: 'MID' },
                 { k: 'DEF', lbl: 'DEF' },
@@ -4736,7 +4953,8 @@
                 ${claimBtn}
             `;
 
-            const lab = u.lab_info || { name: 'Блокнот скаута', odd_bonus: 0, desc: '' };
+            const lab = u.lab_info || { name: 'Блокнот скаута', profit_pct: 0, desc: '' };
+            const labPct = lab.profit_pct !== undefined ? lab.profit_pct : 0;
             const labBtn = u.next_lab
                 ? `<button class="btn-main blue btn-block" onclick="upgradeBuilding('lab')">Улучшить до Ур.${u.lab_level + 1} (${formatFC(u.next_lab.price)})</button>`
                 : `<button class="btn-main btn-block disabled">✅ Максимальный уровень ИИ</button>`;
@@ -4744,9 +4962,9 @@
             document.getElementById('current-lab-card').innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <b style="font-size:13.5px;">${lab.name} (Ур. ${u.lab_level || 1}/5)</b>
-                    <b style="color:#7dd3fc; font-size:13px;">+${lab.odd_bonus} к кэфам</b>
+                    <b style="color:#7dd3fc; font-size:13px;">+${labPct}% к прибыли</b>
                 </div>
-                <div style="font-size:11px; color:#cbd5e1; margin-top:3px;">${lab.desc || ''}</div>
+                <div style="font-size:11px; color:#cbd5e1; margin-top:3px;">Повышает чистую прибыль всех выигранных ставок (при кэфе ≥ 1.35)</div>
                 ${labBtn}
             `;
 
@@ -4786,10 +5004,31 @@
             }).join('');
         }
 
-        /* ==================== ПРОФИЛЬ, ПРОМОКОДЫ И ЛЕСЕНКА ПОБЕД ==================== */
+        /* ==================== ПРОФИЛЬ, GOAL ALERTS, ПРОМОКОДЫ И ЛЕСЕНКА ПОБЕД ==================== */
+        function syncGoalAlertsToggleUI() {
+            const u = (APP_STATE && APP_STATE.user) ? APP_STATE.user : {};
+            const isOn = (u.goal_alerts === undefined || u.goal_alerts === null) ? true : (Number(u.goal_alerts) === 1);
+            const row = document.getElementById('goal-alerts-toggle-row');
+            const st = document.getElementById('ui-goal-alerts-state');
+            if (row) {
+                if (isOn) row.classList.add('active');
+                else row.classList.remove('active');
+            }
+            if (st) st.textContent = isOn ? '🔔 ВКЛ' : '🔕 ВЫКЛ';
+        }
+
         function openProfileSettingsModal() {
             haptic('light');
+            syncGoalAlertsToggleUI();
             document.getElementById('profile-settings-modal').classList.add('show');
+        }
+
+        async function toggleGoalAlerts() {
+            haptic('light');
+            const res = await apiAction({ action: 'toggle_goal_alerts' });
+            if (!res.ok) return showToast(res.error, true);
+            syncGoalAlertsToggleUI();
+            showToast(res.message);
         }
 
         async function redeemPromoCode() {
@@ -4907,6 +5146,7 @@
             document.getElementById('p-streak').textContent = u.streak + ' 🔥';
             document.getElementById('p-profit').textContent = (u.profit >= 0 ? '+' : '') + u.profit;
             document.getElementById('p-refs').textContent = u.referrals_count || 0;
+            syncGoalAlertsToggleUI();
 
             const ladCurEl = document.getElementById('p-ladder-cur');
             if (ladCurEl) ladCurEl.textContent = `Серия: ${u.streak || 0} 🔥`;
@@ -4937,7 +5177,7 @@
                 bLine.style.display = 'block';
                 const parts = [];
                 if (u.active_booster_name) parts.push('Бустер: ' + u.active_booster_name);
-                if (u.hot_hand) parts.push('🔥 Горячая рука (+0.10 к кэфам)');
+                if (u.hot_hand) parts.push('🔥 Горячая рука (+5% к прибыли)');
                 bLine.textContent = parts.join(' • ');
             } else {
                 bLine.style.display = 'none';
@@ -4992,9 +5232,9 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-glass); padding-top:8px; gap:5px; flex-wrap:wrap;">
                                 <div style="font-size:11px;">Ставка: <b>${b.amount} FC</b> ➔ <b style="color:#fde68a;">${b.potential_win} FC</b></div>
                                 <div style="display:flex; gap:5px;">
-                                    <button class="btn-main blue" style="padding:6px 9px; font-size:10.5px;" onclick="publishBetToSignals(${b.bet_id})">📡 В Сигналы</button>
+                                    <button class="btn-main blue" style="padding:6px 9px; font-size:10.5px;" onclick="publishBetToSignals(${b.bet_id})">📡 Сигнал</button>
                                     <button class="btn-main ghost" style="padding:6px 8px; font-size:10.5px;" onclick="openShareReceiptModal(${b.bet_id}, true)">📤</button>
-                                    <button class="btn-main gold" style="padding:6px 10px; font-size:10.5px;" onclick="cashoutBet(${b.bet_id})">CashOut</button>
+                                    ${buildCashoutBtnHtml(b)}
                                 </div>
                             </div>
                         </div>
@@ -5139,7 +5379,10 @@
                         <div style="font-size:12px; color:#6ee7b7; font-weight:700;">Выбор: ${p.pick_label}</div>
                     </div>
                 `).join('');
-                body.innerHTML = `<div style="font-size:12px; color:#6ee7b7; font-weight:700; margin-bottom:10px;">✅ Твой прогноз зафиксирован до начала матчей</div>${picksHtml}`;
+                const statusLine = se.entry.status === 'pending'
+                    ? '✅ Твой прогноз зафиксирован до начала матчей'
+                    : `🏁 Итог тиража: угадано ${se.entry.guessed}/6 • Приз: ${formatFC(se.entry.payout)}`;
+                body.innerHTML = `<div style="font-size:12px; color:#6ee7b7; font-weight:700; margin-bottom:10px;">${statusLine}</div>${picksHtml}`;
                 document.getElementById('se-modal').classList.add('show');
                 return;
             }
@@ -5253,25 +5496,35 @@
         function shareReferralLink() {
             shareCustomText(
                 '🎄 Залетай в Зимний Сезон AI_BET_BOT!\n' +
-                '📊 Тоталы до 6.5, Bet Builder, живая статистика ESPN и правило «+2 Гола = Победа»\n' +
+                '🔴 Быстрый LIVE каждые 18 сек, живая статистика ESPN и ⚽ Гол-уведомления в чат\n' +
                 '🛡️ Футбольные Синдикаты (Кланы), Копи-Беттинг (5% роялти) и Контракты 3➔1\n' +
-                '👕 100 коллекционных карточек FUT + 12 легенд 98–99 OVR на Чёрном рынке!\n\n' +
+                '👕 112 коллекционных карточек FUT + 12 легенд 98–99 OVR на Чёрном рынке!\n\n' +
                 '🎁 Забирай стартовый банк + 1 000 FC по моей ссылке:'
             );
         }
 
+        let _REFRESH_TICK = 0;
         window.addEventListener('DOMContentLoaded', () => {
             renderStartupTab({});
             fetch('/', { method: 'GET', cache: 'no-store' }).catch(() => {});
             loadAppState();
             setInterval(updateBmTimerTick, 1000);
+
+            // Быстрое LIVE-обновление каждые 15 сек на Афише/в LIVE-центре и раз в 30 сек на остальных вкладках
             setInterval(() => {
+                _REFRESH_TICK += 1;
                 const active = document.activeElement;
                 if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
-                loadAppState(true);
-            }, 35000);
+                const isLiveView = (
+                    ACTIVE_TAB === 'matches'
+                    || document.getElementById('live-widget-modal').classList.contains('show')
+                    || document.getElementById('match-detail-modal').classList.contains('show')
+                );
+                if (isLiveView || (_REFRESH_TICK % 2 === 0)) {
+                    loadAppState(true);
+                }
+            }, 15000);
         });
     </script>
 </body>
 </html>
-        
