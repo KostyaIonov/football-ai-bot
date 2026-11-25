@@ -3,3 +3,4 @@ openai
 aiohttp
 aiosqlite
 asyncpg
+Pillow>=10.0.0
