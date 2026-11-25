@@ -4177,6 +4177,9 @@ from collections import defaultdict
 from aiogram.types import MenuButtonWebApp, WebAppInfo, BufferedInputFile, LabeledPrice, PreCheckoutQuery
 
 WEBAPP_BASE_URL = (os.getenv("WEBAPP_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+INTERNAL_API_SECRET = (os.getenv("INTERNAL_API_SECRET") or "").strip()
+_HAS_PENDING_BETS = True
+_LAST_PENDING_DB_CHECK = 0
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -4662,31 +4665,40 @@ async def _safe_db_call(func, *args):
         try:
             return await func(*args)
         except Exception as e:
+            err_low = str(e).lower()
+            if "exceeded the quota" in err_low or "insufficientresources" in type(e).__name__.lower():
+                raise e
             if attempt == 0 and db_manager.use_pg:
                 async with _DB_RECONNECT_LOCK:
                     try:
                         import asyncpg
-                        if db_manager.pg_pool:
-                            try:
-                                await asyncio.wait_for(db_manager.pg_pool.close(), timeout=1.5)
-                            except Exception:
-                                pass
-                        db_manager.pg_pool = await asyncpg.create_pool(
-                            DATABASE_URL, min_size=2, max_size=8,
+                        old_pool = db_manager.pg_pool
+                        new_pool = await asyncpg.create_pool(
+                            DATABASE_URL, min_size=1, max_size=8,
                             max_inactive_connection_lifetime=120.0, command_timeout=8.0, statement_cache_size=0
                         )
+                        db_manager.pg_pool = new_pool
+                        if old_pool:
+                            try:
+                                await asyncio.wait_for(old_pool.close(), timeout=1.5)
+                            except Exception:
+                                pass
                     except Exception:
                         pass
-                await asyncio.sleep(0.02)
+                await asyncio.sleep(0.05)
             else:
                 raise e
 
 async def _cached_exec(query: str, *args):
+    global _HAS_PENDING_BETS
     res = await _safe_db_call(_orig_db_exec, query, *args)
-    if "users" in query.lower():
+    q_low = query.lower()
+    if "users" in q_low:
         for a in args:
             if isinstance(a, int) and a in RAM_USER_CACHE:
                 RAM_USER_CACHE.pop(a, None)
+    if "bets" in q_low and "insert" in q_low:
+        _HAS_PENDING_BETS = True
     return res
 
 async def _fast_get_user(user_id: int, *args, **kwargs) -> dict:
@@ -7596,7 +7608,11 @@ async def fast_unified_settlement_worker():
                 _LAST_CHECKED_TOURNEY_WK = cur_wk
                 asyncio.create_task(distribute_weekly_tournament_prizes(prev_wk))
 
-            pending_rows = await db_manager.fetch("SELECT * FROM bets WHERE status = 'pending'")
+            pending_rows = []
+            if _HAS_PENDING_BETS or (now_ts - _LAST_PENDING_DB_CHECK >= 180):
+                _LAST_PENDING_DB_CHECK = now_ts
+                pending_rows = await db_manager.fetch("SELECT * FROM bets WHERE status = 'pending'")
+                _HAS_PENDING_BETS = len(pending_rows) > 0
             if pending_rows:
                 events_to_fetch = {}
                 events_need_halves = set()
@@ -9821,15 +9837,91 @@ async def ensure_high_load_indexes():
         except Exception as e:
             logging.warning(f"Индекс БД: {e}")
 
+def _check_internal_secret(request) -> bool:
+    if not INTERNAL_API_SECRET:
+        return False
+    hdr = (request.headers.get("X-Internal-Secret") or "").strip()
+    return hmac.compare_digest(hdr, INTERNAL_API_SECRET)
+
+async def api_internal_line(request):
+    """Отдаёт 2-му боту готовую 2D-линию, LIVE-счёт, авторов голов, ЧР и Суперэкспресс из RAM"""
+    if not _check_internal_secret(request):
+        return web.json_response({"ok": False, "error": "Forbidden"}, status=403)
+
+    line_cache = await get_precomputed_webapp_line()
+    filtered_db = line_cache.get("filtered_db") or {}
+    now_ts = int(now_msk().timestamp())
+
+    enriched_matches = []
+    for l_key, l_data in filtered_db.items():
+        l_title = l_data.get("title", l_key)
+        l_slug = l_data.get("slug") or LEAGUES_CONFIG.get(l_key, {}).get("slug", "")
+        for m_id, m in (l_data.get("matches") or {}).items():
+            if m.get("is_finished"):
+                continue
+            compact = build_compact_match_payload(m, l_key, l_title)
+            mat = _get_match_matrix(m)
+            tb25 = evaluate_custom_market(m, "tb_2.5", mat)
+            btts = evaluate_custom_market(m, "btts", mat)
+            compact["odds"]["tb25"] = tb25["odds"] if tb25 else 0
+            compact["odds"]["btts"] = btts["odds"] if btts else 0
+            ai_battle, _ = build_ai_battle_and_radar(m, mat) if not m.get("is_live") else ({}, {})
+            enriched_matches.append({
+                **compact,
+                "league_slug": l_slug,
+                "end_ts": int(m.get("end_ts") or (int(m.get("start_ts") or now_ts) + 7200)),
+                "ai_battle": ai_battle
+            })
+
+    enriched_matches.sort(key=lambda x: (0 if x["is_live"] else 1, int(x["start_ts"])))
+
+    bm_lot = SHARED_DB_CACHE.get("bm_lot") or await get_or_rotate_bm_v3()
+    se_matches = SHARED_DB_CACHE.get("se_matches") or []
+    se_round_key = SHARED_DB_CACHE.get("se_round_key") or ""
+
+    return web.json_response({
+        "ok": True,
+        "bot_username": BOT_USERNAME,
+        "webapp_url": WEBAPP_BASE_URL,
+        "matches": enriched_matches,
+        "daily_express": line_cache.get("daily_express"),
+        "black_market": build_black_market_payload(bm_lot),
+        "superexpress": {"round_key": se_round_key, "matches": se_matches}
+    })
+
+async def api_internal_notify_bet(request):
+    """Синхронизирует кэш 1-го бота, когда 2-й бот принял ставку в групповом чате"""
+    global _HAS_PENDING_BETS
+    if not _check_internal_secret(request):
+        return web.json_response({"ok": False, "error": "Forbidden"}, status=403)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    uid = int(body.get("user_id") or 0)
+    if uid > 0:
+        RAM_USER_CACHE.pop(uid, None)
+    _HAS_PENDING_BETS = True
+    SHARED_DB_CACHE["leaderboard_ts"] = 0
+
+    ev_id = str(body.get("event_id") or "")
+    if ev_id and body.get("username") and body.get("pick_label"):
+        record_match_pulse(
+            ev_id,
+            str(body["username"]),
+            str(body["pick_label"]),
+            int(body.get("amount") or 0),
+            float(body.get("odds") or 1.0)
+        )
+    return web.json_response({"ok": True})
+
 async def db_keep_alive_worker():
+    """Чистка RAM-кэша и авто-бэкап раз в 12ч (без холостого SELECT 1)"""
     last_backup_ts = now_msk().timestamp()
     while True:
-        await asyncio.sleep(18)
+        await asyncio.sleep(60)
         now_f = now_msk().timestamp()
-        try:
-            await db_manager.fetchval("SELECT 1")
-        except Exception:
-            pass
         try:
             stale_uids = [k for k, v in list(RAM_USER_CACHE.items()) if (now_f - v.get("ts", 0)) > 120.0]
             for k in stale_uids:
@@ -9854,6 +9946,8 @@ async def start_web_server():
     app.router.add_get("/api/state/{user_id}", api_get_bootstrap)
     app.router.add_get("/api/match_markets/{league_key}/{event_id}", api_get_match_markets)
     app.router.add_get("/api/match_ai/{league_key}/{event_id}", api_get_match_ai)
+    app.router.add_get("/api/internal/line", api_internal_line)
+    app.router.add_post("/api/internal/notify_bet", api_internal_notify_bet)
     app.router.add_post("/api/action", api_handle_action)
     app.router.add_route("OPTIONS", "/{tail:.*}", handle_options)
     runner = web.AppRunner(app)
