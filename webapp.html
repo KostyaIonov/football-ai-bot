@@ -1784,6 +1784,11 @@
         const CURRENT_TG_UNAME = TG_USER_OBJ ? (TG_USER_OBJ.username || TG_USER_OBJ.first_name || '') : '';
         const TG_INIT_DATA = (tg && tg.initData) ? tg.initData : '';
         const INITIAL_VIEW = urlParams.get('view') || '';
+        const INITIAL_START_PARAM = (
+            (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param)
+            || urlParams.get('startapp')
+            || ''
+        ).trim();
 
         const DEFAULT_CONTAINERS_CATALOG = {
             c_1: { id: 'c_1', name: '📦 Гараж в Детройте', price: 1000, ico: '🏚️', desc: 'Старая электроника, забытый инструмент и гаражные находки', max_win: '3 200 FC' },
@@ -2157,7 +2162,105 @@
             }
             return { ok: false, error: 'Нестабильное соединение, повтори нажатие' };
         }
+        async function handleInitialDeepLink() {
+            const raw = INITIAL_START_PARAM || INITIAL_VIEW;
+            if (!raw || !APP_STATE) return false;
 
+            if (raw === 'live') {
+                openLiveCenterWidget();
+                return true;
+            }
+            if (raw === 'se') {
+                openSuperExpressModal();
+                return true;
+            }
+            if (raw === 'tourney') {
+                openTournamentModal();
+                return true;
+            }
+            if (raw === 'bm') {
+                switchTab('games');
+                const extrasBtn = document.querySelectorAll('#tab-games .sub-nav-btn')[3];
+                switchClubSub('extras', extrasBtn);
+                setTimeout(() => {
+                    const bmEl = document.getElementById('black-market-card');
+                    if (bmEl) bmEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 200);
+                return true;
+            }
+
+            // Формат из канала/чата: match--epl--712345 или pick--epl--712345--p1 (точка кодируется как d: tb_2d5)
+            const parts = raw.includes('--') ? raw.split('--') : raw.split('_');
+            if (parts[0] === 'match' && parts.length >= 3) {
+                const lKey = parts[1];
+                const evId = parts[2];
+                const found = (APP_STATE.matches || []).find(m => m.league_key === lKey && String(m.event_id) === String(evId));
+                if (found) {
+                    openMatchDetail(lKey, evId);
+                    return true;
+                }
+                showToast('Матч уже завершён или снят с линии', true);
+                return true;
+            }
+
+            if (parts[0] === 'pick' && parts.length >= 4) {
+                const lKey = parts[1];
+                const evId = parts[2];
+                const pickCode = parts.slice(3).join('_').replace(/(\d)d(\d)/g, '$1.$2');
+                const found = (APP_STATE.matches || []).find(m => m.league_key === lKey && String(m.event_id) === String(evId));
+                if (!found) {
+                    showToast('Матч из ссылки уже начался или завершён', true);
+                    return true;
+                }
+                let oddVal = (found.odds && found.odds[pickCode]) ? parseFloat(found.odds[pickCode]) : 0;
+                let pickLabel = pickCode === 'p1' ? `П1 (${found.home_team})`
+                    : (pickCode === 'x' ? 'Ничья' : (pickCode === 'p2' ? `П2 (${found.away_team})` : pickCode));
+
+                if (!oddVal || oddVal <= 1.0) {
+                    try {
+                        const r = await fetch(`/api/match_markets/${encodeURIComponent(lKey)}/${encodeURIComponent(evId)}?uid=${CURRENT_UID}`, {
+                            headers: { 'X-Telegram-Init-Data': TG_INIT_DATA }
+                        });
+                        const d = await r.json();
+                        if (d && d.ok && d.match) {
+                            const fm = d.match;
+                            if (fm.odds && fm.odds[pickCode]) oddVal = parseFloat(fm.odds[pickCode]);
+                            const allExtra = [
+                                ...(fm.specials_markets || []),
+                                ...(fm.half_markets || []),
+                                ...(fm.exact_scores || [])
+                            ];
+                            const foundExtra = allExtra.find(x => x.pick_code === pickCode);
+                            if (foundExtra) { oddVal = parseFloat(foundExtra.odds); pickLabel = foundExtra.label; }
+                            (fm.totals_markets || []).forEach(t => {
+                                if (t.tb_code === pickCode) { oddVal = parseFloat(t.tb_odd); pickLabel = t.tb_label; }
+                                if (t.tm_code === pickCode) { oddVal = parseFloat(t.tm_odd); pickLabel = t.tm_label; }
+                            });
+                        }
+                    } catch (e) {}
+                }
+
+                if (oddVal > 1.0) {
+                    SLIP_ITEMS = [{
+                        league_key: lKey,
+                        event_id: String(evId),
+                        pick_code: pickCode,
+                        pickLabel: pickLabel,
+                        oddVal: oddVal,
+                        teamsTitle: found.teams,
+                        is_live: Boolean(found.is_live)
+                    }];
+                    renderMatchesFeed();
+                    renderSlipUI();
+                    openSlipDrawer();
+                    showToast('⚡ Исход загружен в купон из канала!');
+                    return true;
+                }
+                openMatchDetail(lKey, evId);
+                return true;
+            }
+            return false;
+        }
         async function loadBootstrap() {
             if (!CURRENT_UID) {
                 document.getElementById('ui-username').textContent = 'Открой через бота';
@@ -2187,9 +2290,8 @@
                         BOOTSTRAP_DONE = true;
                         renderAll();
 
-                        if (INITIAL_VIEW === 'live') {
-                            openLiveCenterWidget();
-                        } else if (APP_STATE.user && APP_STATE.user.can_claim_bonus && !STREAK_POPUP_SHOWN) {
+                        const deepLinkHandled = await handleInitialDeepLink();
+                        if (!deepLinkHandled && APP_STATE.user && APP_STATE.user.can_claim_bonus && !STREAK_POPUP_SHOWN) {
                             STREAK_POPUP_SHOWN = true;
                             openStreakCalendarModal();
                         }
